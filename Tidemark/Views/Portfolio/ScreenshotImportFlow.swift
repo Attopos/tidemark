@@ -21,9 +21,6 @@ struct ScreenshotImportFlow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(tr("Import holdings — screenshot OCR"))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(DS.textPrimary)
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
@@ -33,20 +30,15 @@ struct ScreenshotImportFlow: View {
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(16)
-            Divider().overlay(DS.border)
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
 
             Group {
                 if let session {
                     switch session.phase {
                     case .recognizing:
-                        VStack(spacing: 12) {
-                            ProgressView().controlSize(.small)
-                            Text(tr("Recognizing text (Simplified Chinese + English)…"))
-                                .font(DS.body)
-                                .foregroundStyle(DS.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        ProgressView().controlSize(.small)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     case .review:
                         OCRReviewStage(session: session,
                                        onSave: { session.commit(into: context) },
@@ -180,9 +172,6 @@ struct ScreenshotImportFlow: View {
             Image(systemName: "text.viewfinder")
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(dropTargeted ? DS.accent : DS.textTertiary)
-            Text(tr("Drop Alipay or Binance holding screenshots here"))
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(DS.textPrimary)
             HStack(spacing: 10) {
                 Button(tr("Choose images…")) { showFilePicker = true }
                     .buttonStyle(AccentButtonStyle())

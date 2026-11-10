@@ -100,4 +100,30 @@ enum CurrencyService {
             context.insert(CurrencyRate(code: code.uppercased(), rate: rate, date: date, source: source))
         }
     }
+
+    // MARK: Live USD rate
+
+    /// Fetch today's USD→CNY reference rate (ECB data via frankfurter.app; no
+    /// key, nothing about the user is sent) when no fetched rate exists for
+    /// today. Failures keep the last known rate. USDT/USDC follow USD.
+    @MainActor
+    static func refreshUSDIfStale(in context: ModelContext) async {
+        let cal = Calendar.current
+        let all = (try? context.fetch(FetchDescriptor<CurrencyRate>())) ?? []
+        let hasToday = all.contains { $0.code.uppercased() == "USD" && !$0.isSeeded && cal.isDateInToday($0.date) }
+        guard !hasToday, let url = URL(string: "https://api.frankfurter.app/latest?from=USD&to=CNY") else { return }
+        struct Response: Decodable { let rates: [String: Double] }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
+            guard let cny = try JSONDecoder().decode(Response.self, from: data).rates["CNY"], cny > 1 else { return }
+            let rate = Decimal(string: String(format: "%.4f", cny)) ?? Decimal(cny)
+            for code in ["USD", "USDT", "USDC"] {
+                record(code: code, rate: rate, source: .market, in: context)
+            }
+            try? context.save()
+        } catch {
+            // Offline: the latest stored rate stays in effect.
+        }
+    }
 }

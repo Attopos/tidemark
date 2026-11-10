@@ -3,11 +3,14 @@ import SwiftData
 
 // MARK: - Portfolio — the app's single screen
 //
-// Mirrors the structure of the user's web portfolio-tracker: a total-value
-// hero, an allocation donut, and a holdings table with a total row. Values
-// come from the latest dated valuation snapshot of each holding — nothing is
-// projected or fabricated. Rows are created/updated by the Alipay OCR flow;
-// right-click offers a manual balance correction and delete.
+// A total-value hero, an allocation donut by risk exposure, and a holdings
+// table grouped two levels deep: exposure (US equity, crypto, gold…), then
+// the individual holdings. Each holding keeps its own currency (a Binance
+// coin in USD, an Alipay fund in CNY); totals, shares and the donut convert
+// everything to the chosen display currency (CNY or USD) with the dated rate
+// of each valuation. Values come from the latest valuation snapshot — nothing
+// is projected or fabricated. Right-click: exposure override, manual balance
+// correction, delete.
 
 struct PortfolioView: View {
     @Environment(AppState.self) private var app
@@ -30,7 +33,15 @@ struct PortfolioView: View {
         let nativeValue: Decimal?
         let baseValue: Decimal
         let updated: Date?
-        var color: Color = DS.categoricalOther
+        let exposure: Exposure
+        var color: Color { exposure.color }
+    }
+
+    private struct ExposureGroup: Identifiable {
+        let exposure: Exposure
+        let rows: [Row]
+        var id: String { exposure.rawValue }
+        var baseValue: Decimal { rows.filter { $0.nativeValue != nil }.reduce(0) { $0 + $1.baseValue } }
     }
 
     private var rows: [Row] {
@@ -48,18 +59,21 @@ struct PortfolioView: View {
                        currency: currency,
                        nativeValue: latest?.marketValue,
                        baseValue: latest.map { converter.toBase($0.marketValue, currency, at: $0.date) } ?? 0,
-                       updated: latest?.date)
+                       updated: latest?.date,
+                       exposure: holding.asset?.exposure ?? .other)
         }
         built.sort { lhs, rhs in
             if (lhs.nativeValue == nil) != (rhs.nativeValue == nil) { return rhs.nativeValue == nil }
             return lhs.baseValue > rhs.baseValue
         }
-        for index in built.indices {
-            built[index].color = index < DS.categorical.count && built[index].nativeValue != nil
-                ? DS.categorical[index]
-                : DS.categoricalOther
-        }
         return built
+    }
+
+    /// Level 1: exposures by value; level 2: holdings by value.
+    private var groups: [ExposureGroup] {
+        Dictionary(grouping: rows, by: \.exposure)
+            .map { ExposureGroup(exposure: $0.key, rows: $0.value) }
+            .sorted { $0.baseValue > $1.baseValue }
     }
 
     private var valuedRows: [Row] { rows.filter { $0.nativeValue != nil } }
@@ -67,16 +81,16 @@ struct PortfolioView: View {
     private var asOf: Date? { valuedRows.compactMap(\.updated).max() }
 
     private var donutSlices: [AllocationSlice] {
-        let ranked = valuedRows.filter { $0.baseValue > 0 }
-        guard !ranked.isEmpty else { return [] }
-        if ranked.count <= Self.maxDonutSegments {
-            return ranked.map { AllocationSlice(label: $0.name, value: $0.baseValue, color: $0.color) }
-        }
-        var slices = ranked.prefix(Self.maxDonutSegments - 1)
-            .map { AllocationSlice(label: $0.name, value: $0.baseValue, color: $0.color) }
-        let rest = ranked.dropFirst(Self.maxDonutSegments - 1).reduce(Decimal(0)) { $0 + $1.baseValue }
-        slices.append(AllocationSlice(label: tr("Others"), value: rest, color: DS.categoricalOther))
-        return slices
+        groups.filter { $0.baseValue > 0 }
+            .map { AllocationSlice(label: $0.exposure.displayName, value: $0.baseValue, color: $0.exposure.color) }
+    }
+
+    /// "1 USD = ¥7.12" for the hero, from the latest stored rate.
+    private var rateCaption: String? {
+        let converter = CurrencyConverter(rates: rates, base: "CNY")
+        guard rows.contains(where: { $0.currency.uppercased() != "CNY" }) || app.baseCurrency != "CNY",
+              let usd = converter.rateToCNY("USD") else { return nil }
+        return "1 USD = ¥" + NSDecimalNumber(decimal: usd.rounded(4)).stringValue
     }
 
     var body: some View {
@@ -137,6 +151,7 @@ struct PortfolioView: View {
                     .foregroundStyle(DS.textPrimary)
                     .kerning(-0.6)
                 Spacer()
+                currencyPicker
                 if !compact {
                     importButton
                 }
@@ -147,6 +162,19 @@ struct PortfolioView: View {
             }
         }
         .padding(.bottom, 6)
+    }
+
+    private var currencyPicker: some View {
+        @Bindable var app = app
+        return Picker("", selection: $app.baseCurrency) {
+            ForEach(AppState.baseCurrencies, id: \.self) { code in
+                Text("\(Fmt.symbol(for: code)) \(code)").tag(code)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help(tr("Display currency for totals and allocation"))
     }
 
     private var importButton: some View {
@@ -177,7 +205,7 @@ struct PortfolioView: View {
             Text(tr("No holdings yet"))
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(DS.textPrimary)
-            Text(tr("Import an Alipay screenshot to get started."))
+            Text(tr("Import a holdings screenshot to get started."))
                 .font(DS.body)
                 .foregroundStyle(DS.textSecondary)
                 .multilineTextAlignment(.center)
@@ -211,10 +239,16 @@ struct PortfolioView: View {
                 .foregroundStyle(DS.heroInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            Text(trf("%d assets", valuedRows.count))
-                .font(DS.caption)
-                .foregroundStyle(DS.heroInkSecondary)
-                .padding(.top, 6)
+            HStack(spacing: 10) {
+                Text(trf("%d assets", valuedRows.count))
+                if let rateCaption {
+                    Text("·")
+                    Text(rateCaption)
+                }
+            }
+            .font(DS.caption)
+            .foregroundStyle(DS.heroInkSecondary)
+            .padding(.top, 6)
         }
         .padding(22)
         .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
@@ -240,23 +274,25 @@ struct PortfolioView: View {
                     }
                 }
                 .padding(.bottom, 4)
-                ForEach(rows) { row in
-                    HoldingRow(row: row,
-                               share: total > 0 && row.nativeValue != nil
-                                   ? (row.baseValue / total).doubleValue : nil,
-                               baseCurrency: app.baseCurrency,
-                               compact: compact,
-                               valueWidth: compact ? 148 : valueWidth,
-                               shareWidth: shareWidth, updatedWidth: updatedWidth)
-                        .contextMenu {
-                            Button(tr("Update balance…")) { editingHolding = row.holding }
-                            Divider()
-                            Button(tr("Delete holding"), role: .destructive) {
-                                pendingDelete = row.holding
-                                deleteConfirmPresented = true
-                            }
-                        }
-                    Divider().overlay(DS.border.opacity(0.6))
+                ForEach(groups) { group in
+                    ExposureHeader(group: group,
+                                   share: total > 0 ? (group.baseValue / total).doubleValue : nil,
+                                   baseCurrency: app.baseCurrency,
+                                   valueWidth: compact ? 148 : valueWidth,
+                                   shareWidth: shareWidth,
+                                   updatedWidth: compact ? 0 : updatedWidth)
+                    ForEach(group.rows) { row in
+                        HoldingRow(row: row,
+                                   share: total > 0 && row.nativeValue != nil
+                                       ? (row.baseValue / total).doubleValue : nil,
+                                   baseCurrency: app.baseCurrency,
+                                   compact: compact,
+                                   valueWidth: compact ? 148 : valueWidth,
+                                   shareWidth: shareWidth, updatedWidth: updatedWidth)
+                            .padding(.leading, 14)
+                            .contextMenu { rowMenu(row) }
+                        Divider().overlay(DS.border.opacity(0.4)).padding(.leading, 14)
+                    }
                 }
                 HStack(spacing: 12) {
                     Text(tr("Total"))
@@ -272,6 +308,71 @@ struct PortfolioView: View {
                 }
                 .padding(.vertical, 11)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func rowMenu(_ row: Row) -> some View {
+        if let asset = row.holding.asset {
+            Menu(tr("Exposure")) {
+                ForEach(Exposure.allCases) { exposure in
+                    Button {
+                        asset.exposure = exposure
+                        try? context.save()
+                    } label: {
+                        if asset.exposure == exposure {
+                            Label(exposure.displayName, systemImage: "checkmark")
+                        } else {
+                            Text(exposure.displayName)
+                        }
+                    }
+                }
+                Divider()
+                Button(tr("Automatic")) {
+                    asset.exposureRaw = nil
+                    try? context.save()
+                }
+            }
+        }
+        Button(tr("Update balance…")) { editingHolding = row.holding }
+        Divider()
+        Button(tr("Delete holding"), role: .destructive) {
+            pendingDelete = row.holding
+            deleteConfirmPresented = true
+        }
+    }
+
+    private struct ExposureHeader: View {
+        let group: ExposureGroup
+        let share: Double?
+        let baseCurrency: String
+        let valueWidth: CGFloat
+        let shareWidth: CGFloat
+        let updatedWidth: CGFloat
+
+        var body: some View {
+            HStack(spacing: 12) {
+                Circle().fill(group.exposure.color).frame(width: 9, height: 9)
+                Text(group.exposure.displayName)
+                    .font(.system(size: 15.5, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Text("\(group.rows.count)")
+                    .font(DS.caption)
+                    .foregroundStyle(DS.textTertiary)
+                Spacer()
+                MoneyText(group.baseValue, baseCurrency, font: DS.money(15, weight: .semibold))
+                    .frame(width: valueWidth, alignment: .trailing)
+                Text(share.map { Fmt.percent($0, showSign: false) } ?? "—")
+                    .font(DS.moneySmall.weight(.semibold))
+                    .foregroundStyle(DS.textPrimary)
+                    .frame(width: shareWidth, alignment: .trailing)
+                if updatedWidth > 0 {
+                    Color.clear.frame(width: updatedWidth, height: 1)
+                }
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .padding(.horizontal, 4)
         }
     }
 
@@ -297,8 +398,8 @@ struct PortfolioView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(row.color)
-                        .frame(width: 4, height: 30)
+                        .fill(row.color.opacity(0.55))
+                        .frame(width: 3, height: 26)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.name)
                             .font(.system(size: 15, weight: .medium))
@@ -315,11 +416,12 @@ struct PortfolioView: View {
                     Spacer(minLength: compact ? 0 : 12)
                     VStack(alignment: .trailing, spacing: 2) {
                         if let native = row.nativeValue {
-                            MoneyText(row.baseValue, baseCurrency, font: DS.moneyTable)
+                            // Recorded currency first; the converted figure below.
+                            MoneyText(native, row.currency, font: DS.moneyTable)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.75)
                             if row.currency.uppercased() != baseCurrency.uppercased() {
-                                Text(Fmt.money(native, row.currency))
+                                Text("≈ " + Fmt.money(row.baseValue, baseCurrency))
                                     .font(.system(size: 12).monospacedDigit())
                                     .foregroundStyle(DS.textTertiary)
                             }

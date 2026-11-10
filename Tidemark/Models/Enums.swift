@@ -312,3 +312,84 @@ extension Calendar {
         dateComponents([.month], from: startOfMonth(for: a), to: startOfMonth(for: b)).month ?? 0
     }
 }
+
+// MARK: - Risk exposure
+//
+// What a holding is actually exposed to, independent of the wrapper: a CNY
+// QDII fund tracking the S&P 500 and a tokenized SPY on Binance are both US
+// equity; a gold ETF feeder fund is gold, not equity. This is the first level
+// of the portfolio view; holdings are the second. Guessed from name/ticker,
+// overridable per asset.
+
+enum Exposure: String, CaseIterable, Identifiable {
+    case usEquity
+    case chinaEquity
+    case intlEquity
+    case crypto
+    case gold
+    case bond
+    case cash
+    case other
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .usEquity: return tr("US equity")
+        case .chinaEquity: return tr("China equity")
+        case .intlEquity: return tr("Other intl equity")
+        case .crypto: return tr("Crypto")
+        case .gold: return tr("Gold")
+        case .bond: return tr("Bonds")
+        case .cash: return tr("Cash")
+        case .other: return tr("Other")
+        }
+    }
+
+    /// Fixed color per exposure so it never shifts with ranking.
+    var color: Color {
+        switch self {
+        case .usEquity: return DS.categorical[0]
+        case .chinaEquity: return DS.categorical[3]
+        case .intlEquity: return DS.categorical[4]
+        case .crypto: return DS.categorical[1]
+        case .gold: return Color(hex: 0xC9A646)
+        case .bond: return DS.categorical[5]
+        case .cash: return DS.categorical[2]
+        case .other: return DS.categoricalOther
+        }
+    }
+
+    static func guess(name: String, symbol: String, assetClass: AssetClass) -> Exposure {
+        let n = (name + " " + symbol).lowercased()
+        func has(_ words: [String]) -> Bool { words.contains { n.contains($0) } }
+        let sym = symbol.uppercased()
+
+        if ["USDT", "USDC", "FDUSD", "BUSD", "DAI"].contains(sym) || assetClass == .cash
+            || assetClass == .moneyMarket || has(["货币", "现金", "余额宝"]) { return .cash }
+        if ["PAXG", "XAUT", "GLD", "IAU"].contains(sym) || has(["黄金", "上海金", "gold"]) { return .gold }
+        if has(["债", "bond", "treasury"]) { return .bond }
+        if has(["纳斯达克", "标普", "道琼斯", "美国", "s&p", "nasdaq", "dow jones", "spdr", "qqq", "russell"])
+            || ["SPY", "QQQ", "VOO", "VTI", "IVV", "DIA", "AAPL", "MSFT", "NVDA", "TSLA", "GOOGL", "AMZN", "META"].contains(sym) {
+            return .usEquity
+        }
+        if assetClass == .crypto { return .crypto }
+        if has(["日经", "cac", "dax", "德国", "法国", "欧洲", "日本", "印度", "越南", "英国", "nikkei", "全球", "国际"]) {
+            return .intlEquity
+        }
+        if has(["沪深", "中证", "上证", "深证", "创业板", "科创", "恒生", "港股", "a股", "中国", "红利"])
+            || assetClass == .equity || assetClass == .mixedFund { return .chinaEquity }
+        return .other
+    }
+}
+
+extension Asset {
+    /// Override when set, otherwise the guess.
+    var exposure: Exposure {
+        get {
+            if let raw = exposureRaw, let chosen = Exposure(rawValue: raw) { return chosen }
+            return Exposure.guess(name: name, symbol: symbol, assetClass: assetClass)
+        }
+        set { exposureRaw = newValue.rawValue }
+    }
+}

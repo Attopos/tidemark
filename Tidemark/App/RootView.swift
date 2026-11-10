@@ -41,6 +41,7 @@ struct RootView: View {
         }
         .task {
             CurrencyService.ensureSeeds(in: context)
+            await CurrencyService.refreshUSDIfStale(in: context)
         }
     }
 

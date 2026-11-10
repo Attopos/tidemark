@@ -175,6 +175,8 @@ final class Asset {
     var currencyCode: String
     var note: String
     var createdAt: Date
+    /// User-chosen risk exposure (Exposure.rawValue); nil = guessed.
+    var exposureRaw: String? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \Holding.asset)
     var holdings: [Holding] = []

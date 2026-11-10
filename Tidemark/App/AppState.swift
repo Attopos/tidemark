@@ -5,13 +5,19 @@ import Observation
 // MARK: - App state
 //
 // The app does exactly two things: show the portfolio, and update it from
-// Alipay screenshots. State is accordingly
+// Alipay / Binance screenshots. State is accordingly
 // tiny: the UI language and the OCR import pipeline.
 
 @Observable
 final class AppState {
-    /// Display currency for all aggregates. Original amounts are preserved.
-    let baseCurrency = "CNY"
+    /// Display currencies offered for totals and allocation.
+    static let baseCurrencies = ["CNY", "USD"]
+
+    /// Display currency for totals and allocation (CNY by default). Each
+    /// holding is still recorded in its own currency.
+    var baseCurrency: String {
+        didSet { UserDefaults.standard.set(baseCurrency, forKey: "baseCurrency") }
+    }
 
     /// UI language — switches live, no relaunch.
     var language: AppLanguage {
@@ -28,6 +34,8 @@ final class AppState {
     init() {
         let savedLanguage = UserDefaults.standard.string(forKey: "appLanguage") ?? ""
         self.language = AppLanguage(rawValue: savedLanguage) ?? .english
+        let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
+        self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
         L10n.current = self.language
     }
 
