@@ -19,6 +19,8 @@ struct PortfolioView: View {
     @Query private var rates: [CurrencyRate]
 
     @State private var editingHolding: Holding?
+    /// Holding whose name is being edited inline.
+    @State private var renamingID: UUID?
     @State private var pendingDelete: Holding?
     @State private var deleteConfirmPresented = false
 
@@ -53,7 +55,7 @@ struct PortfolioView: View {
                 .joined(separator: " · ")
             return Row(id: holding.id,
                        holding: holding,
-                       name: holding.asset?.name ?? "—",
+                       name: holding.asset?.displayName ?? "—",
                        meta: meta,
                        currency: currency,
                        nativeValue: latest?.marketValue,
@@ -116,7 +118,7 @@ struct PortfolioView: View {
             BalanceSheet(holding: holding)
         }
         .confirmationDialog(
-            trf("Delete “%@”?", pendingDelete?.asset?.name ?? ""),
+            trf("Delete “%@”?", pendingDelete?.asset?.displayName ?? ""),
             isPresented: $deleteConfirmPresented,
             titleVisibility: .visible
         ) {
@@ -345,11 +347,21 @@ struct PortfolioView: View {
                                   baseCurrency: app.baseCurrency,
                                   valueWidth: valueWidth,
                                   shareWidth: shareWidth,
+                                  renamingID: $renamingID,
+                                  onRename: { row, newName in rename(row, to: newName) },
                                   menu: { rowMenu($0) })
                         .id(group.id)
                 }
             }
         }
+    }
+
+    /// Empty or the recognized name again → back to the recognized name.
+    private func rename(_ row: Row, to newName: String) {
+        guard let asset = row.holding.asset else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        asset.customName = trimmed.isEmpty || trimmed == asset.name ? nil : trimmed
+        try? context.save()
     }
 
     @ViewBuilder
@@ -375,6 +387,7 @@ struct PortfolioView: View {
                 }
             }
         }
+        Button(tr("Rename…")) { renamingID = row.id }
         Button(tr("Update balance…")) { editingHolding = row.holding }
         Divider()
         Button(tr("Delete holding"), role: .destructive) {
@@ -390,6 +403,8 @@ struct PortfolioView: View {
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
+        @Binding var renamingID: UUID?
+        let onRename: (Row, String) -> Void
         let menu: (Row) -> Menu
 
         private var groupRowMax: Double {
@@ -433,7 +448,13 @@ struct PortfolioView: View {
                                 scale: groupRowMax,
                                 baseCurrency: baseCurrency,
                                 valueWidth: valueWidth,
-                                shareWidth: shareWidth)
+                                shareWidth: shareWidth,
+                                renaming: renamingID == row.id,
+                                startRename: { renamingID = row.id },
+                                finishRename: { newName in
+                                    if let newName { onRename(row, newName) }
+                                    renamingID = nil
+                                })
                         .contextMenu { menu(row) }
                 }
             }
@@ -481,7 +502,12 @@ struct PortfolioView: View {
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
+        let renaming: Bool
+        let startRename: () -> Void
+        let finishRename: (String?) -> Void
         @State private var hovering = false
+        @State private var draft = ""
+        @FocusState private var focused: Bool
 
         private var stale: Bool {
             guard let updated = row.updated else { return true }
@@ -491,10 +517,31 @@ struct PortfolioView: View {
         var body: some View {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(row.name)
-                        .font(.system(size: 14.5, weight: .medium))
-                        .foregroundStyle(DS.textPrimary)
-                        .lineLimit(1)
+                    if renaming {
+                        TextField("", text: $draft)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 14.5, weight: .medium))
+                            .foregroundStyle(DS.textPrimary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(DS.panel)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(DS.accent, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .focused($focused)
+                            .onAppear { draft = row.name; focused = true }
+                            .onSubmit { finishRename(draft) }
+                            .onExitCommand { finishRename(nil) }
+                            .onChange(of: focused) { _, isFocused in
+                                if !isFocused && renaming { finishRename(draft) }
+                            }
+                    } else {
+                        Text(row.name)
+                            .font(.system(size: 14.5, weight: .medium))
+                            .foregroundStyle(DS.textPrimary)
+                            .lineLimit(1)
+                            .onTapGesture(count: 2) { startRename() }
+                            .help(tr("Double-click to rename"))
+                    }
                     HStack(spacing: 5) {
                         if !row.meta.isEmpty { Text(row.meta) }
                         if let updated = row.updated {
@@ -574,7 +621,7 @@ private struct BalanceSheet: View {
             Text(tr("Update balance"))
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(DS.textPrimary)
-            Text(holding.asset?.name ?? "—")
+            Text(holding.asset?.displayName ?? "—")
                 .font(DS.body)
                 .foregroundStyle(DS.textSecondary)
             HStack(spacing: 10) {

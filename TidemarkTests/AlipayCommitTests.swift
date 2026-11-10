@@ -110,3 +110,24 @@ final class AlipayCommitTests: XCTestCase {
         XCTAssertEqual(try context.fetch(FetchDescriptor<Holding>()).count, 1)
     }
 }
+
+@MainActor
+final class RenameTests: XCTestCase {
+    func testCustomNameDoesNotBreakImportMatching() throws {
+        let container = try TidemarkSchema.makeContainer(inMemory: true)
+        let context = ModelContext(container)
+        let asset = Asset(name: "某某标普500指数(QDII)A", symbol: "", assetClass: .equity)
+        context.insert(asset)
+        let holding = Holding(asset: asset, account: nil, source: .manual)
+        context.insert(holding)
+        asset.customName = "标普 500"
+        try context.save()
+
+        XCTAssertEqual(asset.displayName, "标普 500")
+        let draft = HoldingDraft(name: "某某标普500指数(QDII)A", code: nil, nameConfidence: 1, box: .zero)
+        XCTAssertEqual(ScreenshotImportSession.match(draft: draft, in: [holding])?.id, holding.id,
+                       "re-import matches on the recognized name, not the custom one")
+        asset.customName = "  "
+        XCTAssertEqual(asset.displayName, "某某标普500指数(QDII)A")
+    }
+}

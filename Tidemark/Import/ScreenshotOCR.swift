@@ -520,7 +520,7 @@ final class ScreenshotImportSession {
                 flaggedFields: flagged,
                 sourceBox: draft.box,
                 matchedHoldingID: match?.id,
-                matchedLabel: match.map { "\($0.asset?.name ?? "holding") · \($0.account?.name ?? "")" },
+                matchedLabel: match.map { "\($0.asset?.displayName ?? "holding") · \($0.account?.name ?? "")" },
                 platform: draft.platform,
                 excludedReason: draft.excludedAsCash ? tr("Cash (stablecoin) · excluded") : nil
             )

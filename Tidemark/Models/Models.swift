@@ -177,6 +177,14 @@ final class Asset {
     var createdAt: Date
     /// User-chosen risk exposure (Exposure.rawValue); nil = guessed.
     var exposureRaw: String? = nil
+    /// User-chosen display name; `name` stays as recognized so later
+    /// imports still match this asset.
+    var customName: String? = nil
+
+    var displayName: String {
+        if let customName, !customName.trimmingCharacters(in: .whitespaces).isEmpty { return customName }
+        return name
+    }
 
     @Relationship(deleteRule: .cascade, inverse: \Holding.asset)
     var holdings: [Holding] = []
