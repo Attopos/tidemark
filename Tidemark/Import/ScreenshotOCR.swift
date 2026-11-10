@@ -4,10 +4,11 @@ import Vision
 import SwiftData
 import Observation
 
-// MARK: - Alipay screenshot OCR
+// MARK: - Holdings screenshot OCR (Alipay funds, Binance assets)
 //
-// Pipeline: NSImage → Vision text recognition (zh-Hans + en) → layout parser
-// that groups observations into fund cards → editable review drafts → explicit
+// Pipeline: NSImage → Vision text recognition (zh-Hans + en) → platform layout
+// parser (Alipay fund cards or Binance asset rows, chosen per screenshot; see
+// BinanceScreenshotParser.swift) → editable review drafts → explicit
 // user confirmation → holdings + dated valuation snapshots. Uncertain fields
 // are flagged, never silently written. If a screenshot only shows a value, we
 // store a dated valuation — units/cost are never invented.
@@ -36,7 +37,7 @@ enum OCRError: LocalizedError {
 
 // MARK: Vision wrapper
 
-enum AlipayOCRService {
+enum ScreenshotOCRService {
     static func recognize(image: NSImage) async throws -> [RecognizedLine] {
         var rect = CGRect(origin: .zero, size: image.size)
         guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
@@ -99,6 +100,9 @@ struct HoldingDraft: Identifiable {
     var costBasis: OCRField?
     /// Union of contributing boxes (Vision coordinates) for the overlay.
     var box: CGRect
+    var platform: ScreenshotPlatform = .alipay
+    /// Stablecoin cash (USDT/USDC): parsed, but not imported unless opted in.
+    var excludedAsCash = false
 
     var hasAnyValue: Bool {
         marketValue != nil || quantity != nil || unitNAV != nil || profit != nil
@@ -110,10 +114,11 @@ struct HoldingDraft: Identifiable {
     }
 }
 
-struct AlipayParseOutput {
+struct ScreenshotParseOutput {
     var drafts: [HoldingDraft]
     var accountTotal: OCRField?
     var lines: [RecognizedLine]
+    var platform: ScreenshotPlatform = .alipay
 }
 
 // MARK: Layout parser (pure — unit-testable without Vision)
@@ -199,14 +204,14 @@ enum AlipayScreenshotParser {
         }
         // Comma-grouped form must contain at least one comma group, otherwise
         // the plain form takes the whole digit run ("5200" must not parse as 520).
-        guard let regex = try? NSRegularExpression(pattern: #"[-+]?[¥￥]?\s?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|[-+]?[¥￥]?\s?\d+(?:\.\d+)?%?"#) else { return nil }
+        guard let regex = try? NSRegularExpression(pattern: #"[-+]?\s?[¥￥$]?\s?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|[-+]?\s?[¥￥$]?\s?\d+(?:\.\d+)?%?"#) else { return nil }
         let range = NSRange(normalized.startIndex..., in: normalized)
         guard let match = regex.firstMatch(in: normalized, range: range),
               let swiftRange = Range(match.range, in: normalized) else { return nil }
         var token = String(normalized[swiftRange])
         let isPercent = token.hasSuffix("%")
         token = token.replacingOccurrences(of: "%", with: "")
-        token = token.replacingOccurrences(of: "[¥￥,\\s+]", with: "", options: .regularExpression)
+        token = token.replacingOccurrences(of: "[¥￥$,\\s+]", with: "", options: .regularExpression)
         guard let value = Decimal(string: token, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
         return (value, isPercent)
     }
@@ -257,7 +262,7 @@ enum AlipayScreenshotParser {
         return rows.map { $0.sorted { $0.box.minX < $1.box.minX } }
     }
 
-    static func parse(lines: [RecognizedLine]) -> AlipayParseOutput {
+    static func parse(lines: [RecognizedLine]) -> ScreenshotParseOutput {
         let rows = groupRows(lines)
         var drafts: [HoldingDraft] = []
         var accountTotal: OCRField?
@@ -366,7 +371,7 @@ enum AlipayScreenshotParser {
             }
         }
         flush()
-        return AlipayParseOutput(drafts: drafts, accountTotal: accountTotal, lines: lines)
+        return ScreenshotParseOutput(drafts: drafts, accountTotal: accountTotal, lines: lines)
     }
 
     private static func resolved(_ kind: FieldKind, isPercent: Bool) -> FieldKind {
@@ -400,7 +405,7 @@ enum AlipayScreenshotParser {
 
 @MainActor
 @Observable
-final class AlipayOCRSession {
+final class ScreenshotImportSession {
     enum Phase: Equatable {
         case recognizing
         case review
@@ -425,6 +430,11 @@ final class AlipayOCRSession {
         /// Existing holding this draft matched (by code, then name); nil = new.
         var matchedHoldingID: UUID?
         var matchedLabel: String?
+        var platform: ScreenshotPlatform = .alipay
+        /// Why this row is unchecked by default (e.g. stablecoin cash).
+        var excludedReason: String?
+
+        var currencySymbol: String { Fmt.symbol(for: platform.currencyCode) }
     }
 
     let images: [NSImage]
@@ -432,6 +442,7 @@ final class AlipayOCRSession {
     private(set) var lines: [RecognizedLine] = []
     var holdings: [EditableHolding] = []
     var accountTotalText: String = ""
+    var accountTotalCurrency = "CNY"
     var valuationDate = Date()
     var savedSummary = ""
     var showBoxes = true
@@ -448,11 +459,14 @@ final class AlipayOCRSession {
         var collectedLines: [RecognizedLine] = []
         for image in images {
             do {
-                let recognized = try await AlipayOCRService.recognize(image: image)
+                let recognized = try await ScreenshotOCRService.recognize(image: image)
                 if collectedLines.isEmpty { collectedLines = recognized }
-                let output = AlipayScreenshotParser.parse(lines: recognized)
+                let output = ScreenshotParser.parse(lines: recognized)
                 allDrafts.append(contentsOf: output.drafts)
-                if total == nil { total = output.accountTotal }
+                if total == nil, let found = output.accountTotal {
+                    total = found
+                    accountTotalCurrency = output.platform.currencyCode
+                }
             } catch {
                 phase = .failed(error.localizedDescription)
                 return
@@ -464,6 +478,7 @@ final class AlipayOCRSession {
         var merged: [HoldingDraft] = []
         for draft in allDrafts {
             if let index = merged.firstIndex(where: { existing in
+                guard existing.platform == draft.platform else { return false }
                 if let c1 = existing.code, let c2 = draft.code { return c1 == c2 }
                 return Self.normalizeName(existing.name) == Self.normalizeName(draft.name)
             }) {
@@ -490,26 +505,31 @@ final class AlipayOCRSession {
                 return NSDecimalNumber(decimal: f.value.rounded(decimals)).stringValue
             }
             let match = Self.match(draft: draft, in: existingHoldings)
+            // Crypto quantities and prices need far more than 4 decimals.
+            let fine = draft.platform == .binance ? 10 : 4
             return EditableHolding(
+                include: !draft.excludedAsCash,
                 name: draft.name,
                 code: draft.code ?? "",
                 marketValue: text(draft.marketValue, "marketValue"),
                 profit: text(draft.profit, "profit"),
                 returnRatePercent: text(draft.returnRatePercent, "returnRatePercent"),
-                quantity: text(draft.quantity, "quantity", decimals: 4),
-                unitNAV: text(draft.unitNAV, "unitNAV", decimals: 4),
+                quantity: text(draft.quantity, "quantity", decimals: fine),
+                unitNAV: text(draft.unitNAV, "unitNAV", decimals: fine),
                 costBasis: text(draft.costBasis, "costBasis"),
                 flaggedFields: flagged,
                 sourceBox: draft.box,
                 matchedHoldingID: match?.id,
-                matchedLabel: match.map { "\($0.asset?.name ?? "holding") · \($0.account?.name ?? "")" }
+                matchedLabel: match.map { "\($0.asset?.name ?? "holding") · \($0.account?.name ?? "")" },
+                platform: draft.platform,
+                excludedReason: draft.excludedAsCash ? tr("Cash (stablecoin) · excluded") : nil
             )
         }
         if let total {
             accountTotalText = NSDecimalNumber(decimal: total.value.rounded(2)).stringValue
         }
         phase = holdings.isEmpty && accountTotalText.isEmpty
-            ? .failed("No fund holdings were recognized. Try a clearer screenshot of the Alipay holdings list (持有页面).")
+            ? .failed(tr("No holdings were recognized. Try a clearer screenshot of the Alipay holdings list (持有页面) or the Binance asset list."))
             : .review
     }
 
@@ -518,6 +538,8 @@ final class AlipayOCRSession {
     }
 
     static func match(draft: HoldingDraft, in holdings: [Holding]) -> Holding? {
+        // Never match across currencies (a USD "BTC" row must not update a CNY fund).
+        let holdings = holdings.filter { ($0.asset?.currencyCode ?? "CNY").uppercased() == draft.platform.currencyCode }
         if let code = draft.code, !code.isEmpty {
             if let byCode = holdings.first(where: { $0.asset?.symbol == code }) { return byCode }
         }
@@ -553,7 +575,7 @@ final class AlipayOCRSession {
         }
     }
 
-    static let defaultAccountName = "Alipay Funds"
+    static let defaultAccountName = ScreenshotPlatform.alipay.accountName
 
     static func normalizeAccountKey(_ name: String) -> String {
         name.lowercased().replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
@@ -564,27 +586,36 @@ final class AlipayOCRSession {
         var stats = CommitStats()
         let calendar = Calendar.current
 
-        // New holdings land in one standing investment account; matched
-        // holdings keep whichever account they already live in.
+        // New holdings land in one standing account per platform ("Alipay
+        // Funds" in CNY, "Binance" in USD); matched holdings keep whichever
+        // account they already live in.
         let allAccounts = try context.fetch(FetchDescriptor<Account>())
-        var cachedAccount: Account?
-        func destinationAccount() -> Account {
-            if let cachedAccount { return cachedAccount }
-            let key = Self.normalizeAccountKey(Self.defaultAccountName)
+        var accounts: [ScreenshotPlatform: Account] = [:]
+        func destinationAccount(_ platform: ScreenshotPlatform) -> Account {
+            if let cached = accounts[platform] { return cached }
+            let key = Self.normalizeAccountKey(platform.accountName)
             let account = allAccounts.first(where: {
-                $0.kind == .investment && Self.normalizeAccountKey($0.name) == key
+                $0.kind == platform.accountKind && Self.normalizeAccountKey($0.name) == key
             }) ?? {
-                let created = Account(name: Self.defaultAccountName, kind: .investment,
-                                      currencyCode: "CNY", source: .alipayOCR)
+                let created = Account(name: platform.accountName, kind: platform.accountKind,
+                                      currencyCode: platform.currencyCode, source: platform.source)
                 context.insert(created)
                 return created
             }()
-            cachedAccount = account
+            accounts[platform] = account
             return account
         }
 
-        let record = ImportRecord(source: .alipayOCR, fileName: "Screenshot · \(Fmt.dateMedium.string(from: valuationDate))")
-        context.insert(record)
+        // One import record per platform touched by this save.
+        var records: [ScreenshotPlatform: (record: ImportRecord, stats: CommitStats)] = [:]
+        func record(_ platform: ScreenshotPlatform) -> ImportRecord {
+            if let existing = records[platform] { return existing.record }
+            let created = ImportRecord(source: platform.source,
+                                       fileName: "\(platform.displayName) screenshot · \(Fmt.dateMedium.string(from: valuationDate))")
+            context.insert(created)
+            records[platform] = (created, CommitStats())
+            return created
+        }
 
         let allHoldings = try context.fetch(FetchDescriptor<Holding>())
         let allAssets = try context.fetch(FetchDescriptor<Asset>())
@@ -596,6 +627,8 @@ final class AlipayOCRSession {
         }
 
         for edited in holdings where edited.include {
+            let platform = edited.platform
+            let currency = platform.currencyCode
             let name = edited.name.trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else { continue }
             let code = edited.code.trimmingCharacters(in: .whitespaces)
@@ -607,32 +640,37 @@ final class AlipayOCRSession {
             let rate = decimal(edited.returnRatePercent)
             guard marketValue != nil || (quantity != nil && nav != nil) else { continue }
             let effectiveValue = marketValue ?? ((quantity ?? 0) * (nav ?? 0))
+            let importRecord = record(platform)
+            var local = records[platform]!.stats
 
             // Find or create the holding.
             let holding: Holding
             if let id = edited.matchedHoldingID, let matched = allHoldings.first(where: { $0.id == id }) {
                 holding = matched
-                stats.updated += 1
+                local.updated += 1
             } else {
+                let sameCurrency = allAssets.filter { $0.currencyCode.uppercased() == currency }
                 let asset: Asset
-                if !code.isEmpty, let byCode = allAssets.first(where: { $0.symbol == code }) {
+                if !code.isEmpty, let byCode = sameCurrency.first(where: { $0.symbol == code }) {
                     asset = byCode
-                } else if let byName = allAssets.first(where: { Self.normalizeName($0.name) == Self.normalizeName(name) }) {
+                } else if let byName = sameCurrency.first(where: { Self.normalizeName($0.name) == Self.normalizeName(name) }) {
                     asset = byName
                 } else {
-                    asset = Asset(name: name, symbol: code,
-                                  assetClass: AssetClass.guessFund(name: name), currencyCode: "CNY")
+                    let assetClass = platform == .binance
+                        ? BinanceScreenshotParser.assetClass(name: name, code: code)
+                        : AssetClass.guessFund(name: name)
+                    asset = Asset(name: name, symbol: code, assetClass: assetClass, currencyCode: currency)
                     context.insert(asset)
                 }
-                let account = destinationAccount()
+                let account = destinationAccount(platform)
                 if let existing = asset.holdings.first(where: { $0.account?.id == account.id && $0.isActive }) {
                     holding = existing
-                    stats.updated += 1
+                    local.updated += 1
                 } else {
-                    let created = Holding(asset: asset, account: account, source: .alipayOCR)
+                    let created = Holding(asset: asset, account: account, source: platform.source)
                     context.insert(created)
                     holding = created
-                    stats.created += 1
+                    local.created += 1
                 }
             }
 
@@ -649,47 +687,56 @@ final class AlipayOCRSession {
                 if let cost { sameDay.costBasis = cost }
                 if let profit { sameDay.unrealizedPL = profit }
                 if let rate { sameDay.returnRate = rate / 100 }
-                sameDay.sourceRaw = DataSource.alipayOCR.rawValue
-                stats.snapshotUpdates += 1
+                sameDay.sourceRaw = platform.source.rawValue
+                local.snapshotUpdates += 1
             } else {
                 let snap = HoldingSnapshot(holding: holding, date: valuationDate,
                                            marketValue: effectiveValue,
                                            quantity: quantity, unitNAV: nav, costBasis: cost,
                                            unrealizedPL: profit,
                                            returnRate: rate.map { $0 / 100 },
-                                           source: .alipayOCR)
-                snap.importRecord = record
+                                           source: platform.source)
+                snap.importRecord = importRecord
                 context.insert(snap)
-                stats.snapshots += 1
+                local.snapshots += 1
             }
 
-            // NAV becomes a price point for history.
+            // NAV / price becomes a price point for history.
             if let nav, let asset = holding.asset {
                 let hasSameDay = asset.prices.contains { calendar.isDate($0.date, inSameDayAs: valuationDate) }
                 if !hasSameDay {
                     context.insert(PricePoint(asset: asset, date: valuationDate, price: nav,
-                                              currencyCode: "CNY", source: .alipayOCR))
+                                              currencyCode: asset.currencyCode, source: platform.source))
                 }
             }
+            records[platform]!.stats = local
         }
 
-        record.inserted = stats.snapshots
-        record.skipped = stats.snapshotUpdates
-        record.summary = "\(stats.snapshots) valuations · \(stats.created) new holdings · \(stats.updated) updated"
-        record.status = .success
+        for (platform, entry) in records {
+            let (importRecord, local) = entry
+            stats.created += local.created
+            stats.updated += local.updated
+            stats.snapshots += local.snapshots
+            stats.snapshotUpdates += local.snapshotUpdates
 
-        let ocrRaw = DataSource.alipayOCR.rawValue
-        let stateFetch = FetchDescriptor<ImportSourceState>(predicate: #Predicate { $0.sourceRaw == ocrRaw })
-        let state = (try? context.fetch(stateFetch))?.first ?? {
-            let s = ImportSourceState(source: .alipayOCR)
-            context.insert(s)
-            return s
-        }()
-        state.lastSuccessAt = Date()
-        state.totalRecords += stats.snapshots
-        state.lastMessage = record.summary
-        state.isConnected = true
-        state.updatedAt = Date()
+            importRecord.inserted = local.snapshots
+            importRecord.skipped = local.snapshotUpdates
+            importRecord.summary = "\(local.snapshots) valuations · \(local.created) new holdings · \(local.updated) updated"
+            importRecord.status = .success
+
+            let sourceRaw = platform.source.rawValue
+            let stateFetch = FetchDescriptor<ImportSourceState>(predicate: #Predicate { $0.sourceRaw == sourceRaw })
+            let state = (try? context.fetch(stateFetch))?.first ?? {
+                let s = ImportSourceState(source: platform.source)
+                context.insert(s)
+                return s
+            }()
+            state.lastSuccessAt = Date()
+            state.totalRecords += local.snapshots
+            state.lastMessage = importRecord.summary
+            state.isConnected = true
+            state.updatedAt = Date()
+        }
 
         try context.save()
         return stats

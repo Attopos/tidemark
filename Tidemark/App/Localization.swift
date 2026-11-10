@@ -57,7 +57,7 @@ enum L10n {
     static let zh: [String: String] = [
         // Chrome & commands
         "Portfolio": "投资组合", "Settings": "设置",
-        "Import Alipay Screenshot…": "导入支付宝截图…",
+        "Import Holdings Screenshot…": "导入持仓截图…",
         "Import screenshot": "导入截图",
         "Drop screenshots to import": "拖放截图以导入",
 
@@ -79,6 +79,12 @@ enum L10n {
         // Alipay OCR flow
         "Import Alipay holdings — screenshot OCR": "导入支付宝持仓——截图 OCR",
         "Drop Alipay holding screenshots here": "把支付宝持仓截图拖到这里",
+        "Import holdings — screenshot OCR": "导入持仓——截图 OCR",
+        "Drop Alipay or Binance holding screenshots here": "把支付宝或币安持仓截图拖到这里",
+        "Cash (stablecoin) · excluded": "现金(稳定币) · 已排除",
+        "No holdings parsed — check the screenshot shows the holdings list.": "未解析到持仓——请确认截图是持仓列表。",
+        "No holdings were recognized. Try a clearer screenshot of the Alipay holdings list (持有页面) or the Binance asset list.": "未识别到持仓。请换一张更清晰的支付宝持有页面或币安资产列表截图。",
+        "Asset name": "资产名称", "Alipay": "支付宝",
         "Choose images…": "选择图片…", "Paste from clipboard": "从剪贴板粘贴",
         "Recognizing text (Simplified Chinese + English)…": "文字识别中…",
         "Saving holdings…": "保存持仓中…", "Saved to Portfolio": "已存入投资组合",
@@ -109,7 +115,7 @@ enum L10n {
     static let es: [String: String] = [
         // Chrome & commands
         "Portfolio": "Cartera", "Settings": "Ajustes",
-        "Import Alipay Screenshot…": "Importar captura de Alipay…",
+        "Import Holdings Screenshot…": "Importar captura de posiciones…",
         "Import screenshot": "Importar captura",
         "Drop screenshots to import": "Suelta capturas para importar",
 
@@ -131,6 +137,12 @@ enum L10n {
         // Alipay OCR flow
         "Import Alipay holdings — screenshot OCR": "Importar fondos de Alipay — OCR",
         "Drop Alipay holding screenshots here": "Suelta capturas de Alipay aquí",
+        "Import holdings — screenshot OCR": "Importar posiciones — OCR",
+        "Drop Alipay or Binance holding screenshots here": "Suelta capturas de Alipay o Binance aquí",
+        "Cash (stablecoin) · excluded": "Efectivo (stablecoin) · excluido",
+        "No holdings parsed — check the screenshot shows the holdings list.": "No se detectaron posiciones — verifica que la captura muestre la lista.",
+        "No holdings were recognized. Try a clearer screenshot of the Alipay holdings list (持有页面) or the Binance asset list.": "No se reconocieron posiciones. Prueba una captura más clara de Alipay o de la lista de activos de Binance.",
+        "Asset name": "Nombre del activo", "Alipay": "Alipay",
         "Choose images…": "Elegir imágenes…", "Paste from clipboard": "Pegar del portapapeles",
         "Recognizing text (Simplified Chinese + English)…": "Reconociendo texto…",
         "Saving holdings…": "Guardando…", "Saved to Portfolio": "Guardado en Cartera",

@@ -17,3 +17,4 @@ xcuserdata/
 
 # Real-account test fixtures (screenshots + expected values) stay local
 TidemarkTests/alipay-fixture-*
+TidemarkTests/binance-fixture-*

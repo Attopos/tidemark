@@ -193,7 +193,7 @@ final class AlipayParserTests: XCTestCase {
 
         let lines: [RecognizedLine]
         do {
-            lines = try await AlipayOCRService.recognize(image: image)
+            lines = try await ScreenshotOCRService.recognize(image: image)
         } catch {
             throw XCTSkip("Vision unavailable in this environment: \(error)")
         }

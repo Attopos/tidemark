@@ -15,8 +15,8 @@ final class AlipayCommitTests: XCTestCase {
     }
 
     private func editable(name: String, code: String = "", value: String,
-                          matched: Holding? = nil) -> AlipayOCRSession.EditableHolding {
-        AlipayOCRSession.EditableHolding(
+                          matched: Holding? = nil) -> ScreenshotImportSession.EditableHolding {
+        ScreenshotImportSession.EditableHolding(
             name: name, code: code, marketValue: value, profit: "", returnRatePercent: "",
             quantity: "", unitNAV: "", costBasis: "", flaggedFields: [], sourceBox: .zero,
             matchedHoldingID: matched?.id, matchedLabel: matched.map { $0.asset?.name ?? "" })
@@ -24,7 +24,7 @@ final class AlipayCommitTests: XCTestCase {
 
     func testCommitCreatesHoldingAndBalance() throws {
         let context = try makeContext()
-        let session = AlipayOCRSession(images: [])
+        let session = ScreenshotImportSession(images: [])
         session.holdings = [editable(name: "易方达蓝筹精选混合", code: "005827", value: "12,345.67")]
         session.commit(into: context)
 
@@ -32,7 +32,7 @@ final class AlipayCommitTests: XCTestCase {
         XCTAssertEqual(holdings.count, 1)
         XCTAssertEqual(holdings.first?.asset?.name, "易方达蓝筹精选混合")
         XCTAssertEqual(holdings.first?.asset?.symbol, "005827")
-        XCTAssertEqual(holdings.first?.account?.name, AlipayOCRSession.defaultAccountName)
+        XCTAssertEqual(holdings.first?.account?.name, ScreenshotImportSession.defaultAccountName)
         let snapshots = try context.fetch(FetchDescriptor<HoldingSnapshot>())
         XCTAssertEqual(snapshots.count, 1)
         XCTAssertEqual(snapshots.first?.marketValue, Decimal(string: "12345.67"))
@@ -42,7 +42,7 @@ final class AlipayCommitTests: XCTestCase {
         let context = try makeContext()
 
         // First screenshot: creates the entry.
-        let first = AlipayOCRSession(images: [])
+        let first = ScreenshotImportSession(images: [])
         first.valuationDate = Date(timeIntervalSinceNow: -3 * 86_400)
         first.holdings = [editable(name: "易方达蓝筹精选混合", code: "005827", value: "10000")]
         first.commit(into: context)
@@ -53,10 +53,10 @@ final class AlipayCommitTests: XCTestCase {
         let draft = HoldingDraft(name: "易方达蓝筹精选混合", code: "005827", nameConfidence: 1,
                                  marketValue: OCRField(value: 11000, confidence: 1, needsReview: false, sourceText: ""),
                                  box: .zero)
-        let match = AlipayOCRSession.match(draft: draft, in: existing)
+        let match = ScreenshotImportSession.match(draft: draft, in: existing)
         XCTAssertNotNil(match, "re-scan of the same fund must match the existing holding")
 
-        let second = AlipayOCRSession(images: [])
+        let second = ScreenshotImportSession(images: [])
         second.holdings = [editable(name: "易方达蓝筹精选混合", code: "005827", value: "11,000.00", matched: match)]
         second.commit(into: context)
 
@@ -72,13 +72,13 @@ final class AlipayCommitTests: XCTestCase {
         let context = try makeContext()
         let day = Date()
 
-        let first = AlipayOCRSession(images: [])
+        let first = ScreenshotImportSession(images: [])
         first.valuationDate = day
         first.holdings = [editable(name: "博时信用债纯债A", code: "050027", value: "5000")]
         first.commit(into: context)
 
         let existing = try context.fetch(FetchDescriptor<Holding>())
-        let second = AlipayOCRSession(images: [])
+        let second = ScreenshotImportSession(images: [])
         second.valuationDate = day
         second.holdings = [editable(name: "博时信用债纯债A", code: "050027", value: "5200", matched: existing.first)]
         second.commit(into: context)
@@ -91,7 +91,7 @@ final class AlipayCommitTests: XCTestCase {
     func testNameMatchWithoutCodeStillUpdates() throws {
         let context = try makeContext()
 
-        let first = AlipayOCRSession(images: [])
+        let first = ScreenshotImportSession(images: [])
         first.valuationDate = Date(timeIntervalSinceNow: -86_400)
         first.holdings = [editable(name: "天弘余额宝货币", value: "888.88")]
         first.commit(into: context)
@@ -100,10 +100,10 @@ final class AlipayCommitTests: XCTestCase {
         let draft = HoldingDraft(name: "天弘余额宝货币", code: nil, nameConfidence: 1,
                                  marketValue: OCRField(value: 900, confidence: 1, needsReview: false, sourceText: ""),
                                  box: .zero)
-        let match = AlipayOCRSession.match(draft: draft, in: existing)
+        let match = ScreenshotImportSession.match(draft: draft, in: existing)
         XCTAssertNotNil(match)
 
-        let second = AlipayOCRSession(images: [])
+        let second = ScreenshotImportSession(images: [])
         second.holdings = [editable(name: "天弘余额宝货币", value: "900", matched: match)]
         second.commit(into: context)
 

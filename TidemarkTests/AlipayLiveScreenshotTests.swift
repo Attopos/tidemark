@@ -78,7 +78,7 @@ final class AlipayLiveScreenshotTests: XCTestCase {
         let context = ModelContext(container)
 
         // ── Pass 1: recognize, merge across screenshots, review ──────────
-        let first = AlipayOCRSession(images: images)
+        let first = ScreenshotImportSession(images: images)
         await first.run(existingHoldings: [])
         guard case .review = first.phase else {
             return XCTFail("OCR did not reach review: \(first.phase)")
@@ -118,7 +118,7 @@ final class AlipayLiveScreenshotTests: XCTestCase {
         XCTAssertEqual(total1, expectedTotal, "sum of saved balances")
 
         // ── Pass 2: identical screenshots again → update, never duplicate ─
-        let second = AlipayOCRSession(images: images)
+        let second = ScreenshotImportSession(images: images)
         await second.run(existingHoldings: holdingsAfter1)
         guard case .review = second.phase else {
             return XCTFail("OCR pass 2 did not reach review: \(second.phase)")

@@ -2,26 +2,26 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-// MARK: - Alipay screenshot OCR flow
+// MARK: - Holdings screenshot OCR flow (Alipay funds, Binance assets)
 //
 // Drop/pick/paste screenshots → Vision OCR → review every parsed field beside
 // the original image (uncertain values flagged) → explicit confirm → dated
 // valuation snapshots, matched against existing holdings without duplication.
 
-struct AlipayImportFlow: View {
+struct ScreenshotImportFlow: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query private var allHoldings: [Holding]
 
-    @State private var session: AlipayOCRSession?
+    @State private var session: ScreenshotImportSession?
     @State private var showFilePicker = false
     @State private var dropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(tr("Import Alipay holdings — screenshot OCR"))
+                Text(tr("Import holdings — screenshot OCR"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
                 Spacer()
@@ -130,7 +130,7 @@ struct AlipayImportFlow: View {
     }
 
     private func start(_ images: [NSImage]) {
-        let newSession = AlipayOCRSession(images: images)
+        let newSession = ScreenshotImportSession(images: images)
         session = newSession
         let holdings = allHoldings.filter(\.isActive)
         Task { await newSession.run(existingHoldings: holdings) }
@@ -180,7 +180,7 @@ struct AlipayImportFlow: View {
             Image(systemName: "text.viewfinder")
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(dropTargeted ? DS.accent : DS.textTertiary)
-            Text(tr("Drop Alipay holding screenshots here"))
+            Text(tr("Drop Alipay or Binance holding screenshots here"))
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(DS.textPrimary)
             HStack(spacing: 10) {
@@ -205,7 +205,7 @@ struct AlipayImportFlow: View {
 // MARK: - Review stage
 
 private struct OCRReviewStage: View {
-    @Bindable var session: AlipayOCRSession
+    @Bindable var session: ScreenshotImportSession
     let onSave: () -> Void
     let onCancel: () -> Void
 
@@ -276,7 +276,7 @@ private struct OCRReviewStage: View {
                                 Text(tr("Account total detected:"))
                                     .font(DS.caption)
                                     .foregroundStyle(DS.textSecondary)
-                                Text("¥\(session.accountTotalText)")
+                                Text("\(Fmt.symbol(for: session.accountTotalCurrency))\(session.accountTotalText)")
                                     .font(DS.moneySmall)
                                     .foregroundStyle(DS.textPrimary)
                                 Spacer()
@@ -287,7 +287,7 @@ private struct OCRReviewStage: View {
                             DraftCard(holding: $holding)
                         }
                         if session.holdings.isEmpty {
-                            Text("No fund entries parsed — check the screenshot shows the holdings list.")
+                            Text(tr("No holdings parsed — check the screenshot shows the holdings list."))
                                 .font(DS.body)
                                 .foregroundStyle(DS.textTertiary)
                                 .padding(.top, 30)
@@ -357,7 +357,7 @@ private struct ScreenshotPane: View {
 // MARK: - Editable draft card
 
 private struct DraftCard: View {
-    @Binding var holding: AlipayOCRSession.EditableHolding
+    @Binding var holding: ScreenshotImportSession.EditableHolding
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -365,7 +365,7 @@ private struct DraftCard: View {
                 Toggle("", isOn: $holding.include)
                     .toggleStyle(.checkbox)
                     .labelsHidden()
-                TextField(tr("Fund name"), text: $holding.name)
+                TextField(holding.platform == .binance ? tr("Asset name") : tr("Fund name"), text: $holding.name)
                     .textFieldStyle(.plain)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
@@ -376,6 +376,16 @@ private struct DraftCard: View {
                     .foregroundStyle(DS.textSecondary)
                     .frame(width: 64)
                 Spacer()
+                if let reason = holding.excludedReason {
+                    Text(reason)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(DS.textSecondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(DS.textSecondary.opacity(0.12))
+                        .clipShape(Capsule())
+                        .help("Stablecoins are cash, not positions — tick the box to import anyway")
+                }
                 if let matched = holding.matchedLabel {
                     HStack(spacing: 4) {
                         Image(systemName: "link")
@@ -401,12 +411,22 @@ private struct DraftCard: View {
                 }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                fieldEditor("持有金额 · value ¥", $holding.marketValue, key: "marketValue")
-                fieldEditor("持有收益 · profit ¥", $holding.profit, key: "profit")
-                fieldEditor("收益率 · return %", $holding.returnRatePercent, key: "returnRatePercent")
-                fieldEditor("份额 · units", $holding.quantity, key: "quantity")
-                fieldEditor("净值 · NAV", $holding.unitNAV, key: "unitNAV")
-                fieldEditor("成本 · cost ¥", $holding.costBasis, key: "costBasis")
+                let sym = holding.currencySymbol
+                if holding.platform == .binance {
+                    fieldEditor("value \(sym)", $holding.marketValue, key: "marketValue")
+                    fieldEditor("PNL \(sym)", $holding.profit, key: "profit")
+                    fieldEditor("total cost \(sym)", $holding.costBasis, key: "costBasis")
+                    fieldEditor("amount", $holding.quantity, key: "quantity")
+                    fieldEditor("price \(sym)", $holding.unitNAV, key: "unitNAV")
+                    fieldEditor("return %", $holding.returnRatePercent, key: "returnRatePercent")
+                } else {
+                    fieldEditor("持有金额 · value \(sym)", $holding.marketValue, key: "marketValue")
+                    fieldEditor("持有收益 · profit \(sym)", $holding.profit, key: "profit")
+                    fieldEditor("收益率 · return %", $holding.returnRatePercent, key: "returnRatePercent")
+                    fieldEditor("份额 · units", $holding.quantity, key: "quantity")
+                    fieldEditor("净值 · NAV", $holding.unitNAV, key: "unitNAV")
+                    fieldEditor("成本 · cost \(sym)", $holding.costBasis, key: "costBasis")
+                }
             }
         }
         .padding(12)

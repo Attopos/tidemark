@@ -46,7 +46,7 @@ struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .newItem) {
             Divider()
-            Button(tr("Import Alipay Screenshot…")) {
+            Button(tr("Import Holdings Screenshot…")) {
                 app.ocrImportPresented = true
             }
             .keyboardShortcut("i", modifiers: .command)

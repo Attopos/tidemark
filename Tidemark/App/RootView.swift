@@ -29,7 +29,7 @@ struct RootView: View {
             if dropTargeted { DropHint() }
         }
         .sheet(isPresented: $app.ocrImportPresented) {
-            AlipayImportFlow()
+            ScreenshotImportFlow()
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             handleDrop(providers)
