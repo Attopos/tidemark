@@ -26,3 +26,14 @@ final class ExposureTests: XCTestCase {
         XCTAssertEqual(guess("某某基金", "", .other), .other, "'基金' alone is not gold")
     }
 }
+
+final class ShareBarTests: XCTestCase {
+    func testBarLengthIsProportional() {
+        let w: CGFloat = 80
+        XCTAssertEqual(PortfolioView.barLength(share: 0.28, scale: 0.28, width: w), 80)
+        XCTAssertEqual(PortfolioView.barLength(share: 0.07, scale: 0.28, width: w), 20, accuracy: 0.001)
+        XCTAssertEqual(PortfolioView.barLength(share: 0.035, scale: 0.28, width: w), 10, accuracy: 0.001)
+        XCTAssertEqual(PortfolioView.barLength(share: 0.002, scale: 0.28, width: w), 1, "tiny share keeps a 1pt sliver")
+        XCTAssertEqual(PortfolioView.barLength(share: 0, scale: 0.28, width: w), 0)
+    }
+}

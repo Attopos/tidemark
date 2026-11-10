@@ -138,7 +138,7 @@ struct SegmentBar: View {
                 ForEach(visible) { segment in
                     Capsule()
                         .fill(segment.color)
-                        .frame(width: max(height * 0.6, usable * segment.fraction))
+                        .frame(width: max(2, usable * segment.fraction))
                 }
                 let used = visible.reduce(0) { $0 + $1.fraction }
                 if used < 0.999 {

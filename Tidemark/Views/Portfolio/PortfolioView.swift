@@ -322,7 +322,7 @@ struct PortfolioView: View {
     // it. Freshness lives in the row's subtitle instead of its own column.
 
     private let valueWidth: CGFloat = 150
-    private let shareWidth: CGFloat = 130
+    private let shareWidth: CGFloat = 146
 
 
     private func holdingsCard(compact: Bool) -> some View {
@@ -453,6 +453,13 @@ struct PortfolioView: View {
         }
     }
 
+    /// Bar length proportional to share / scale (the group's largest share);
+    /// at least 1pt so a nonzero share is still visible.
+    static func barLength(share: Double, scale: Double, width: CGFloat) -> CGFloat {
+        guard share > 0, scale > 0 else { return 0 }
+        return max(1, width * CGFloat(min(share / scale, 1)))
+    }
+
     /// "29.7%" with a bar. The bar is scaled to `scale` (the largest share
     /// among its peers), so the biggest holding fills it and the rest are
     /// visibly proportional — raw shares of ~30% max would all look tiny.
@@ -461,17 +468,21 @@ struct PortfolioView: View {
         let color: Color
         var scale: Double = 1
         var bold = false
-        private let barWidth: CGFloat = 64
+        private let barWidth: CGFloat = 80
 
         var body: some View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 if let share {
-                    Capsule().fill(DS.panel)
+                    // Square-ended bars: rounded caps eat visible length on
+                    // short bars (a 16pt capsule reads well under 1/4 of 64pt).
+                    // No minimum length, so 0.1% and 0.2% stay distinguishable.
+                    RoundedRectangle(cornerRadius: 1.5).fill(DS.panel)
                         .frame(width: barWidth, height: 6)
                         .overlay(alignment: .leading) {
-                            Capsule().fill(color)
-                                .frame(width: max(4, barWidth * min(share / max(scale, 0.0001), 1)), height: 6)
+                            RoundedRectangle(cornerRadius: 1.5).fill(color)
+                                .frame(width: PortfolioView.barLength(share: share, scale: scale, width: barWidth),
+                                       height: 6)
                         }
                     Text(Fmt.percent(share, showSign: false))
                         .font(.system(size: 13.5, weight: bold ? .semibold : .regular).monospacedDigit())
