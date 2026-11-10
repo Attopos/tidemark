@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CoreImage
 
 // MARK: - Round asset icons
 //
@@ -7,6 +8,8 @@ import AppKit
 // variant), bundled as Resources/CryptoIcons/crypto-<ticker>.png and tinted
 // with the exposure color, so logos stay inside the two-hue palette instead
 // of bringing brand oranges and yellows.
+// Every icon is single-hue: logos are desaturated and tinted with the
+// exposure color (the app shows only violet and lime).
 // Index funds/ETFs: the icon of the index they track, detected from the name
 // or ticker (标普/S&P/SPY → S&P 500, 纳斯达克/QQQ → Nasdaq, DAX, CAC 40,
 // 日经/Nikkei, 黄金/上海金 → gold); see Resources/IndexIcons/SOURCES.md.
@@ -66,7 +69,7 @@ enum AssetIconStore {
     }
 
     /// Coins the icon set doesn't cover, matched by name or ticker (incl. a
-    /// common OCR misread), drawn in full color like a logo.
+    /// common OCR misread), drawn duotone like every other icon.
     private static let customCoins: [(names: [String], file: String)] = [
         (["币安人生", "市安人生"], "coin-binancelife"),
     ]
@@ -80,6 +83,30 @@ enum AssetIconStore {
               let image = NSImage(contentsOf: url) else { return nil }
         cache[rule.file] = image
         return image
+    }
+
+    /// Desaturate a logo and multiply it by `tint` (alpha kept), so any
+    /// brand mark renders in the app's palette. Baked into a bitmap rather
+    /// than SwiftUI filters so it's exact everywhere, and cached per tint.
+    static func duotone(_ image: NSImage, key: String, tint: NSColor) -> NSImage {
+        let rgb = tint.usingColorSpace(.sRGB) ?? tint
+        let cacheKey = "\(key)|\(Int(rgb.redComponent * 255)),\(Int(rgb.greenComponent * 255)),\(Int(rgb.blueComponent * 255))"
+        if let hit = cache[cacheKey] { return hit }
+        guard let tiff = image.tiffRepresentation, let input = CIImage(data: tiff) else { return image }
+        let gray = input.applyingFilter("CIColorControls", parameters: [
+            kCIInputSaturationKey: 0, kCIInputContrastKey: 1.15,
+        ])
+        let tinted = gray.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: rgb.redComponent, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: rgb.greenComponent, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: rgb.blueComponent, w: 0),
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+        ])
+        let context = CIContext()
+        guard let cg = context.createCGImage(tinted, from: input.extent) else { return image }
+        let result = NSImage(cgImage: cg, size: image.size)
+        cache[cacheKey] = result
+        return result
     }
 
     static func monogram(name: String, symbol: String) -> String {
@@ -97,34 +124,43 @@ struct AssetIcon: View {
     let symbol: String
     let color: Color
     var size: CGFloat = 30
-    /// Discs need a light tint for the knocked-out glyph to read.
-    var glyphTint: Color = DS.violetSoft
+
+    /// One tint per icon: the exposure color, lifted for the darkest
+    /// violets so marks stay readable on the dark panel.
+    private var tint: Color {
+        color == DS.violetDark || color == DS.violetDeep ? DS.violetSoft : color
+    }
+
+    /// Any logo → luminance only → multiplied by the tint: brand colors are
+    /// dropped, the mark's shape and light/dark structure stay.
+    private func duotone(_ image: NSImage, key: String, fill: Bool) -> some View {
+        Image(nsImage: AssetIconStore.duotone(image, key: key, tint: NSColor(tint)))
+            .resizable()
+            .interpolation(.high)
+            .aspectRatio(contentMode: fill ? .fill : .fit)
+            .padding(fill ? 0 : size * 0.2)
+            .frame(width: size, height: size)
+            .background(fill ? Color.clear : tint.opacity(0.12))
+            .clipShape(Circle())
+    }
 
     var body: some View {
         if let coin = AssetIconStore.customCoin(name: name, symbol: symbol) {
-            Image(nsImage: coin)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .clipShape(Circle())
+            duotone(coin, key: "coin|" + name, fill: true)
         } else if let mark = AssetIconStore.indexMark(name: name, symbol: symbol) {
             if mark.fills {
-                Image(nsImage: mark.image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
+                duotone(mark.image, key: "index|" + name + symbol, fill: true)
             } else {
+                // Transparent marks: the shape alone, in the tint, full strength.
                 Image(nsImage: mark.image)
+                    .renderingMode(.template)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .padding(size * 0.2)
+                    .foregroundStyle(tint)
+                    .padding(size * 0.22)
                     .frame(width: size, height: size)
-                    .background(Color(hex: 0x0E0E0E))
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
+                    .background(tint.opacity(0.12))
                     .clipShape(Circle())
             }
         } else if let image = AssetIconStore.cryptoImage(ticker: symbol) {
@@ -134,13 +170,12 @@ struct AssetIcon: View {
                 .renderingMode(.template)
                 .resizable()
                 .interpolation(.high)
-                .foregroundStyle(glyphTint)
+                .foregroundStyle(tint)
                 .frame(width: size, height: size)
         } else {
             Text(AssetIconStore.monogram(name: name, symbol: symbol))
                 .font(.system(size: size * 0.45, weight: .semibold))
-                // The darkest violet doesn't read as text on the dark panel.
-                .foregroundStyle(color == DS.violetDark || color == DS.violetDeep ? DS.violetSoft : color)
+                .foregroundStyle(tint)
                 .frame(width: size, height: size)
                 .background(color.opacity(0.16))
                 .overlay(Circle().strokeBorder(color.opacity(0.35), lineWidth: 1))
