@@ -320,7 +320,17 @@ struct PortfolioView: View {
     // it. Freshness lives in the row's subtitle instead of its own column.
 
     private let valueWidth: CGFloat = 150
-    private let shareWidth: CGFloat = 110
+    private let shareWidth: CGFloat = 130
+
+    /// Largest single holding / exposure share: the full length of a bar.
+    private var maxRowShare: Double {
+        guard total > 0 else { return 1 }
+        return valuedRows.map { ($0.baseValue / total).doubleValue }.max() ?? 1
+    }
+    private var maxGroupShare: Double {
+        guard total > 0 else { return 1 }
+        return groups.map { ($0.baseValue / total).doubleValue }.max() ?? 1
+    }
 
     private func holdingsCard(compact: Bool) -> some View {
         Panel(title: tr("Holdings"), icon: "list.bullet") {
@@ -343,6 +353,8 @@ struct PortfolioView: View {
                     ExposureBlock(group: group,
                                   share: total > 0 ? (group.baseValue / total).doubleValue : 0,
                                   total: total,
+                                  groupScale: maxGroupShare,
+                                  rowScale: maxRowShare,
                                   baseCurrency: app.baseCurrency,
                                   valueWidth: valueWidth,
                                   shareWidth: shareWidth,
@@ -388,6 +400,8 @@ struct PortfolioView: View {
         let group: ExposureGroup
         let share: Double
         let total: Decimal
+        let groupScale: Double
+        let rowScale: Double
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
@@ -414,9 +428,13 @@ struct PortfolioView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     MoneyText(group.baseValue, baseCurrency, font: DS.money(16, weight: .semibold))
                         .frame(width: valueWidth, alignment: .trailing)
-                    ShareCell(share: share, color: group.exposure.color, bold: true)
-                        .frame(width: shareWidth)
-                }
+                    // Group shares are already drawn in the overview bar; a second
+                    // bar scale here would make equal percentages look unequal.
+                    Text(Fmt.percent(share, showSign: false))
+                        .font(.system(size: 13.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(DS.textPrimary)
+                        .frame(width: shareWidth, alignment: .trailing)
+                    }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 13)
 
@@ -426,6 +444,7 @@ struct PortfolioView: View {
                     HoldingLine(row: row,
                                 share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
                                 color: group.exposure.color,
+                                scale: rowScale,
                                 baseCurrency: baseCurrency,
                                 valueWidth: valueWidth,
                                 shareWidth: shareWidth)
@@ -437,20 +456,25 @@ struct PortfolioView: View {
         }
     }
 
-    /// "29.7%" with a thin bar of the same share underneath-right.
+    /// "29.7%" with a bar. The bar is scaled to `scale` (the largest share
+    /// among its peers), so the biggest holding fills it and the rest are
+    /// visibly proportional — raw shares of ~30% max would all look tiny.
     private struct ShareCell: View {
         let share: Double?
         let color: Color
+        var scale: Double = 1
         var bold = false
+        private let barWidth: CGFloat = 64
 
         var body: some View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 if let share {
                     Capsule().fill(DS.panel)
-                        .frame(width: 44, height: 5)
+                        .frame(width: barWidth, height: 6)
                         .overlay(alignment: .leading) {
-                            Capsule().fill(color).frame(width: max(3, 44 * min(share, 1)), height: 5)
+                            Capsule().fill(color)
+                                .frame(width: max(4, barWidth * min(share / max(scale, 0.0001), 1)), height: 6)
                         }
                     Text(Fmt.percent(share, showSign: false))
                         .font(.system(size: 13.5, weight: bold ? .semibold : .regular).monospacedDigit())
@@ -467,6 +491,7 @@ struct PortfolioView: View {
         let row: PortfolioView.Row
         let share: Double?
         let color: Color
+        let scale: Double
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
@@ -517,7 +542,7 @@ struct PortfolioView: View {
                 }
                 .frame(width: valueWidth, alignment: .trailing)
 
-                ShareCell(share: share, color: color.opacity(0.7))
+                ShareCell(share: share, color: color.opacity(0.75), scale: scale)
                     .frame(width: shareWidth)
             }
             .padding(.horizontal, 16)
