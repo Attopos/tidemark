@@ -40,6 +40,9 @@ enum AssetIconStore {
         /// Wordmark on a light background: fitted, the background becomes
         /// the disc.
         case wordmark
+        /// Too wide to read as a fitted image at icon size: drawn as heavy
+        /// black text on the tint instead.
+        case text(String)
     }
 
     struct IndexMark {
@@ -52,7 +55,7 @@ enum AssetIconStore {
         ("sp500", ["标普", "s&p", "spdr s&p", "standard & poor"], ["SPY", "VOO", "IVV", "SPLG", "RSP"], .fill),
         ("dax", ["dax", "德国"], ["EWG", "DAX"], .wordmark),
         ("cac", ["cac", "法国"], ["EWQ"], .wordmark),
-        ("nikkei", ["日经", "nikkei", "日本"], ["EWJ", "DXJ"], .wordmark),
+        ("nikkei", ["日经", "nikkei", "日本"], ["EWJ", "DXJ"], .text("NIKKEI")),
         ("gold", ["黄金", "上海金", "gold"], ["GLD", "IAU", "PAXG", "XAUT"], .fill),
     ]
 
@@ -67,6 +70,7 @@ enum AssetIconStore {
 
     static func indexMark(name: String, symbol: String) -> IndexMark? {
         guard let (key, style) = indexKey(name: name, symbol: symbol) else { return nil }
+        if case .text = style { return IndexMark(image: NSImage(), style: style) }
         let cacheKey = "index-" + key
         if let hit = cache[cacheKey] { return IndexMark(image: hit, style: style) }
         guard let url = Bundle.main.url(forResource: cacheKey, withExtension: "png"),
@@ -174,6 +178,18 @@ struct AssetIcon: View {
             switch mark.style {
             case .fill:
                 duotone(mark.image, key: "index|" + name + symbol, fill: true)
+            case .text(let label):
+                Text(label)
+                    .font(.system(size: size * 0.25, weight: .black))
+                    .italic()
+                    .kerning(-0.3)
+                    .foregroundStyle(Color.black)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, size * 0.08)
+                    .frame(width: size, height: size)
+                    .background(tint)
+                    .clipShape(Circle())
             case .wordmark:
                 Image(nsImage: AssetIconStore.duotone(mark.image, key: "index|" + name + symbol, tint: NSColor(tint)))
                     .resizable()
