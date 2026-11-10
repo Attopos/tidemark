@@ -1,0 +1,19 @@
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad
+
+# macOS
+.DS_Store
+
+# Temporary
+*.swp
+*.tmp
+
+# Coverage
+*.profraw
+
+# Real-account test fixtures (screenshots + expected values) stay local
+TidemarkTests/alipay-fixture-*

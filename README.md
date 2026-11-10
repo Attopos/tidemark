@@ -1,0 +1,73 @@
+# Tidemark
+
+> A tidemark is the line the water leaves behind: proof of where the level
+> stood at a given moment, never a guess at where it is going.
+
+Tidemark is a deliberately small, native macOS app that does one thing: show
+what you own, as of the last time you checked. Drop in an Alipay fund
+screenshot and on-device OCR reads every holding; you confirm each field
+before anything is saved, and every value is kept as a dated snapshot, never
+projected or interpolated. Daily bookkeeping stays in iCost.
+
+Built with Swift, SwiftUI, Swift Charts, SwiftData, and the Vision framework.
+No Electron, no web views, no third-party dependencies.
+
+## What it does
+
+1. **Portfolio board** — total value in CNY, an allocation donut, and a
+   holdings table (value, share, last update) with a total row. Values come
+   from dated valuation snapshots; nothing is projected or fabricated.
+2. **Alipay screenshot OCR** (`⌘I`, drag-drop, or paste) — Vision reads your
+   fund list, you review every parsed field next to the screenshot, then
+   confirm. A recognized fund that already exists gets its balance updated
+   (same-day re-imports update in place, new dates keep history); an unknown
+   fund becomes a new entry. Low-confidence fields are flagged, never silently
+   written.
+
+Settings has exactly one option: language (English / 中文 / Español), switching
+live without relaunch. Right-click a holding to correct its balance by hand or
+delete it.
+
+To work alongside iCost, use macOS
+window tiling (Window → Move & Resize → Left & Right, or `fn ⌃ ←` / `fn ⌃ →`).
+
+## Build & run
+
+Requirements: **Xcode 16.4 or newer** (built with Xcode 26.4.1), macOS 15+.
+
+```bash
+open Tidemark.xcodeproj   # then press ⌘R
+```
+
+> **Note if this folder lives in a cloud-synced location (Google Drive, Dropbox):**
+> building *into* a synced folder lets the sync daemon's extended attributes break
+> code-signing. Use Xcode's default DerivedData, or pass
+> `-derivedDataPath ~/Library/Caches/tidemark-dd` to xcodebuild.
+
+Tests (OCR layout parser, number extraction, a live Vision round-trip, and the
+create-vs-update commit invariant):
+
+```bash
+xcodebuild -project Tidemark.xcodeproj -scheme Tidemark \
+  -derivedDataPath ~/Library/Caches/tidemark-dd test
+```
+
+The real-screenshot test needs three local, git-ignored fixtures in
+`TidemarkTests/`: `alipay-fixture-1.webp`, `alipay-fixture-2.webp`, and
+`alipay-fixture-expected.json` (the funds and amounts those screenshots show;
+the format is documented in `AlipayLiveScreenshotTests.swift`). Without them the
+test is skipped; the other OCR/parser/commit tests run independently.
+
+## Data
+
+Everything is stored locally in SwiftData
+(`~/Library/Containers/com.tidemark.app/…/default.store`). Builds from before
+the rename used the bundle identifier `com.personalfinanceos.app`; to carry that
+data over, quit Tidemark and copy `default.store*` from
+`~/Library/Containers/com.personalfinanceos.app/Data/Library/Application Support/`
+into the same path under `com.tidemark.app`. The schema
+still carries the tables of earlier, broader versions of the app (transactions
+imported from iCost, FX rate history, import records), so existing databases
+open unchanged; the UI reads and writes only assets, holdings, and their
+valuation snapshots. FX conversion for non-CNY holdings uses seeded approximate
+rates.
