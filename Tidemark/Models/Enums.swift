@@ -346,17 +346,27 @@ enum Exposure: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fixed color per exposure so it never shifts with ranking.
+    /// Color = risk family, shade = which market inside it. Fixed, never by rank.
     var color: Color {
         switch self {
-        case .usEquity: return DS.categorical[0]
-        case .chinaEquity: return DS.categorical[3]
-        case .intlEquity: return DS.categorical[4]
-        case .crypto: return DS.categorical[1]
-        case .gold: return Color(hex: 0xC9A646)
-        case .bond: return DS.categorical[5]
-        case .cash: return DS.categorical[2]
-        case .other: return DS.categoricalOther
+        case .usEquity: return DS.violet
+        case .chinaEquity: return DS.violetDeep
+        case .intlEquity: return DS.violetSoft
+        case .crypto: return DS.orange
+        case .gold: return DS.amber
+        case .bond: return DS.limeDeep
+        case .cash: return DS.lime
+        case .other: return DS.textTertiary
+        }
+    }
+
+    var family: RiskFamily {
+        switch self {
+        case .usEquity, .chinaEquity, .intlEquity: return .equity
+        case .crypto: return .crypto
+        case .gold: return .gold
+        case .bond, .cash: return .defensive
+        case .other: return .other
         }
     }
 
@@ -391,5 +401,30 @@ extension Asset {
             return Exposure.guess(name: name, symbol: symbol, assetClass: assetClass)
         }
         set { exposureRaw = newValue.rawValue }
+    }
+}
+
+/// What a color means across the app.
+enum RiskFamily: CaseIterable {
+    case equity, crypto, gold, defensive, other
+
+    var displayName: String {
+        switch self {
+        case .equity: return tr("Equity")
+        case .crypto: return tr("Crypto")
+        case .gold: return tr("Gold")
+        case .defensive: return tr("Cash & bonds")
+        case .other: return tr("Other")
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .equity: return DS.violet
+        case .crypto: return DS.orange
+        case .gold: return DS.amber
+        case .defensive: return DS.lime
+        case .other: return DS.textTertiary
+        }
     }
 }
