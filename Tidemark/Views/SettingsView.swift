@@ -9,15 +9,11 @@ struct SettingsView: View {
         @Bindable var app = app
         Form {
             Section(tr("Language")) {
-                Picker(tr("Language"), selection: $app.language) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.displayName).tag(language)
-                    }
-                }
-                .pickerStyle(.segmented)
+                CapsuleSwitch(options: AppLanguage.allCases, selection: $app.language) { $0.displayName }
             }
         }
         .formStyle(.grouped)
+        .tint(DS.accent)
         .frame(width: 440, height: 130)
         .id(app.language)
         .environment(\.locale, app.language.locale)

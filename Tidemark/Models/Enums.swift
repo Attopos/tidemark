@@ -346,26 +346,25 @@ enum Exposure: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Color = risk family, shade = which market inside it. Fixed, never by rank.
+    /// Color = risk family (violet risk assets, lime hedges & cash), shade =
+    /// which one inside it. Fixed, never by rank.
     var color: Color {
         switch self {
         case .usEquity: return DS.violet
-        case .chinaEquity: return DS.violetDeep
         case .intlEquity: return DS.violetSoft
-        case .crypto: return DS.orange
-        case .gold: return DS.amber
+        case .chinaEquity: return DS.violetDeep
+        case .crypto: return DS.violetDark
+        case .gold: return DS.lime
         case .bond: return DS.limeDeep
-        case .cash: return DS.lime
+        case .cash: return DS.limeSoft
         case .other: return DS.textTertiary
         }
     }
 
     var family: RiskFamily {
         switch self {
-        case .usEquity, .chinaEquity, .intlEquity: return .equity
-        case .crypto: return .crypto
-        case .gold: return .gold
-        case .bond, .cash: return .defensive
+        case .usEquity, .chinaEquity, .intlEquity, .crypto: return .risk
+        case .gold, .bond, .cash: return .hedge
         case .other: return .other
         }
     }
@@ -406,25 +405,28 @@ extension Asset {
 
 /// What a color means across the app.
 enum RiskFamily: CaseIterable {
-    case equity, crypto, gold, defensive, other
+    case risk, hedge, other
 
     var displayName: String {
         switch self {
-        case .equity: return tr("Equity")
-        case .crypto: return tr("Crypto")
-        case .gold: return tr("Gold")
-        case .defensive: return tr("Cash & bonds")
+        case .risk: return tr("Risk assets")
+        case .hedge: return tr("Hedges & cash")
         case .other: return tr("Other")
         }
     }
 
     var color: Color {
         switch self {
-        case .equity: return DS.violet
-        case .crypto: return DS.orange
-        case .gold: return DS.amber
-        case .defensive: return DS.lime
+        case .risk: return DS.violet
+        case .hedge: return DS.lime
         case .other: return DS.textTertiary
         }
+    }
+}
+
+extension Exposure {
+    /// Text color that reads on `color`.
+    var ink: Color {
+        self == .crypto || self == .chinaEquity ? .white : DS.ink
     }
 }

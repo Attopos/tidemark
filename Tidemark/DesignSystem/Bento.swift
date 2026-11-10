@@ -4,10 +4,10 @@ import SwiftUI
 //
 // Dark rounded cards on near-black, solid pastel category cards with dark
 // ink, a round black arrow badge, capsule allocation bars with a hatched
-// remainder. Every data color has one meaning (see RiskFamily):
-//   violet = equity (US solid, intl light, China deep)
-//   orange = crypto · amber = gold · lime = cash & bonds · gray = other
-// Lime also stays the interaction color (buttons), as in the reference.
+// remainder. Only two hues exist, each with one meaning (see RiskFamily):
+//   violet = risk assets (equities, crypto); shade = which market
+//   lime   = hedges & cash (gold, bonds, cash); shade = which kind
+// Gray is "other". Lime is also the interaction color (buttons, selection).
 
 extension DS {
     static let page = Color(hex: 0x141414)
@@ -19,8 +19,8 @@ extension DS {
     static let violet = Color(hex: 0xA98BFA)
     static let violetSoft = Color(hex: 0xCDBDFD)
     static let violetDeep = Color(hex: 0x7E5FE6)
-    static let orange = Color(hex: 0xFF8F57)
-    static let amber = Color(hex: 0xF5BD4F)
+    static let violetDark = Color(hex: 0x5E43B8)
+    static let limeSoft = Color(hex: 0xE9FAB0)
     static let lime = Color(hex: 0xD5F56B)
     static let limeDeep = Color(hex: 0x9CB84A)
     static let ink = Color(hex: 0x141414)
@@ -147,5 +147,61 @@ struct SegmentBar: View {
             }
         }
         .frame(height: height)
+    }
+}
+
+/// Two-option capsule switch in palette colors (replaces the system
+/// segmented control, which follows the macOS accent color).
+struct CapsuleSwitch<Value: Hashable>: View {
+    let options: [Value]
+    @Binding var selection: Value
+    let label: (Value) -> String
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.self) { option in
+                let selected = option == selection
+                Button { selection = option } label: {
+                    Text(label(option))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(selected ? DS.ink : DS.textSecondary)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 5)
+                        .background(selected ? DS.accent : Color.clear)
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(DS.tile)
+        .clipShape(Capsule())
+    }
+}
+
+/// Checkbox in palette colors (the system one follows the macOS accent).
+struct LimeCheckboxStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button { configuration.isOn.toggle() } label: {
+            HStack(spacing: 7) {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(configuration.isOn ? DS.accent : DS.tile)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(configuration.isOn ? Color.clear : DS.border, lineWidth: 1)
+                    )
+                    .overlay(
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(DS.ink)
+                            .opacity(configuration.isOn ? 1 : 0)
+                    )
+                    .frame(width: 17, height: 17)
+                configuration.label
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }

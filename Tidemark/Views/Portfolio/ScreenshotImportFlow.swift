@@ -214,16 +214,11 @@ private struct OCRReviewStage: View {
                                boxes: session.showBoxes ? session.holdings.filter(\.include).map(\.sourceBox) : [])
                 HStack {
                     if session.images.count > 1 {
-                        Picker("", selection: $session.currentImageIndex) {
-                            ForEach(0..<session.images.count, id: \.self) { index in
-                                Text(trf("Image %d", index + 1)).tag(index)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 180)
+                        CapsuleSwitch(options: Array(0..<session.images.count),
+                                      selection: $session.currentImageIndex) { trf("Image %d", $0 + 1) }
                     }
                     Toggle(tr("Show detections"), isOn: $session.showBoxes)
-                        .toggleStyle(.checkbox)
+                        .toggleStyle(LimeCheckboxStyle())
                         .font(DS.caption)
                         .foregroundStyle(DS.textSecondary)
                     Spacer()
@@ -352,7 +347,7 @@ private struct DraftCard: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
                 Toggle("", isOn: $holding.include)
-                    .toggleStyle(.checkbox)
+                    .toggleStyle(LimeCheckboxStyle())
                     .labelsHidden()
                 TextField(holding.platform == .binance ? tr("Asset name") : tr("Fund name"), text: $holding.name)
                     .textFieldStyle(.plain)

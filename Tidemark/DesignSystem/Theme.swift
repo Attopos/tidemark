@@ -51,24 +51,20 @@ enum DS {
     static let border       = Color(hex: 0x303134)
 
     // Financial semantics — polarity & status only, never series identity
-    static let finBlue      = Color(hex: 0x7597B8)   // neutral financial data
-    static let positive     = Color(hex: 0x568F74)   // gains
-    static let negative     = Color(hex: 0xC47D68)   // losses / overspending
-    static let warning      = Color(hex: 0xC9A16C)   // upcoming obligations
+    // Two-hue palette: only violet and lime exist in the UI.
+    static let finBlue      = Color(hex: 0xA98BFA)   // neutral financial data (violet)
+    static let positive     = Color(hex: 0xD5F56B)   // gains (lime)
+    static let negative     = Color(hex: 0xCDBDFD)   // losses (soft violet)
+    static let warning      = Color(hex: 0xCDBDFD)   // needs attention / stale (soft violet)
 
     /// Categorical identity ramp for charts (allocation, categories).
     /// Fixed assignment order; index ≥ count folds into `categoricalOther`.
     /// Validated: OKLCH L 0.48–0.67, C ≥ 0.10, CVD ΔE pass vs dark surface.
     static let categorical: [Color] = [
-        Color(hex: 0x5B97D3),  // blue
-        Color(hex: 0xAD6723),  // amber
-        Color(hex: 0x3AA273),  // green
-        Color(hex: 0xB4514C),  // red
-        Color(hex: 0x9577C7),  // purple
-        Color(hex: 0x00A0A1),  // teal
-        Color(hex: 0xA54B82),  // pink
+        Color(hex: 0xA98BFA), Color(hex: 0xD5F56B), Color(hex: 0x7E5FE6),
+        Color(hex: 0x9CB84A), Color(hex: 0xCDBDFD), Color(hex: 0xE9FAB0), Color(hex: 0x5E43B8),
     ]
-    static let categoricalOther = Color(hex: 0x8A8F98)
+    static let categoricalOther = Color(hex: 0x6B6C70)
 
     static func categoryColor(_ index: Int) -> Color {
         index >= 0 && index < categorical.count ? categorical[index] : categoricalOther

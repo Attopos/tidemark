@@ -157,14 +157,9 @@ struct PortfolioView: View {
 
     private var currencyPicker: some View {
         @Bindable var app = app
-        return Picker("", selection: $app.baseCurrency) {
-            ForEach(AppState.baseCurrencies, id: \.self) { code in
-                Text("\(Fmt.symbol(for: code)) \(code)").tag(code)
-            }
+        return CapsuleSwitch(options: AppState.baseCurrencies, selection: $app.baseCurrency) { code in
+            "\(Fmt.symbol(for: code)) \(code)"
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
         .help(tr("Display currency for totals and allocation"))
     }
 
@@ -294,16 +289,16 @@ struct PortfolioView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(group.exposure.displayName) (\(group.rows.count))")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(DS.ink)
+                    .foregroundStyle(group.exposure.ink)
                     .lineLimit(2)
                 Spacer(minLength: 22)
                 Text("\(tr("Share")) \(Fmt.percent(share, showSign: false))")
                     .font(.system(size: 13).monospacedDigit())
-                    .foregroundStyle(DS.ink.opacity(0.65))
+                    .foregroundStyle(group.exposure.ink.opacity(0.65))
                 HStack(alignment: .bottom) {
                     Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
                         .font(DS.money(26, weight: .bold))
-                        .foregroundStyle(DS.ink)
+                        .foregroundStyle(group.exposure.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     Spacer(minLength: 8)
@@ -431,7 +426,8 @@ struct PortfolioView: View {
                 MoneyText(group.baseValue, baseCurrency, font: DS.money(15, weight: .semibold))
                     .frame(width: valueWidth, alignment: .trailing)
                 TagChip(text: share.map { Fmt.percent($0, showSign: false) } ?? "—",
-                        color: group.exposure.color)
+                        // Darkest shades don't read as text on the dark panel.
+                        color: group.exposure.ink == .white ? DS.violetSoft : group.exposure.color)
                     .frame(width: shareWidth, alignment: .trailing)
                 if updatedWidth > 0 {
                     Color.clear.frame(width: updatedWidth, height: 1)

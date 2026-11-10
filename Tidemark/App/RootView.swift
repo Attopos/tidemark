@@ -25,11 +25,13 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .tint(DS.accent)
         .overlay {
             if dropTargeted { DropHint() }
         }
         .sheet(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
+                .tint(DS.accent)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             handleDrop(providers)
