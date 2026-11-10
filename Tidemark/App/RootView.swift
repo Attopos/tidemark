@@ -41,7 +41,12 @@ struct RootView: View {
         }
         .task {
             CurrencyService.ensureSeeds(in: context)
-            await CurrencyService.refreshUSDIfStale(in: context)
+            // Daily rate: check hourly while the app is open; only fetches
+            // when today's rate is missing, so it's one request per day.
+            while !Task.isCancelled {
+                await CurrencyService.refreshUSDIfStale(in: context)
+                try? await Task.sleep(for: .seconds(3600))
+            }
         }
     }
 

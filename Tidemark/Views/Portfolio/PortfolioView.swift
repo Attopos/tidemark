@@ -102,12 +102,16 @@ struct PortfolioView: View {
                     if rows.isEmpty {
                         emptyState
                     } else {
-                        hero
-                        if donutSlices.count > 1 {
-                            Card(title: tr("Allocation")) {
-                                AllocationDonut(slices: donutSlices, code: app.baseCurrency,
-                                                centerLabel: tr("Total"), diameter: 185)
+                        if compact {
+                            hero
+                            allocationCard
+                        } else {
+                            // One row: total on the left, allocation on the right.
+                            HStack(alignment: .top, spacing: DS.gridGap) {
+                                hero.frame(width: 340)
+                                allocationCard
                             }
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                         holdingsCard(compact: compact)
                     }
@@ -217,6 +221,16 @@ struct PortfolioView: View {
         .padding(32)
     }
 
+    @ViewBuilder
+    private var allocationCard: some View {
+        if donutSlices.count > 1 {
+            Card(title: tr("Allocation"), fillHeight: true) {
+                AllocationDonut(slices: donutSlices, code: app.baseCurrency,
+                                centerLabel: tr("Total"), diameter: 170)
+            }
+        }
+    }
+
     // MARK: Hero
 
     private var hero: some View {
@@ -251,7 +265,7 @@ struct PortfolioView: View {
             .padding(.top, 6)
         }
         .padding(22)
-        .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity, alignment: .topLeading)
         .background(DS.heroGradient)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }

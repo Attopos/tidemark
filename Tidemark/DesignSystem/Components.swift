@@ -48,13 +48,16 @@ struct Card<Content: View>: View {
     var title: String?
     var subtitle: String?
     var minHeight: CGFloat?
+    /// Stretch to the row's height (cards placed side by side).
+    var fillHeight = false
     @ViewBuilder var content: Content
 
     init(title: String? = nil, subtitle: String? = nil, minHeight: CGFloat? = nil,
-         @ViewBuilder content: () -> Content) {
+         fillHeight: Bool = false, @ViewBuilder content: () -> Content) {
         self.title = title
         self.subtitle = subtitle
         self.minHeight = minHeight
+        self.fillHeight = fillHeight
         self.content = content()
     }
 
@@ -73,7 +76,8 @@ struct Card<Content: View>: View {
             content
         }
         .padding(DS.cardPadding)
-        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: minHeight,
+               maxHeight: fillHeight ? .infinity : nil, alignment: .topLeading)
         .cardSurface()
     }
 }
