@@ -37,3 +37,19 @@ final class ShareBarTests: XCTestCase {
         XCTAssertEqual(PortfolioView.barLength(share: 0, scale: 0.28, width: w), 0)
     }
 }
+
+final class IndexIconTests: XCTestCase {
+    func testIndexDetection() {
+        func key(_ n: String, _ t: String = "") -> String? { AssetIconStore.indexKey(name: n, symbol: t)?.key }
+        XCTAssertEqual(key("南方纳斯达克100指数(QDII)A"), "nasdaq")
+        XCTAssertEqual(key("Invesco QQQ Trust, Series 1", "QQQ"), "nasdaq")
+        XCTAssertEqual(key("博时标普500ETF联接(QDII)A"), "sp500")
+        XCTAssertEqual(key("State Street SPDR S&P 500 ET", "SPY"), "sp500")
+        XCTAssertEqual(key("华安国际龙头(DAX)ETF联接(QDII)A"), "dax")
+        XCTAssertEqual(key("华安法国CAC40ETF联接(QDII)A"), "cac")
+        XCTAssertEqual(key("华安三菱日联日经225ETF联接(QDII)A"), "nikkei")
+        XCTAssertEqual(key("富国上海金ETF联接C"), "gold")
+        XCTAssertNil(key("Bitcoin", "BTC"))
+        XCTAssertNil(key("某某蓝筹精选混合"))
+    }
+}
