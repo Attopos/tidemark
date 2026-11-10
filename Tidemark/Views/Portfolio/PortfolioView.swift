@@ -34,7 +34,6 @@ struct PortfolioView: View {
         let baseValue: Decimal
         let updated: Date?
         let exposure: Exposure
-        var color: Color { exposure.color }
     }
 
     private struct ExposureGroup: Identifiable {
@@ -80,11 +79,6 @@ struct PortfolioView: View {
     private var total: Decimal { valuedRows.reduce(0) { $0 + $1.baseValue } }
     private var asOf: Date? { valuedRows.compactMap(\.updated).max() }
 
-    private var donutSlices: [AllocationSlice] {
-        groups.filter { $0.baseValue > 0 }
-            .map { AllocationSlice(label: $0.exposure.displayName, value: $0.baseValue, color: $0.exposure.color) }
-    }
-
     /// "1 USD = ¥7.12" for the hero, from the latest stored rate.
     private var rateCaption: String? {
         let converter = CurrencyConverter(rates: rates, base: "CNY")
@@ -102,17 +96,7 @@ struct PortfolioView: View {
                     if rows.isEmpty {
                         emptyState
                     } else {
-                        if compact {
-                            hero
-                            allocationCard
-                        } else {
-                            // One row: total on the left, allocation on the right.
-                            HStack(alignment: .top, spacing: DS.gridGap) {
-                                hero.frame(width: 340)
-                                allocationCard
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
+                        overview(compact: compact)
                         holdingsCard(compact: compact)
                     }
                 }
@@ -151,9 +135,9 @@ struct PortfolioView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 10) {
                 Text(tr("Portfolio"))
-                    .font(DS.editorial(compact ? 34 : 40))
+                    .font(DS.display(compact ? 38 : 46))
                     .foregroundStyle(DS.textPrimary)
-                    .kerning(-0.6)
+                    .kerning(-1.4)
                 Spacer()
                 currencyPicker
                 if !compact {
@@ -221,39 +205,47 @@ struct PortfolioView: View {
         .padding(32)
     }
 
-    @ViewBuilder
-    private var allocationCard: some View {
-        if donutSlices.count > 1 {
-            Card(title: tr("Allocation"), fillHeight: true) {
-                AllocationDonut(slices: donutSlices, code: app.baseCurrency,
-                                centerLabel: tr("Total"), diameter: 170)
+    // MARK: Overview bento
+    //
+    // One panel: the total on a lime half, the allocation by exposure as
+    // tiles on the dark half (largest exposure in lime, the rest dark).
+
+    private func overview(compact: Bool) -> some View {
+        BentoPanel(padding: 12) {
+            if compact {
+                VStack(spacing: 12) {
+                    totalPanel
+                    exposureTiles(columns: 2)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    totalPanel.frame(width: 380)
+                    exposureTiles(columns: groups.filter { $0.baseValue > 0 }.count > 4 ? 3 : 2)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
 
-    // MARK: Hero
-
-    private var hero: some View {
+    private var totalPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(tr("TOTAL VALUE"))
-                    .font(DS.label)
-                    .tracking(1.4)
-                    .foregroundStyle(DS.heroInkSecondary)
-                Spacer()
-                if let asOf {
-                    Text("\(tr("As of")) \(Fmt.dateMedium.string(from: asOf))")
-                        .font(DS.caption)
-                        .foregroundStyle(DS.heroInkSecondary)
-                }
+            Text(tr("Total value"))
+                .font(DS.display(40))
+                .kerning(-1.2)
+                .foregroundStyle(DS.heroInk)
+                .lineLimit(2)
+            if let asOf {
+                Pill(Fmt.dateMedium.string(from: asOf), ink: DS.heroInk, size: 14)
+                    .padding(.top, 10)
             }
-            Spacer(minLength: 12)
+            Spacer(minLength: 28)
             Text(Fmt.money(total, app.baseCurrency))
-                .font(DS.money(44, weight: .bold))
+                .font(DS.display(46).monospacedDigit())
+                .kerning(-1.5)
                 .foregroundStyle(DS.heroInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Text(trf("%d assets", valuedRows.count))
                 if let rateCaption {
                     Text("·")
@@ -263,25 +255,75 @@ struct PortfolioView: View {
             .font(DS.caption)
             .foregroundStyle(DS.heroInkSecondary)
             .padding(.top, 6)
-            // Equal space above and below: the figure sits mid-card when the
-            // hero is stretched to the allocation card's height.
-            Spacer(minLength: 12)
         }
         .padding(22)
-        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 250, maxHeight: .infinity, alignment: .topLeading)
         .background(DS.heroGradient)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: DS.tileRadius + 2, style: .continuous))
+    }
+
+    private func exposureTiles(columns: Int) -> some View {
+        let valued = groups.filter { $0.baseValue > 0 }
+        let grid = Array(repeating: GridItem(.flexible(), spacing: 12), count: columns)
+        return LazyVGrid(columns: grid, spacing: 12) {
+            ForEach(Array(valued.enumerated()), id: \.element.id) { rank, group in
+                ExposureTile(group: group,
+                             share: total > 0 ? (group.baseValue / total).doubleValue : 0,
+                             baseCurrency: app.baseCurrency,
+                             highlighted: rank == 0)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private struct ExposureTile: View {
+        let group: ExposureGroup
+        let share: Double
+        let baseCurrency: String
+        let highlighted: Bool
+
+        var body: some View {
+            let ink = highlighted ? DS.heroInk : DS.textPrimary
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Fmt.percent(share, showSign: false))
+                    .font(DS.display(32).monospacedDigit())
+                    .kerning(-0.8)
+                    .foregroundStyle(ink)
+                Spacer(minLength: 18)
+                Text(group.exposure.displayName)
+                    .font(.system(size: 14.5, weight: .medium))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
+                    .font(.system(size: 13.5).monospacedDigit())
+                    .foregroundStyle(highlighted ? DS.heroInkSecondary : DS.textSecondary)
+                    .padding(.top, 1)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 119, alignment: .topLeading)
+            .background(highlighted ? AnyShapeStyle(DS.accent) : AnyShapeStyle(DS.tile))
+            .clipShape(RoundedRectangle(cornerRadius: DS.tileRadius, style: .continuous))
+        }
     }
 
     // MARK: Holdings table
 
     private let valueWidth: CGFloat = 170
-    private let shareWidth: CGFloat = 64
+    private let shareWidth: CGFloat = 76
     private let updatedWidth: CGFloat = 148
 
     private func holdingsCard(compact: Bool) -> some View {
-        Card(title: tr("Holdings")) {
+        BentoPanel {
             VStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 12) {
+                    Text(tr("Holdings"))
+                        .font(DS.display(34))
+                        .kerning(-1)
+                        .foregroundStyle(DS.textPrimary)
+                    Pill("\(rows.count)", size: 13)
+                    Spacer()
+                }
+                .padding(.bottom, 14)
                 HStack(spacing: 12) {
                     Spacer()
                     columnHeader(tr("Value"), width: compact ? 148 : valueWidth)
@@ -291,8 +333,8 @@ struct PortfolioView: View {
                     }
                 }
                 .padding(.bottom, 4)
-                ForEach(groups) { group in
-                    ExposureHeader(group: group,
+                ForEach(Array(groups.enumerated()), id: \.element.id) { rank, group in
+                    ExposureHeader(group: group, color: DS.limeShade(rank),
                                    share: total > 0 ? (group.baseValue / total).doubleValue : nil,
                                    baseCurrency: app.baseCurrency,
                                    valueWidth: compact ? 148 : valueWidth,
@@ -361,6 +403,7 @@ struct PortfolioView: View {
 
     private struct ExposureHeader: View {
         let group: ExposureGroup
+        let color: Color
         let share: Double?
         let baseCurrency: String
         let valueWidth: CGFloat
@@ -369,9 +412,9 @@ struct PortfolioView: View {
 
         var body: some View {
             HStack(spacing: 12) {
-                Circle().fill(group.exposure.color).frame(width: 9, height: 9)
+                Circle().fill(color).frame(width: 9, height: 9)
                 Text(group.exposure.displayName)
-                    .font(.system(size: 15.5, weight: .semibold))
+                    .font(DS.display(21))
                     .foregroundStyle(DS.textPrimary)
                 Text("\(group.rows.count)")
                     .font(DS.caption)
@@ -379,9 +422,7 @@ struct PortfolioView: View {
                 Spacer()
                 MoneyText(group.baseValue, baseCurrency, font: DS.money(15, weight: .semibold))
                     .frame(width: valueWidth, alignment: .trailing)
-                Text(share.map { Fmt.percent($0, showSign: false) } ?? "—")
-                    .font(DS.moneySmall.weight(.semibold))
-                    .foregroundStyle(DS.textPrimary)
+                Pill(share.map { Fmt.percent($0, showSign: false) } ?? "—", size: 12.5)
                     .frame(width: shareWidth, alignment: .trailing)
                 if updatedWidth > 0 {
                     Color.clear.frame(width: updatedWidth, height: 1)
@@ -414,9 +455,6 @@ struct PortfolioView: View {
         var body: some View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(row.color.opacity(0.55))
-                        .frame(width: 3, height: 26)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.name)
                             .font(.system(size: 15, weight: .medium))
