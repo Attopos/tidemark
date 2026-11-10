@@ -80,20 +80,16 @@ enum AssetIconStore {
     }
 
     /// Coins the icon set doesn't cover, matched by name or ticker (incl. a
-    /// common OCR misread), drawn duotone like every other icon.
-    private static let customCoins: [(names: [String], file: String)] = [
-        (["币安人生", "市安人生"], "coin-binancelife"),
+    /// common OCR misread): drawn as black text on the tint, line-broken to
+    /// stay legible at icon size.
+    private static let customCoins: [(names: [String], label: String)] = [
+        (["币安人生", "市安人生"], "币安\n人生"),
     ]
 
-    static func customCoin(name: String, symbol: String) -> NSImage? {
-        guard let rule = customCoins.first(where: { rule in
+    static func customCoinLabel(name: String, symbol: String) -> String? {
+        customCoins.first(where: { rule in
             rule.names.contains { name.contains($0) || symbol.contains($0) }
-        }) else { return nil }
-        if let hit = cache[rule.file] { return hit }
-        guard let url = Bundle.main.url(forResource: rule.file, withExtension: "png"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        cache[rule.file] = image
-        return image
+        })?.label
     }
 
     /// Re-color a logo in the palette. Grayscale, then (if `inverted`) flip
@@ -171,9 +167,22 @@ struct AssetIcon: View {
             .clipShape(Circle())
     }
 
+    /// Black text on a solid tint disc: the look for anything without a logo.
+    private func textBadge(_ text: String, scale: CGFloat) -> some View {
+        Text(text)
+            .font(.system(size: size * scale, weight: .heavy))
+            .foregroundStyle(Color.black)
+            .multilineTextAlignment(.center)
+            .lineSpacing(-size * 0.06)
+            .minimumScaleFactor(0.6)
+            .frame(width: size, height: size)
+            .background(tint)
+            .clipShape(Circle())
+    }
+
     var body: some View {
-        if let coin = AssetIconStore.customCoin(name: name, symbol: symbol) {
-            duotone(coin, key: "coin|" + name, fill: true)
+        if let label = AssetIconStore.customCoinLabel(name: name, symbol: symbol) {
+            textBadge(label, scale: 0.27)
         } else if let mark = AssetIconStore.indexMark(name: name, symbol: symbol) {
             switch mark.style {
             case .fill:
@@ -210,13 +219,7 @@ struct AssetIcon: View {
                 .foregroundStyle(tint)
                 .frame(width: size, height: size)
         } else {
-            Text(AssetIconStore.monogram(name: name, symbol: symbol))
-                .font(.system(size: size * 0.45, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: size, height: size)
-                .background(color.opacity(0.16))
-                .overlay(Circle().strokeBorder(color.opacity(0.35), lineWidth: 1))
-                .clipShape(Circle())
+            textBadge(AssetIconStore.monogram(name: name, symbol: symbol), scale: 0.45)
         }
     }
 }
