@@ -287,7 +287,7 @@ struct PortfolioView: View {
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
-                Text("\(group.exposure.displayName) (\(group.rows.count))")
+                Text(group.exposure.displayName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(group.exposure.ink)
                     .lineLimit(2)
@@ -322,21 +322,10 @@ struct PortfolioView: View {
     private let valueWidth: CGFloat = 150
     private let shareWidth: CGFloat = 130
 
-    /// Largest single holding / exposure share: the full length of a bar.
-    private var maxRowShare: Double {
-        guard total > 0 else { return 1 }
-        return valuedRows.map { ($0.baseValue / total).doubleValue }.max() ?? 1
-    }
-    private var maxGroupShare: Double {
-        guard total > 0 else { return 1 }
-        return groups.map { ($0.baseValue / total).doubleValue }.max() ?? 1
-    }
 
     private func holdingsCard(compact: Bool) -> some View {
         Panel(title: tr("Holdings"), icon: "list.bullet") {
             HStack(spacing: 6) {
-                Text(trf("%d assets", rows.count))
-                Text("·")
                 MoneyText(total, app.baseCurrency, font: DS.money(14, weight: .semibold))
             }
             .font(DS.caption.monospacedDigit())
@@ -353,8 +342,6 @@ struct PortfolioView: View {
                     ExposureBlock(group: group,
                                   share: total > 0 ? (group.baseValue / total).doubleValue : 0,
                                   total: total,
-                                  groupScale: maxGroupShare,
-                                  rowScale: maxRowShare,
                                   baseCurrency: app.baseCurrency,
                                   valueWidth: valueWidth,
                                   shareWidth: shareWidth,
@@ -400,12 +387,16 @@ struct PortfolioView: View {
         let group: ExposureGroup
         let share: Double
         let total: Decimal
-        let groupScale: Double
-        let rowScale: Double
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
         let menu: (Row) -> Menu
+
+        private var groupRowMax: Double {
+            guard total > 0 else { return 1 }
+            return group.rows.filter { $0.nativeValue != nil }
+                .map { ($0.baseValue / total).doubleValue }.max() ?? 1
+        }
 
         var body: some View {
             VStack(spacing: 0) {
@@ -417,13 +408,6 @@ struct PortfolioView: View {
                         Text(group.exposure.displayName)
                             .font(DS.title(16))
                             .foregroundStyle(DS.textPrimary)
-                        Text("\(group.rows.count)")
-                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(DS.textSecondary)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 1.5)
-                            .background(DS.panel)
-                            .clipShape(Capsule())
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     MoneyText(group.baseValue, baseCurrency, font: DS.money(16, weight: .semibold))
@@ -444,7 +428,9 @@ struct PortfolioView: View {
                     HoldingLine(row: row,
                                 share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
                                 color: group.exposure.color,
-                                scale: rowScale,
+                                // Bars compare holdings within their exposure: the
+                                // largest in the group fills the bar.
+                                scale: groupRowMax,
                                 baseCurrency: baseCurrency,
                                 valueWidth: valueWidth,
                                 shareWidth: shareWidth)
