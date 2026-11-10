@@ -263,6 +263,9 @@ struct PortfolioView: View {
             .font(DS.caption)
             .foregroundStyle(DS.heroInkSecondary)
             .padding(.top, 6)
+            // Equal space above and below: the figure sits mid-card when the
+            // hero is stretched to the allocation card's height.
+            Spacer(minLength: 12)
         }
         .padding(22)
         .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity, alignment: .topLeading)
