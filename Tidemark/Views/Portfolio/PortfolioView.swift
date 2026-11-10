@@ -327,11 +327,7 @@ struct PortfolioView: View {
 
     private func holdingsCard(compact: Bool) -> some View {
         Panel(title: tr("Holdings"), icon: "list.bullet") {
-            HStack(spacing: 6) {
-                MoneyText(total, app.baseCurrency, font: DS.money(14, weight: .semibold))
-            }
-            .font(DS.caption.monospacedDigit())
-            .foregroundStyle(DS.textSecondary)
+            EmptyView()
         } content: {
             VStack(spacing: 12) {
                 HStack(spacing: 14) {
@@ -425,17 +421,11 @@ struct PortfolioView: View {
                             .foregroundStyle(DS.textPrimary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    MoneyText(group.baseValue, baseCurrency, font: DS.money(16, weight: .semibold))
-                        .frame(width: valueWidth, alignment: .trailing)
-                    // Group shares are already drawn in the overview bar; a second
-                    // bar scale here would make equal percentages look unequal.
-                    Text(Fmt.percent(share, showSign: false))
-                        .font(.system(size: 13.5, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(DS.textPrimary)
-                        .frame(width: shareWidth, alignment: .trailing)
+                    // No group totals here: this is the detail list; totals
+                    // live in the overview cards above.
                     }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 13)
+                .padding(.vertical, 11)
 
                 ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
                     Rectangle().fill(DS.border.opacity(index == 0 ? 0.9 : 0.5)).frame(height: 1)
