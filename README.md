@@ -44,15 +44,26 @@ open Tidemark.xcodeproj   # then press ⌘R
 > code-signing. Use Xcode's default DerivedData, or pass
 > `-derivedDataPath ~/Library/Caches/tidemark-dd` to xcodebuild.
 
-Or use the helper script, which always closes any simulator and deletes the
-build intermediates (DerivedData, coverage files) when it finishes:
+Or use the helper script. This Mac is short on memory and disk, so every
+command cleans up when it ends, whether it succeeds, fails, or is stopped
+with Ctrl-C, and then prints free disk space (`df -h`):
 
 ```bash
 ./build.sh build   # Debug build
-./build.sh test    # run the tests on this Mac
+./build.sh test    # run the tests on this Mac (no simulator)
 ./build.sh run     # build, install to ~/Applications/Tidemark.app, launch
-./build.sh clean   # just close simulators and delete intermediates
+./build.sh clean   # only clean up
+./build.sh test --keep   # skip cleanup to debug a build
 ```
+
+Cleanup deletes `~/Library/Caches/tidemark-dd` (keeping its small
+`ModuleCache.noindex` so the next build is faster), Xcode's own
+`~/Library/Developer/Xcode/DerivedData/Tidemark-*` when it belongs to this
+project, `./build`, and `*.profraw` coverage files. It shuts down any booted
+simulator and quits Simulator. `run` deletes intermediates only after the app
+is copied to `~/Applications`. Simulator runtimes and devices, the installed
+app, its data, and source files are never touched. Tidemark is a macOS app,
+so tests always run on the Mac itself.
 
 Tests (OCR layout parser, number extraction, a live Vision round-trip, and the
 create-vs-update commit invariant):
