@@ -41,12 +41,12 @@ enum AssetIconStore {
     }
 
     private static let indexRules: [(key: String, words: [String], tickers: Set<String>, fills: Bool)] = [
-        ("nasdaq", ["纳斯达克", "nasdaq", "纳指"], ["QQQ", "QQQM", "ONEQ", "TQQQ"], false),
+        ("nasdaq", ["纳斯达克", "nasdaq", "纳指"], ["QQQ", "QQQM", "ONEQ", "TQQQ"], true),
         ("sp500", ["标普", "s&p", "spdr s&p", "standard & poor"], ["SPY", "VOO", "IVV", "SPLG", "RSP"], true),
         ("dax", ["dax", "德国"], ["EWG", "DAX"], true),
         ("cac", ["cac", "法国"], ["EWQ"], false),
         ("nikkei", ["日经", "nikkei", "日本"], ["EWJ", "DXJ"], true),
-        ("gold", ["黄金", "上海金", "gold"], ["GLD", "IAU", "PAXG", "XAUT"], false),
+        ("gold", ["黄金", "上海金", "gold"], ["GLD", "IAU", "PAXG", "XAUT"], true),
     ]
 
     static func indexKey(name: String, symbol: String) -> (key: String, fills: Bool)? {
