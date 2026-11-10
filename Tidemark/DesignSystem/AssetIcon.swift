@@ -92,24 +92,40 @@ enum AssetIconStore {
         return image
     }
 
-    /// Desaturate a logo and multiply it by `tint` (alpha kept), so any
-    /// brand mark renders in the app's palette. Baked into a bitmap rather
-    /// than SwiftUI filters so it's exact everywhere, and cached per tint.
-    static func duotone(_ image: NSImage, key: String, tint: NSColor) -> NSImage {
+    /// Re-color a logo in the palette. Grayscale, then (if `inverted`) flip
+    /// luminance and stretch so the logo's own background lands on full
+    /// tint and its mark goes dark: a light disc with a dark mark, never a
+    /// black disc. Baked into a bitmap (exact everywhere), cached per tint.
+    static func duotone(_ image: NSImage, key: String, tint: NSColor, inverted: Bool = false) -> NSImage {
         let rgb = tint.usingColorSpace(.sRGB) ?? tint
-        let cacheKey = "\(key)|\(Int(rgb.redComponent * 255)),\(Int(rgb.greenComponent * 255)),\(Int(rgb.blueComponent * 255))"
+        let cacheKey = "\(key)|\(inverted)|\(Int(rgb.redComponent * 255)),\(Int(rgb.greenComponent * 255)),\(Int(rgb.blueComponent * 255))"
         if let hit = cache[cacheKey] { return hit }
         guard let tiff = image.tiffRepresentation, let input = CIImage(data: tiff) else { return image }
-        let gray = input.applyingFilter("CIColorControls", parameters: [
+        let context = CIContext()
+        var gray = input.applyingFilter("CIColorControls", parameters: [
             kCIInputSaturationKey: 0, kCIInputContrastKey: 1.15,
         ])
+        var scale: CGFloat = 1
+        if inverted {
+            gray = gray.applyingFilter("CIColorInvert")
+            // Background sample: a small patch near the left edge, mid-height.
+            let e = gray.extent
+            let patch = CGRect(x: e.minX + e.width * 0.04, y: e.midY - e.height * 0.03,
+                               width: max(1, e.width * 0.03), height: max(1, e.height * 0.06))
+            let avg = gray.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: patch)])
+            var px = [UInt8](repeating: 0, count: 4)
+            context.render(avg, toBitmap: &px, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+                           format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+            let alpha = max(CGFloat(px[3]) / 255, 0.01)
+            let level = CGFloat(px[0]) / 255 / alpha
+            scale = min(6, 1 / max(level, 0.15))
+        }
         let tinted = gray.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: rgb.redComponent, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: rgb.greenComponent, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: rgb.blueComponent, w: 0),
+            "inputRVector": CIVector(x: rgb.redComponent * scale, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: rgb.greenComponent * scale, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: rgb.blueComponent * scale, w: 0),
             "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-        ])
-        let context = CIContext()
+        ]).applyingFilter("CIColorClamp")
         guard let cg = context.createCGImage(tinted, from: input.extent) else { return image }
         let result = NSImage(cgImage: cg, size: image.size)
         cache[cacheKey] = result
@@ -141,7 +157,7 @@ struct AssetIcon: View {
     /// Any logo → luminance only → multiplied by the tint: brand colors are
     /// dropped, the mark's shape and light/dark structure stay.
     private func duotone(_ image: NSImage, key: String, fill: Bool) -> some View {
-        Image(nsImage: AssetIconStore.duotone(image, key: key, tint: NSColor(tint)))
+        Image(nsImage: AssetIconStore.duotone(image, key: key, tint: NSColor(tint), inverted: fill))
             .resizable()
             .interpolation(.high)
             .aspectRatio(contentMode: fill ? .fill : .fit)
