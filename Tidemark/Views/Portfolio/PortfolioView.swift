@@ -312,62 +312,43 @@ struct PortfolioView: View {
         }
     }
 
-    // MARK: Holdings table
+    // MARK: Holdings
+    //
+    // One block per exposure (color square, name, total, share bar), rows
+    // inside it. The value column is always the display currency so it lines
+    // up; a holding recorded in another currency shows its own amount under
+    // it. Freshness lives in the row's subtitle instead of its own column.
 
-    private let valueWidth: CGFloat = 170
-    private let shareWidth: CGFloat = 76
-    private let updatedWidth: CGFloat = 148
+    private let valueWidth: CGFloat = 150
+    private let shareWidth: CGFloat = 110
 
     private func holdingsCard(compact: Bool) -> some View {
         Panel(title: tr("Holdings"), icon: "list.bullet") {
-            Text("\(rows.count)")
-                .font(DS.caption.monospacedDigit())
-                .foregroundStyle(DS.textSecondary)
+            HStack(spacing: 6) {
+                Text(trf("%d assets", rows.count))
+                Text("·")
+                MoneyText(total, app.baseCurrency, font: DS.money(14, weight: .semibold))
+            }
+            .font(DS.caption.monospacedDigit())
+            .foregroundStyle(DS.textSecondary)
         } content: {
-            VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Spacer()
-                    columnHeader(tr("Value"), width: compact ? 148 : valueWidth)
-                    columnHeader(tr("Share"), width: shareWidth)
-                    if !compact {
-                        columnHeader(tr("Updated"), width: updatedWidth)
-                    }
+            VStack(spacing: 12) {
+                HStack(spacing: 14) {
+                    columnHeader(tr("Asset"), width: nil, alignment: .leading)
+                    columnHeader(tr("Value"), width: valueWidth, alignment: .trailing)
+                    columnHeader(tr("Share"), width: shareWidth, alignment: .trailing)
                 }
-                .padding(.bottom, 4)
+                .padding(.horizontal, 16)
                 ForEach(groups) { group in
-                    ExposureHeader(group: group,
-                                   share: total > 0 ? (group.baseValue / total).doubleValue : nil,
-                                   baseCurrency: app.baseCurrency,
-                                   valueWidth: compact ? 148 : valueWidth,
-                                   shareWidth: shareWidth,
-                                   updatedWidth: compact ? 0 : updatedWidth)
+                    ExposureBlock(group: group,
+                                  share: total > 0 ? (group.baseValue / total).doubleValue : 0,
+                                  total: total,
+                                  baseCurrency: app.baseCurrency,
+                                  valueWidth: valueWidth,
+                                  shareWidth: shareWidth,
+                                  menu: { rowMenu($0) })
                         .id(group.id)
-                    ForEach(group.rows) { row in
-                        HoldingRow(row: row,
-                                   share: total > 0 && row.nativeValue != nil
-                                       ? (row.baseValue / total).doubleValue : nil,
-                                   baseCurrency: app.baseCurrency,
-                                   compact: compact,
-                                   valueWidth: compact ? 148 : valueWidth,
-                                   shareWidth: shareWidth, updatedWidth: updatedWidth)
-                            .padding(.leading, 14)
-                            .contextMenu { rowMenu(row) }
-                        Divider().overlay(DS.border.opacity(0.4)).padding(.leading, 14)
-                    }
                 }
-                HStack(spacing: 12) {
-                    Text(tr("Total"))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(DS.textPrimary)
-                    Spacer()
-                    MoneyText(total, app.baseCurrency, font: DS.money(16, weight: .bold))
-                        .frame(width: compact ? 148 : valueWidth, alignment: .trailing)
-                    Color.clear.frame(width: shareWidth, height: 1)
-                    if !compact {
-                        Color.clear.frame(width: updatedWidth, height: 1)
-                    }
-                }
-                .padding(.vertical, 11)
             }
         }
     }
@@ -403,116 +384,157 @@ struct PortfolioView: View {
         }
     }
 
-    private struct ExposureHeader: View {
+    private struct ExposureBlock<Menu: View>: View {
         let group: ExposureGroup
-        let share: Double?
+        let share: Double
+        let total: Decimal
         let baseCurrency: String
         let valueWidth: CGFloat
         let shareWidth: CGFloat
-        let updatedWidth: CGFloat
+        let menu: (Row) -> Menu
 
         var body: some View {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(group.exposure.color)
-                    .frame(width: 12, height: 12)
-                Text(group.exposure.displayName)
-                    .font(DS.title(16))
-                    .foregroundStyle(DS.textPrimary)
-                Text("\(group.rows.count)")
-                    .font(DS.caption)
-                    .foregroundStyle(DS.textTertiary)
-                Spacer()
-                MoneyText(group.baseValue, baseCurrency, font: DS.money(15, weight: .semibold))
-                    .frame(width: valueWidth, alignment: .trailing)
-                TagChip(text: share.map { Fmt.percent($0, showSign: false) } ?? "—",
-                        // Darkest shades don't read as text on the dark panel.
-                        color: group.exposure.ink == .white ? DS.violetSoft : group.exposure.color)
-                    .frame(width: shareWidth, alignment: .trailing)
-                if updatedWidth > 0 {
-                    Color.clear.frame(width: updatedWidth, height: 1)
+            VStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    HStack(spacing: 10) {
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(group.exposure.color)
+                            .frame(width: 12, height: 12)
+                        Text(group.exposure.displayName)
+                            .font(DS.title(16))
+                            .foregroundStyle(DS.textPrimary)
+                        Text("\(group.rows.count)")
+                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                            .foregroundStyle(DS.textSecondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 1.5)
+                            .background(DS.panel)
+                            .clipShape(Capsule())
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    MoneyText(group.baseValue, baseCurrency, font: DS.money(16, weight: .semibold))
+                        .frame(width: valueWidth, alignment: .trailing)
+                    ShareCell(share: share, color: group.exposure.color, bold: true)
+                        .frame(width: shareWidth)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
+
+                ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
+                    Rectangle().fill(DS.border.opacity(index == 0 ? 0.9 : 0.5)).frame(height: 1)
+                        .padding(.leading, index == 0 ? 0 : 38)
+                    HoldingLine(row: row,
+                                share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
+                                color: group.exposure.color,
+                                baseCurrency: baseCurrency,
+                                valueWidth: valueWidth,
+                                shareWidth: shareWidth)
+                        .contextMenu { menu(row) }
                 }
             }
-            .padding(.top, 14)
-            .padding(.bottom, 6)
-            .padding(.horizontal, 4)
+            .background(DS.tile.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
-    private func columnHeader(_ text: String, width: CGFloat) -> some View {
-        Text(text.uppercased())
-            .font(.system(size: 11.5, weight: .semibold))
-            .tracking(1)
-            .foregroundStyle(DS.textTertiary)
-            .frame(width: width, alignment: .trailing)
-    }
-
-    private struct HoldingRow: View {
-        let row: PortfolioView.Row
+    /// "29.7%" with a thin bar of the same share underneath-right.
+    private struct ShareCell: View {
         let share: Double?
-        let baseCurrency: String
-        let compact: Bool
-        let valueWidth: CGFloat
-        let shareWidth: CGFloat
-        let updatedWidth: CGFloat
-        @State private var hovering = false
+        let color: Color
+        var bold = false
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.name)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(DS.textPrimary)
-                            .lineLimit(compact ? 2 : 1)
-                        if !row.meta.isEmpty {
-                            Text(row.meta)
-                                .font(.system(size: 12.5).monospacedDigit())
-                                .foregroundStyle(DS.textTertiary)
-                                .lineLimit(1)
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                if let share {
+                    Capsule().fill(DS.panel)
+                        .frame(width: 44, height: 5)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(color).frame(width: max(3, 44 * min(share, 1)), height: 5)
                         }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Spacer(minLength: compact ? 0 : 12)
-                    VStack(alignment: .trailing, spacing: 2) {
-                        if let native = row.nativeValue {
-                            // Recorded currency first; the converted figure below.
-                            MoneyText(native, row.currency, font: DS.moneyTable)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            if row.currency.uppercased() != baseCurrency.uppercased() {
-                                Text("≈ " + Fmt.money(row.baseValue, baseCurrency))
-                                    .font(.system(size: 12).monospacedDigit())
-                                    .foregroundStyle(DS.textTertiary)
-                            }
-                        } else {
-                            Text(tr("no valuation"))
-                                .font(DS.caption)
-                                .foregroundStyle(DS.warning)
-                        }
-                    }
-                    .frame(width: valueWidth, alignment: .trailing)
-                    Text(share.map { Fmt.percent($0, showSign: false) } ?? "—")
-                        .font(DS.moneySmall)
-                        .foregroundStyle(DS.textSecondary)
-                        .frame(width: shareWidth, alignment: .trailing)
-                    if !compact {
-                        FreshnessLabel(date: row.updated)
-                            .frame(width: updatedWidth, alignment: .trailing)
-                    }
-                }
-                if compact {
-                    FreshnessLabel(date: row.updated)
-                        .padding(.leading, 16)
+                    Text(Fmt.percent(share, showSign: false))
+                        .font(.system(size: 13.5, weight: bold ? .semibold : .regular).monospacedDigit())
+                        .foregroundStyle(bold ? DS.textPrimary : DS.textSecondary)
+                        .frame(width: 46, alignment: .trailing)
+                } else {
+                    Text("—").foregroundStyle(DS.textTertiary)
                 }
             }
-            .padding(.vertical, 9)
-            .padding(.horizontal, 4)
-            .background(hovering ? DS.bgElevated.opacity(0.55) : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+    }
+
+    private struct HoldingLine: View {
+        let row: PortfolioView.Row
+        let share: Double?
+        let color: Color
+        let baseCurrency: String
+        let valueWidth: CGFloat
+        let shareWidth: CGFloat
+        @State private var hovering = false
+
+        private var stale: Bool {
+            guard let updated = row.updated else { return true }
+            return Date().timeIntervalSince(updated) > 7 * 86_400
+        }
+
+        var body: some View {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(row.name)
+                        .font(.system(size: 14.5, weight: .medium))
+                        .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        if !row.meta.isEmpty { Text(row.meta) }
+                        if let updated = row.updated {
+                            Text("·")
+                            Text(Fmt.relative(updated))
+                                .foregroundStyle(stale ? DS.violetSoft : DS.textTertiary)
+                        }
+                    }
+                    .font(.system(size: 12).monospacedDigit())
+                    .foregroundStyle(DS.textTertiary)
+                    .lineLimit(1)
+                }
+                .padding(.leading, 22)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .trailing, spacing: 3) {
+                    if let native = row.nativeValue {
+                        MoneyText(row.baseValue, baseCurrency, font: DS.moneyTable)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        if row.currency.uppercased() != baseCurrency.uppercased() {
+                            Text(Fmt.money(native, row.currency) + " " + row.currency.uppercased())
+                                .font(.system(size: 12).monospacedDigit())
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                    } else {
+                        Text(tr("no valuation"))
+                            .font(DS.caption)
+                            .foregroundStyle(DS.violetSoft)
+                    }
+                }
+                .frame(width: valueWidth, alignment: .trailing)
+
+                ShareCell(share: share, color: color.opacity(0.7))
+                    .frame(width: shareWidth)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(hovering ? Color.white.opacity(0.03) : .clear)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
         }
+    }
+
+    private func columnHeader(_ text: String, width: CGFloat?, alignment: Alignment) -> some View {
+        Text(text.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(1)
+            .foregroundStyle(DS.textTertiary)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)
+            .frame(width: width, alignment: alignment)
     }
 }
 
