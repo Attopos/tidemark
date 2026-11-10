@@ -429,7 +429,7 @@ struct PortfolioView: View {
 
                 ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
                     Rectangle().fill(DS.border.opacity(index == 0 ? 0.9 : 0.5)).frame(height: 1)
-                        .padding(.leading, index == 0 ? 0 : 38)
+                        .padding(.leading, index == 0 ? 0 : 60)
                     HoldingLine(row: row,
                                 share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
                                 color: group.exposure.color,
@@ -517,6 +517,9 @@ struct PortfolioView: View {
 
         var body: some View {
             HStack(spacing: 14) {
+                AssetIcon(name: row.holding.asset?.name ?? row.name,
+                          symbol: row.holding.asset?.symbol ?? "",
+                          color: color)
                 VStack(alignment: .leading, spacing: 3) {
                     if renaming {
                         TextField("", text: $draft)
@@ -555,7 +558,6 @@ struct PortfolioView: View {
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
                 }
-                .padding(.leading, 22)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .trailing, spacing: 3) {
