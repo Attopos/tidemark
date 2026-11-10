@@ -34,38 +34,45 @@ enum AssetIconStore {
         return image
     }
 
-    struct IndexMark {
-        let image: NSImage
-        /// Opaque square logos fill the circle; transparent marks sit inset.
-        let fills: Bool
+    enum MarkStyle {
+        /// Opaque square logo: fills the circle.
+        case fill
+        /// Wordmark on a light background: fitted, the background becomes
+        /// the disc.
+        case wordmark
     }
 
-    private static let indexRules: [(key: String, words: [String], tickers: Set<String>, fills: Bool)] = [
-        ("nasdaq", ["纳斯达克", "nasdaq", "纳指"], ["QQQ", "QQQM", "ONEQ", "TQQQ"], true),
-        ("sp500", ["标普", "s&p", "spdr s&p", "standard & poor"], ["SPY", "VOO", "IVV", "SPLG", "RSP"], true),
-        ("dax", ["dax", "德国"], ["EWG", "DAX"], true),
-        ("cac", ["cac", "法国"], ["EWQ"], false),
-        ("nikkei", ["日经", "nikkei", "日本"], ["EWJ", "DXJ"], true),
-        ("gold", ["黄金", "上海金", "gold"], ["GLD", "IAU", "PAXG", "XAUT"], true),
+    struct IndexMark {
+        let image: NSImage
+        let style: MarkStyle
+    }
+
+    private static let indexRules: [(key: String, words: [String], tickers: Set<String>, style: MarkStyle)] = [
+        ("nasdaq", ["纳斯达克", "nasdaq", "纳指"], ["QQQ", "QQQM", "ONEQ", "TQQQ"], .fill),
+        ("sp500", ["标普", "s&p", "spdr s&p", "standard & poor"], ["SPY", "VOO", "IVV", "SPLG", "RSP"], .fill),
+        ("dax", ["dax", "德国"], ["EWG", "DAX"], .wordmark),
+        ("cac", ["cac", "法国"], ["EWQ"], .wordmark),
+        ("nikkei", ["日经", "nikkei", "日本"], ["EWJ", "DXJ"], .wordmark),
+        ("gold", ["黄金", "上海金", "gold"], ["GLD", "IAU", "PAXG", "XAUT"], .fill),
     ]
 
-    static func indexKey(name: String, symbol: String) -> (key: String, fills: Bool)? {
+    static func indexKey(name: String, symbol: String) -> (key: String, style: MarkStyle)? {
         let n = name.lowercased()
         let t = symbol.uppercased()
         for rule in indexRules where rule.tickers.contains(t) || rule.words.contains(where: n.contains) {
-            return (rule.key, rule.fills)
+            return (rule.key, rule.style)
         }
         return nil
     }
 
     static func indexMark(name: String, symbol: String) -> IndexMark? {
-        guard let (key, fills) = indexKey(name: name, symbol: symbol) else { return nil }
+        guard let (key, style) = indexKey(name: name, symbol: symbol) else { return nil }
         let cacheKey = "index-" + key
-        if let hit = cache[cacheKey] { return IndexMark(image: hit, fills: fills) }
+        if let hit = cache[cacheKey] { return IndexMark(image: hit, style: style) }
         guard let url = Bundle.main.url(forResource: cacheKey, withExtension: "png"),
               let image = NSImage(contentsOf: url) else { return nil }
         cache[cacheKey] = image
-        return IndexMark(image: image, fills: fills)
+        return IndexMark(image: image, style: style)
     }
 
     /// Coins the icon set doesn't cover, matched by name or ticker (incl. a
@@ -148,19 +155,17 @@ struct AssetIcon: View {
         if let coin = AssetIconStore.customCoin(name: name, symbol: symbol) {
             duotone(coin, key: "coin|" + name, fill: true)
         } else if let mark = AssetIconStore.indexMark(name: name, symbol: symbol) {
-            if mark.fills {
+            switch mark.style {
+            case .fill:
                 duotone(mark.image, key: "index|" + name + symbol, fill: true)
-            } else {
-                // Transparent marks: the shape alone, in the tint, full strength.
-                Image(nsImage: mark.image)
-                    .renderingMode(.template)
+            case .wordmark:
+                Image(nsImage: AssetIconStore.duotone(mark.image, key: "index|" + name + symbol, tint: NSColor(tint)))
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .foregroundStyle(tint)
-                    .padding(size * 0.22)
+                    .padding(.horizontal, size * 0.1)
                     .frame(width: size, height: size)
-                    .background(tint.opacity(0.12))
+                    .background(tint)
                     .clipShape(Circle())
             }
         } else if let image = AssetIconStore.cryptoImage(ticker: symbol) {
