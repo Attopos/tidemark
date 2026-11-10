@@ -44,6 +44,16 @@ open Tidemark.xcodeproj   # then press ⌘R
 > code-signing. Use Xcode's default DerivedData, or pass
 > `-derivedDataPath ~/Library/Caches/tidemark-dd` to xcodebuild.
 
+Or use the helper script, which always closes any simulator and deletes the
+build intermediates (DerivedData, coverage files) when it finishes:
+
+```bash
+./build.sh build   # Debug build
+./build.sh test    # run the tests on this Mac
+./build.sh run     # build, install to ~/Applications/Tidemark.app, launch
+./build.sh clean   # just close simulators and delete intermediates
+```
+
 Tests (OCR layout parser, number extraction, a live Vision round-trip, and the
 create-vs-update commit invariant):
 
