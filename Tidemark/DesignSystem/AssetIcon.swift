@@ -65,6 +65,23 @@ enum AssetIconStore {
         return IndexMark(image: image, fills: fills)
     }
 
+    /// Coins the icon set doesn't cover, matched by name or ticker (incl. a
+    /// common OCR misread), drawn in full color like a logo.
+    private static let customCoins: [(names: [String], file: String)] = [
+        (["币安人生", "市安人生"], "coin-binancelife"),
+    ]
+
+    static func customCoin(name: String, symbol: String) -> NSImage? {
+        guard let rule = customCoins.first(where: { rule in
+            rule.names.contains { name.contains($0) || symbol.contains($0) }
+        }) else { return nil }
+        if let hit = cache[rule.file] { return hit }
+        guard let url = Bundle.main.url(forResource: rule.file, withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        cache[rule.file] = image
+        return image
+    }
+
     static func monogram(name: String, symbol: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if let first = trimmed.first, first.unicodeScalars.first.map({ (0x4E00...0x9FFF).contains($0.value) }) == true {
@@ -84,7 +101,14 @@ struct AssetIcon: View {
     var glyphTint: Color = DS.violetSoft
 
     var body: some View {
-        if let mark = AssetIconStore.indexMark(name: name, symbol: symbol) {
+        if let coin = AssetIconStore.customCoin(name: name, symbol: symbol) {
+            Image(nsImage: coin)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+        } else if let mark = AssetIconStore.indexMark(name: name, symbol: symbol) {
             if mark.fills {
                 Image(nsImage: mark.image)
                     .resizable()
