@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Dashboard kit
 //
 // Dark rounded cards on near-black, solid pastel category cards with dark
-// ink, a round black arrow badge, capsule allocation bars with a hatched
+// ink, capsule allocation bars with a hatched
 // remainder. Only two hues exist, each with one meaning (see RiskFamily):
 //   violet = risk assets (equities, crypto); shade = which market
 //   lime   = hedges & cash (gold, bonds, cash); shade = which kind
