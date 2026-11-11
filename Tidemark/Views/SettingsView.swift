@@ -48,6 +48,21 @@ struct SettingsView: View {
                 .foregroundStyle(DS.textTertiary)
             }
             Section {
+                Button(tr("Import bookkeeping export…")) { app.pickLedgerExport(into: context) }
+            } header: {
+                Text(tr("Ledger"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Reads the .xlsx a bookkeeping app exports (date, type, amount, categories, accounts, remark, currency). Records already imported are skipped, so a newer export can be imported on top."))
+                        .foregroundStyle(DS.textTertiary)
+                    if let message = app.ledgerImportMessage {
+                        Text(message)
+                            .foregroundStyle(app.ledgerImportFailed ? DS.warning : DS.textSecondary)
+                    }
+                }
+                .font(DS.caption)
+            }
+            Section {
                 HStack(spacing: 8) {
                     Button(tr("Back up now")) { app.backUp(context) }
                     Button(tr("Export…")) { app.exportBackup(context) }
@@ -58,7 +73,7 @@ struct SettingsView: View {
                 Text(tr("Backup"))
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, rates and settings. Restoring merges the file in; nothing is deleted."))
+                    Text(tr("Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted."))
                         .foregroundStyle(DS.textTertiary)
                     if let message = app.backupMessage {
                         Text(message)

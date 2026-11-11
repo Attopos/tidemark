@@ -3,7 +3,7 @@ import SwiftData
 import UniformTypeIdentifiers
 import Combine
 
-// MARK: - Root window: the portfolio, full stop
+// MARK: - Root window: a page rail and the selected page
 
 struct RootView: View {
     @Environment(AppState.self) private var app
@@ -15,8 +15,23 @@ struct RootView: View {
     var body: some View {
         @Bindable var app = app
         ZStack(alignment: .top) {
-            DS.bgPrimary.ignoresSafeArea()
-            PortfolioView()
+            DS.page.ignoresSafeArea()
+            HStack(spacing: 0) {
+                SectionRail(selection: $app.section)
+                Group {
+                    switch app.section {
+                    case .portfolio: PortfolioView()
+                    case .ledger: LedgerView()
+                    case .accounts: AccountsView()
+                    case .analysis: AnalysisView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if let message = app.ledgerImportMessage {
+                ImportNotice(message: message, failed: app.ledgerImportFailed) { app.ledgerImportMessage = nil }
+                    .padding(.top, 10)
+            }
             if let storageError {
                 IssueBanner(issue: DataQualityIssue(severity: .warning,
                                                     icon: "externaldrive.badge.exclamationmark",
@@ -72,12 +87,89 @@ struct RootView: View {
                 }
                 if let url {
                     Task { @MainActor in
-                        app.routeImport(url: url)
+                        if url.pathExtension.lowercased() == "xlsx" {
+                            app.importLedgerExport(url: url, into: context)
+                        } else {
+                            app.routeImport(url: url)
+                        }
                     }
                 }
             }
         }
         return handled
+    }
+}
+
+// MARK: - Section rail
+
+/// Narrow icon rail on the left edge: one button per page, settings at the bottom.
+private struct SectionRail: View {
+    @Binding var selection: AppSection
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ForEach(AppSection.allCases) { section in
+                let selected = section == selection
+                Button { selection = section } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: section.icon)
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(section.title)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .foregroundStyle(selected ? DS.ink : DS.textSecondary)
+                    .frame(width: 60, height: 52)
+                    .background(selected ? DS.accent : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(section.title)
+            }
+            Spacer()
+            SettingsLink {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(DS.textSecondary)
+                    .frame(width: 60, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(tr("Settings"))
+        }
+        .padding(.top, 44)
+        .padding(.bottom, 14)
+        .frame(width: 76)
+        .background(DS.panel)
+    }
+}
+
+private struct ImportNotice: View {
+    let message: String
+    let failed: Bool
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                .foregroundStyle(failed ? DS.warning : DS.accent)
+            Text(message)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(DS.textPrimary)
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(DS.textSecondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(DS.bgElevated)
+        .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(DS.border, lineWidth: 1))
     }
 }
 
@@ -89,7 +181,7 @@ private struct DropHint: View {
                 Image(systemName: "text.viewfinder")
                     .font(.system(size: 32, weight: .light))
                     .foregroundStyle(DS.accent)
-                Text(tr("Drop screenshots to import"))
+                Text(tr("Drop screenshots or a bookkeeping export to import"))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
             }

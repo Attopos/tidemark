@@ -19,3 +19,4 @@ xcuserdata/
 TidemarkTests/alipay-fixture-*
 TidemarkTests/binance-fixture-*
 TidemarkTests/ZZSnapshotLocal.swift
+TidemarkTests/ledger-fixture-*

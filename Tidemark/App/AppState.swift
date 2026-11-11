@@ -6,9 +6,35 @@ import UniformTypeIdentifiers
 
 // MARK: - App state
 //
-// The app does exactly two things: show the portfolio, and update it from
-// Alipay / Binance screenshots. State is accordingly
-// tiny: the UI language and the OCR import pipeline.
+// Two halves share one window: long-term holdings (the portfolio, updated
+// from Alipay / Binance screenshots) and day-to-day cash flow (the ledger,
+// its accounts and analysis). State here is the page on screen, the display
+// currency, the UI language and the import pipelines.
+
+/// Pages of the main window.
+enum AppSection: String, CaseIterable, Identifiable {
+    case portfolio, ledger, accounts, analysis
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .portfolio: return tr("Portfolio")
+        case .ledger: return tr("Ledger")
+        case .accounts: return tr("Accounts")
+        case .analysis: return tr("Analysis")
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .portfolio: return "chart.pie.fill"
+        case .ledger: return "list.bullet.rectangle.fill"
+        case .accounts: return "square.stack.3d.up.fill"
+        case .analysis: return "chart.bar.fill"
+        }
+    }
+}
 
 @Observable
 final class AppState {
@@ -40,6 +66,18 @@ final class AppState {
         return value
     }
 
+    /// Page on screen; remembered across launches.
+    var section: AppSection {
+        didSet { UserDefaults.standard.set(section.rawValue, forKey: "appSection") }
+    }
+
+    /// Month or year the Ledger and Analysis pages show.
+    var cashPeriod = CashPeriod(unit: .month, containing: Date())
+
+    /// Result of the last bookkeeping-export import, for Settings and the banner.
+    var ledgerImportMessage: String?
+    var ledgerImportFailed = false
+
     // Backup (see BackupService)
     var lastBackup: Date?
     /// Why the last automatic backup or restore failed, or what a restore did.
@@ -56,6 +94,7 @@ final class AppState {
         let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
         self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
         self.targets = (UserDefaults.standard.dictionary(forKey: "targetAllocation") as? [String: Double]) ?? [:]
+        self.section = AppSection(rawValue: UserDefaults.standard.string(forKey: "appSection") ?? "") ?? .portfolio
         L10n.current = self.language
     }
 
@@ -66,6 +105,37 @@ final class AppState {
               let image = NSImage(contentsOf: url) else { return }
         pendingOCRImages = [image]
         ocrImportPresented = true
+    }
+
+    // MARK: Bookkeeping export
+
+    /// Import a bookkeeping export (.xlsx). Rows already in the ledger are skipped.
+    @MainActor
+    func importLedgerExport(url: URL, into context: ModelContext) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let stats = try LedgerExportImporter.importFile(at: url, into: context)
+            var message = trf("Imported %d records, %d already there", stats.inserted, stats.skipped)
+            if stats.accountsCreated > 0 { message += " · " + trf("%d accounts created", stats.accountsCreated) }
+            if stats.rejected > 0 { message += " · " + trf("%d rows could not be read", stats.rejected) }
+            ledgerImportMessage = message
+            ledgerImportFailed = false
+            if stats.inserted > 0 { section = .ledger }
+        } catch {
+            context.rollback()
+            ledgerImportMessage = trf("Import failed: %@", error.localizedDescription)
+            ledgerImportFailed = true
+        }
+    }
+
+    @MainActor
+    func pickLedgerExport(into context: ModelContext) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "xlsx")].compactMap { $0 }
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importLedgerExport(url: url, into: context)
     }
 
     // MARK: Backup & restore
@@ -80,7 +150,7 @@ final class AppState {
     func backUp(_ context: ModelContext) {
         do {
             let backup = try BackupService.makeBackup(from: context, settings: backupSettings)
-            guard !backup.holdings.isEmpty else { return }
+            guard !backup.holdings.isEmpty || !(backup.transactions ?? []).isEmpty else { return }
             try BackupService.writeBackup(backup, to: BackupService.automaticFolder)
             lastBackup = Date()
             backupMessage = nil

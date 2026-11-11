@@ -93,6 +93,18 @@ final class Transaction {
     var createdAt: Date
     var excludeFromStats: Bool
     var importRecord: ImportRecord?
+    // Cash-flow ledger fields. All have defaults so older stores migrate.
+    /// Where it happened (free text).
+    var address: String = ""
+    /// Part of an expense that came back; statistics count amount − refund.
+    var refundAmount: Decimal = 0
+    var discountAmount: Decimal = 0
+    var feeAmount: Decimal = 0
+    /// Amount that arrived in `transferAccount`, in that account's currency,
+    /// when it differs from `amount` (cross-currency transfer). Nil = converted
+    /// at the dated rate.
+    var transferAmount: Decimal? = nil
+    var updatedAt: Date = Date()
 
     var kind: TransactionKind {
         get { TransactionKind(rawValue: kindRaw) ?? .expense }
@@ -111,7 +123,7 @@ final class Transaction {
         case .income:
             return isSource ? amount : 0
         case .expense:
-            return isSource ? -amount : 0
+            return isSource ? -(amount - refundAmount) : 0
         case .transfer, .liabilityPayment:
             if isSource && isDestination { return 0 }
             if isSource { return -amount }

@@ -47,6 +47,57 @@ final class BackupTests: XCTestCase {
         return try BackupService.decode(try BackupService.encode(backup))
     }
 
+    func testLedgerRecordsRoundTrip() throws {
+        let source = try makeContext()
+        let bank = Account(name: "Bank", kind: .payment, openingBalance: Decimal(string: "1234.56")!)
+        let cash = Account(name: "Dollars", kind: .cash, currencyCode: "USD")
+        [bank, cash].forEach(source.insert)
+        let day = Date(timeIntervalSince1970: 1_750_000_000)
+        let lunch = Transaction(date: day, kind: .expense, amount: Decimal(string: "36.78")!, category: "Food",
+                                subcategory: "Lunch", note: "noodles", tags: "trip", account: bank,
+                                source: .icost, fingerprint: "ledger:abc")
+        lunch.address = "Somewhere 1"
+        lunch.refundAmount = 5
+        let exchange = Transaction(date: day.addingTimeInterval(60), kind: .transfer, amount: 700,
+                                   category: "Transfer", account: bank, transferAccount: cash)
+        exchange.transferAmount = Decimal(string: "98.5")
+        [lunch, exchange].forEach(source.insert)
+        try source.save()
+
+        let backup = try roundTrip(source)
+        let target = try makeContext()
+        try BackupService.restore(backup, into: target)
+        let stats = try BackupService.restore(backup, into: target)
+        XCTAssertEqual(stats.added, 0, "restoring twice adds nothing")
+
+        let records = try target.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date)]))
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records[0].amount, Decimal(string: "36.78"))
+        XCTAssertEqual(records[0].subcategory, "Lunch")
+        XCTAssertEqual(records[0].address, "Somewhere 1")
+        XCTAssertEqual(records[0].refundAmount, 5)
+        XCTAssertEqual(records[0].fingerprint, "ledger:abc")
+        XCTAssertEqual(records[0].account?.name, "Bank")
+        XCTAssertEqual(records[0].account?.openingBalance, Decimal(string: "1234.56"))
+        XCTAssertEqual(records[1].kind, .transfer)
+        XCTAssertEqual(records[1].transferAccount?.name, "Dollars")
+        XCTAssertEqual(records[1].transferAmount, Decimal(string: "98.5"))
+    }
+
+    func testRestoreMatchesAnImportedRecordByFingerprint() throws {
+        // The same export imported on two Macs: ids differ, fingerprints agree.
+        let source = try makeContext()
+        source.insert(Transaction(date: Date(timeIntervalSince1970: 1_750_000_000), kind: .expense, amount: 10,
+                                  source: .icost, fingerprint: "ledger:same"))
+        try source.save()
+        let target = try makeContext()
+        target.insert(Transaction(date: Date(timeIntervalSince1970: 1_750_000_000), kind: .expense, amount: 10,
+                                  source: .icost, fingerprint: "ledger:same"))
+        try target.save()
+        try BackupService.restore(try roundTrip(source), into: target)
+        XCTAssertEqual(try target.fetchCount(FetchDescriptor<Transaction>()), 1)
+    }
+
     func testRestoreIntoEmptyStoreBringsEverythingBack() throws {
         let source = try makeContext()
         try seed(source)
@@ -57,7 +108,7 @@ final class BackupTests: XCTestCase {
 
         let holdings = try target.fetch(FetchDescriptor<Holding>())
         XCTAssertEqual(holdings.count, 2)
-        XCTAssertEqual(try target.fetch(FetchDescriptor<Account>()).count, 2, "accounts without holdings are not part of the board")
+        XCTAssertEqual(try target.fetch(FetchDescriptor<Account>()).count, 3, "cash accounts travel too, for the ledger")
         XCTAssertEqual(try target.fetch(FetchDescriptor<HoldingSnapshot>()).count, 3)
         XCTAssertEqual(try target.fetch(FetchDescriptor<PricePoint>()).count, 1)
         XCTAssertEqual(try target.fetch(FetchDescriptor<CurrencyRate>()).map(\.code), ["USD"], "seed rates are not history")

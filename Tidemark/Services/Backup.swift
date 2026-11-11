@@ -27,6 +27,8 @@ struct BackupFile: Codable {
     var snapshots: [SnapshotRecord]
     var prices: [PriceRecord]
     var rates: [RateRecord]
+    /// Ledger records. Optional so backups made before the ledger still load.
+    var transactions: [TransactionRecord]? = nil
 
     struct Settings: Codable {
         var baseCurrency: String?
@@ -44,6 +46,34 @@ struct BackupFile: Codable {
         var includeInNetWorth: Bool
         var isArchived: Bool
         var createdAt: Date
+        var openingBalance: String? = nil
+    }
+
+    struct TransactionRecord: Codable {
+        var id: UUID
+        var date: Date
+        var kind: String
+        var amount: String
+        var currency: String
+        var category: String
+        var subcategory: String
+        var merchant: String
+        var note: String
+        var tags: String
+        var address: String
+        var account: UUID?
+        var transferAccount: UUID?
+        var transferAmount: String?
+        var refund: String
+        var discount: String
+        var fee: String
+        var source: String
+        var externalID: String?
+        var fingerprint: String
+        var rawPayload: String?
+        var excludeFromStats: Bool
+        var createdAt: Date
+        var updatedAt: Date
     }
 
     struct AssetRecord: Codable {
@@ -140,10 +170,15 @@ enum BackupService {
         let assets = try context.fetch(FetchDescriptor<Asset>())
         let rates = try context.fetch(FetchDescriptor<CurrencyRate>())
 
-        // Only accounts that hold something: the rest are not part of the board.
+        let transactions = try context.fetch(FetchDescriptor<Transaction>())
+
+        // Accounts that hold something, plus every cash-side ledger account.
         var accounts: [UUID: Account] = [:]
         for holding in holdings {
             if let account = holding.account { accounts[account.id] = account }
+        }
+        for account in try context.fetch(FetchDescriptor<Account>()) where account.isLedgerAccount {
+            accounts[account.id] = account
         }
 
         return BackupFile(
@@ -154,7 +189,8 @@ enum BackupService {
             accounts: accounts.values.sorted { $0.createdAt < $1.createdAt }.map {
                 .init(id: $0.id, name: $0.name, kind: $0.kindRaw, currency: $0.currencyCode,
                       source: $0.sourceRaw, note: $0.note, includeInNetWorth: $0.includeInNetWorth,
-                      isArchived: $0.isArchived, createdAt: $0.createdAt)
+                      isArchived: $0.isArchived, createdAt: $0.createdAt,
+                      openingBalance: string($0.openingBalance))
             },
             assets: assets.sorted { $0.createdAt < $1.createdAt }.map {
                 .init(id: $0.id, name: $0.name, symbol: $0.symbol, assetClass: $0.classRaw,
@@ -188,6 +224,17 @@ enum BackupService {
             // Seed rates are rebuilt by the app; only real ones are history.
             rates: rates.filter { !$0.isSeeded }.sorted { $0.date < $1.date }.map {
                 .init(id: $0.id, code: $0.code, rate: string($0.rate), date: $0.date, source: $0.sourceRaw)
+            },
+            transactions: transactions.sorted { $0.date < $1.date }.map {
+                .init(id: $0.id, date: $0.date, kind: $0.kindRaw, amount: string($0.amount),
+                      currency: $0.currencyCode, category: $0.category, subcategory: $0.subcategory,
+                      merchant: $0.merchant, note: $0.note, tags: $0.tags, address: $0.address,
+                      account: $0.account?.id, transferAccount: $0.transferAccount?.id,
+                      transferAmount: $0.transferAmount.map(string), refund: string($0.refundAmount),
+                      discount: string($0.discountAmount), fee: string($0.feeAmount),
+                      source: $0.sourceRaw, externalID: $0.externalID, fingerprint: $0.fingerprint,
+                      rawPayload: $0.rawPayload, excludeFromStats: $0.excludeFromStats,
+                      createdAt: $0.createdAt, updatedAt: $0.updatedAt)
             })
     }
 
@@ -250,6 +297,7 @@ enum BackupService {
             account.includeInNetWorth = record.includeInNetWorth
             account.isArchived = record.isArchived
             account.createdAt = record.createdAt
+            if let opening = record.openingBalance { account.openingBalance = decimal(opening) }
         }
 
         for record in backup.assets {
@@ -359,6 +407,52 @@ enum BackupService {
             rate.date = record.date
             rate.sourceRaw = record.source
             rate.isSeeded = false
+        }
+
+        // Ledger records: matched by id, then by fingerprint (the same export
+        // imported on two devices yields the same fingerprints).
+        var transactions: [UUID: Transaction] = [:]
+        var byFingerprint: [String: Transaction] = [:]
+        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
+            transactions[transaction.id] = transaction
+            byFingerprint[transaction.fingerprint] = transaction
+        }
+        for record in backup.transactions ?? [] {
+            let transaction: Transaction
+            if let existing = transactions[record.id] ?? byFingerprint[record.fingerprint] {
+                transaction = existing
+                stats.updated += 1
+            } else {
+                transaction = Transaction(date: record.date, kind: .expense, amount: 0,
+                                          fingerprint: record.fingerprint)
+                transaction.id = record.id
+                context.insert(transaction)
+                transactions[record.id] = transaction
+                byFingerprint[record.fingerprint] = transaction
+                stats.added += 1
+            }
+            transaction.date = record.date
+            transaction.kindRaw = record.kind
+            transaction.amount = decimal(record.amount)
+            transaction.currencyCode = record.currency
+            transaction.category = record.category
+            transaction.subcategory = record.subcategory
+            transaction.merchant = record.merchant
+            transaction.note = record.note
+            transaction.tags = record.tags
+            transaction.address = record.address
+            transaction.account = record.account.flatMap { accounts[$0] }
+            transaction.transferAccount = record.transferAccount.flatMap { accounts[$0] }
+            transaction.transferAmount = record.transferAmount.map(decimal)
+            transaction.refundAmount = decimal(record.refund)
+            transaction.discountAmount = decimal(record.discount)
+            transaction.feeAmount = decimal(record.fee)
+            transaction.sourceRaw = record.source
+            transaction.externalID = record.externalID
+            transaction.rawPayload = record.rawPayload
+            transaction.excludeFromStats = record.excludeFromStats
+            transaction.createdAt = record.createdAt
+            transaction.updatedAt = record.updatedAt
         }
 
         try context.save()
