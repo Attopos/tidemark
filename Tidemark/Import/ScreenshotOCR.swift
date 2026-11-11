@@ -433,8 +433,31 @@ final class ScreenshotImportSession {
         var platform: ScreenshotPlatform = .alipay
         /// Why this row is unchecked by default (e.g. stablecoin cash).
         var excludedReason: String?
+        /// A holding with a similar, not identical, name. Offered in review,
+        /// never applied on its own: "…联接" and "…联接C" are different funds.
+        var suggestedHoldingID: UUID?
+        var suggestedLabel: String?
+        /// The matched holding was marked as sold earlier; saving reopens it.
+        var reopens = false
 
         var currencySymbol: String { Fmt.symbol(for: platform.currencyCode) }
+    }
+
+    /// A holding of the imported account that no screenshot shows.
+    struct MissingHolding: Identifiable {
+        /// The existing holding's id.
+        let id: UUID
+        let label: String
+        let lastValue: String
+        /// Mark it as sold on the valuation date when saving.
+        var close: Bool
+    }
+
+    /// The account total a screenshot shows against the rows read from it.
+    struct Checksum {
+        let rowsSum: Decimal
+        let total: Decimal
+        let matches: Bool
     }
 
     let images: [NSImage]
@@ -443,6 +466,10 @@ final class ScreenshotImportSession {
     var holdings: [EditableHolding] = []
     var accountTotalText: String = ""
     var accountTotalCurrency = "CNY"
+    /// The detected account total and the platform it belongs to.
+    var accountTotal: Decimal?
+    var accountTotalPlatform: ScreenshotPlatform?
+    var missing: [MissingHolding] = []
     var valuationDate = Date()
     var savedSummary = ""
     var showBoxes = true
@@ -450,6 +477,57 @@ final class ScreenshotImportSession {
 
     init(images: [NSImage]) {
         self.images = images
+    }
+
+    /// Rows of the platform that showed a total, summed and compared with it.
+    /// A mismatch nearly always means a row was cut off or misread.
+    var checksum: Checksum? {
+        guard let total = accountTotal, let platform = accountTotalPlatform else { return nil }
+        let sum = holdings
+            .filter { $0.platform == platform }
+            .compactMap { AlipayScreenshotParser.extractNumber($0.marketValue)?.value }
+            .reduce(Decimal(0), +)
+        return Checksum(rowsSum: sum, total: total, matches: Self.totalsAgree(sum, total))
+    }
+
+    /// Equal within rounding: one unit, or 0.1% of the total if larger.
+    static func totalsAgree(_ rows: Decimal, _ total: Decimal) -> Bool {
+        let tolerance = max(Decimal(1), Swift.abs(total) / 1000)
+        return Swift.abs(rows - total) <= tolerance
+    }
+
+    /// Ids of existing holdings the included rows will update.
+    var matchedHoldingIDs: Set<UUID> {
+        Set(holdings.filter(\.include).compactMap(\.matchedHoldingID))
+    }
+
+    /// Active holdings in the imported platforms' accounts that no row
+    /// matched. Pre-ticked only for the platform whose total was verified
+    /// against the rows: then the screenshots provably show the whole account.
+    static func missingHoldings(existing: [Holding], imported: [EditableHolding],
+                                verifiedPlatform: ScreenshotPlatform?) -> [MissingHolding] {
+        let platforms = Set(imported.map(\.platform))
+        let matched = Set(imported.compactMap(\.matchedHoldingID))
+        var result: [MissingHolding] = []
+        for holding in existing where holding.isActive && !matched.contains(holding.id) {
+            guard let account = holding.account,
+                  let platform = platforms.first(where: {
+                      $0.accountKind == account.kind
+                          && normalizeAccountKey($0.accountName) == normalizeAccountKey(account.name)
+                  }),
+                  let latest = holding.snapshots.max(by: { $0.date < $1.date }),
+                  latest.marketValue > 0 else { continue }
+            result.append(MissingHolding(
+                id: holding.id,
+                label: holding.asset?.displayName ?? "—",
+                lastValue: Fmt.money(latest.marketValue, holding.asset?.currencyCode ?? platform.currencyCode),
+                close: platform == verifiedPlatform))
+        }
+        return result
+    }
+
+    private static func label(_ holding: Holding) -> String {
+        "\(holding.asset?.displayName ?? "holding") · \(holding.account?.name ?? "")"
     }
 
     func run(existingHoldings: [Holding]) async {
@@ -466,6 +544,8 @@ final class ScreenshotImportSession {
                 if total == nil, let found = output.accountTotal {
                     total = found
                     accountTotalCurrency = output.platform.currencyCode
+                    accountTotal = found.value
+                    accountTotalPlatform = output.platform
                 }
             } catch {
                 phase = .failed(error.localizedDescription)
@@ -505,6 +585,7 @@ final class ScreenshotImportSession {
                 return NSDecimalNumber(decimal: f.value.rounded(decimals)).stringValue
             }
             let match = Self.match(draft: draft, in: existingHoldings)
+            let suggestion = match == nil ? Self.suggest(draft: draft, in: existingHoldings) : nil
             // Crypto quantities and prices need far more than 4 decimals.
             let fine = draft.platform == .binance ? 10 : 4
             return EditableHolding(
@@ -520,11 +601,16 @@ final class ScreenshotImportSession {
                 flaggedFields: flagged,
                 sourceBox: draft.box,
                 matchedHoldingID: match?.id,
-                matchedLabel: match.map { "\($0.asset?.displayName ?? "holding") · \($0.account?.name ?? "")" },
+                matchedLabel: match.map(Self.label),
                 platform: draft.platform,
-                excludedReason: draft.excludedAsCash ? tr("Cash (stablecoin) · excluded") : nil
+                excludedReason: draft.excludedAsCash ? tr("Cash (stablecoin) · excluded") : nil,
+                suggestedHoldingID: suggestion?.id,
+                suggestedLabel: suggestion.map(Self.label),
+                reopens: match.map { !$0.isActive } ?? false
             )
         }
+        let verified = (checksum?.matches ?? false) ? accountTotalPlatform : nil
+        missing = Self.missingHoldings(existing: existingHoldings, imported: holdings, verifiedPlatform: verified)
         if let total {
             accountTotalText = NSDecimalNumber(decimal: total.value.rounded(2)).stringValue
         }
@@ -537,18 +623,35 @@ final class ScreenshotImportSession {
         name.replacingOccurrences(of: "[\\s()（）\\-·]", with: "", options: .regularExpression).lowercased()
     }
 
+    /// Holdings a draft may refer to: same currency only (a USD "BTC" row
+    /// must not update a CNY fund), active ones first so a sold duplicate
+    /// never wins over the live holding.
+    private static func candidates(for draft: HoldingDraft, in holdings: [Holding]) -> [Holding] {
+        holdings
+            .filter { ($0.asset?.currencyCode ?? "CNY").uppercased() == draft.platform.currencyCode }
+            .sorted { $0.isActive && !$1.isActive }
+    }
+
+    /// Certain match: same code, or the same name after normalization.
     static func match(draft: HoldingDraft, in holdings: [Holding]) -> Holding? {
-        // Never match across currencies (a USD "BTC" row must not update a CNY fund).
-        let holdings = holdings.filter { ($0.asset?.currencyCode ?? "CNY").uppercased() == draft.platform.currencyCode }
+        let holdings = candidates(for: draft, in: holdings)
         if let code = draft.code, !code.isEmpty {
             if let byCode = holdings.first(where: { $0.asset?.symbol == code }) { return byCode }
         }
         let target = normalizeName(draft.name)
         guard !target.isEmpty else { return nil }
-        if let exact = holdings.first(where: { normalizeName($0.asset?.name ?? "") == target }) { return exact }
-        return holdings.first { holding in
+        return holdings.first(where: { normalizeName($0.asset?.name ?? "") == target })
+    }
+
+    /// Possible match: one name contains the other. Share classes differ by
+    /// one trailing letter, so this is only ever a suggestion for review.
+    static func suggest(draft: HoldingDraft, in holdings: [Holding]) -> Holding? {
+        let target = normalizeName(draft.name)
+        guard !target.isEmpty else { return nil }
+        return candidates(for: draft, in: holdings).first { holding in
+            guard holding.isActive else { return false }
             let candidate = normalizeName(holding.asset?.name ?? "")
-            guard candidate.count >= 6 else { return false }
+            guard candidate.count >= 6, candidate != target else { return false }
             return candidate.contains(target) || target.contains(candidate)
         }
     }
@@ -560,6 +663,7 @@ final class ScreenshotImportSession {
         var updated = 0
         var snapshots = 0
         var snapshotUpdates = 0
+        var closed = 0
     }
 
     func commit(into context: ModelContext) {
@@ -568,6 +672,7 @@ final class ScreenshotImportSession {
             let stats = try performCommit(into: context)
             savedSummary = "\(stats.created) new holding\(stats.created == 1 ? "" : "s"), \(stats.updated) updated · \(stats.snapshots) valuation\(stats.snapshots == 1 ? "" : "s") saved"
                 + (stats.snapshotUpdates > 0 ? " (\(stats.snapshotUpdates) same-day updated in place)" : "")
+                + (stats.closed > 0 ? " · \(stats.closed) marked as sold" : "")
             phase = .done
         } catch {
             context.rollback()
@@ -647,6 +752,7 @@ final class ScreenshotImportSession {
             let holding: Holding
             if let id = edited.matchedHoldingID, let matched = allHoldings.first(where: { $0.id == id }) {
                 holding = matched
+                matched.isActive = true   // sold earlier, bought again
                 local.updated += 1
             } else {
                 let sameCurrency = allAssets.filter { $0.currencyCode.uppercased() == currency }
@@ -663,8 +769,10 @@ final class ScreenshotImportSession {
                     context.insert(asset)
                 }
                 let account = destinationAccount(platform)
-                if let existing = asset.holdings.first(where: { $0.account?.id == account.id && $0.isActive }) {
+                let inAccount = asset.holdings.filter { $0.account?.id == account.id }
+                if let existing = inAccount.first(where: \.isActive) ?? inAccount.first {
                     holding = existing
+                    existing.isActive = true
                     local.updated += 1
                 } else {
                     let created = Holding(asset: asset, account: account, source: platform.source)
@@ -736,6 +844,15 @@ final class ScreenshotImportSession {
             state.lastMessage = importRecord.summary
             state.isConnected = true
             state.updatedAt = Date()
+        }
+
+        // Holdings the user confirmed are gone: a zero valuation on this
+        // date, history kept. Skipped if a row ended up updating the holding.
+        let updatedIDs = matchedHoldingIDs
+        for item in missing where item.close && !updatedIDs.contains(item.id) {
+            guard let holding = allHoldings.first(where: { $0.id == item.id }) else { continue }
+            holding.close(on: valuationDate, source: holding.source, in: context, calendar: calendar)
+            stats.closed += 1
         }
 
         try context.save()

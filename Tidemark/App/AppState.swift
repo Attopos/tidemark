@@ -27,6 +27,17 @@ final class AppState {
         }
     }
 
+    /// Target weight per exposure (Exposure.rawValue → fraction, 0.30 = 30%).
+    /// Empty means no targets; the board then shows no drift.
+    var targets: [String: Double] {
+        didSet { UserDefaults.standard.set(targets, forKey: "targetAllocation") }
+    }
+
+    func target(for exposure: Exposure) -> Double? {
+        guard let value = targets[exposure.rawValue], value > 0 else { return nil }
+        return value
+    }
+
     // Alipay OCR import flow
     var pendingOCRImages: [NSImage] = []
     var ocrImportPresented = false
@@ -36,6 +47,7 @@ final class AppState {
         self.language = AppLanguage(rawValue: savedLanguage) ?? .english
         let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
         self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
+        self.targets = (UserDefaults.standard.dictionary(forKey: "targetAllocation") as? [String: Double]) ?? [:]
         L10n.current = self.language
     }
 

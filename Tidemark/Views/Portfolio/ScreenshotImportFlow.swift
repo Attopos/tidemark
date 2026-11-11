@@ -124,7 +124,8 @@ struct ScreenshotImportFlow: View {
     private func start(_ images: [NSImage]) {
         let newSession = ScreenshotImportSession(images: images)
         session = newSession
-        let holdings = allHoldings.filter(\.isActive)
+        // Sold holdings too: a re-bought fund reopens its old entry.
+        let holdings = allHoldings
         Task { await newSession.run(existingHoldings: holdings) }
     }
 
@@ -202,6 +203,11 @@ private struct OCRReviewStage: View {
         session.holdings.filter { $0.include && (!$0.marketValue.isEmpty || (!$0.quantity.isEmpty && !$0.unitNAV.isEmpty)) }.count
     }
 
+    private var closingCount: Int {
+        let updated = session.matchedHoldingIDs
+        return session.missing.filter { $0.close && !updated.contains($0.id) }.count
+    }
+
     private var flaggedCount: Int {
         session.holdings.filter { $0.include && !$0.flaggedFields.isEmpty }.count
     }
@@ -263,6 +269,20 @@ private struct OCRReviewStage: View {
                                 Text("\(Fmt.symbol(for: session.accountTotalCurrency))\(session.accountTotalText)")
                                     .font(DS.moneySmall)
                                     .foregroundStyle(DS.textPrimary)
+                                if let checksum = session.checksum {
+                                    if checksum.matches {
+                                        Label(tr("matches the rows"), systemImage: "checkmark.circle.fill")
+                                            .font(DS.caption)
+                                            .foregroundStyle(DS.positive)
+                                    } else {
+                                        Label(trf("rows add up to %@ — a row may be missing or misread",
+                                                  Fmt.money(checksum.rowsSum, session.accountTotalCurrency)),
+                                              systemImage: "exclamationmark.triangle.fill")
+                                            .font(DS.caption)
+                                            .foregroundStyle(DS.warning)
+                                            .lineLimit(2)
+                                    }
+                                }
                                 Spacer()
                             }
                             .padding(.horizontal, 4)
@@ -270,6 +290,7 @@ private struct OCRReviewStage: View {
                         ForEach($session.holdings) { $holding in
                             DraftCard(holding: $holding)
                         }
+                        MissingHoldingsCard(session: session)
                         if session.holdings.isEmpty {
                             Text(tr("No holdings parsed — check the screenshot shows the holdings list."))
                                 .font(DS.body)
@@ -287,7 +308,7 @@ private struct OCRReviewStage: View {
                         .buttonStyle(GhostButtonStyle())
                     Button(trf("Save %d holdings", includedWithValues), action: onSave)
                         .buttonStyle(AccentButtonStyle())
-                        .disabled(includedWithValues == 0)
+                        .disabled(includedWithValues == 0 && closingCount == 0)
                         .keyboardShortcut(.defaultAction)
                 }
                 .padding(12)
@@ -338,6 +359,52 @@ private struct ScreenshotPane: View {
     }
 }
 
+// MARK: - Holdings the screenshots don't show
+//
+// A fund that was sold simply disappears from the next screenshot. Without
+// an explicit answer it would stay on the board at its last value forever,
+// so the review asks: still held (screenshot was partial), or sold?
+
+private struct MissingHoldingsCard: View {
+    @Bindable var session: ScreenshotImportSession
+
+    var body: some View {
+        let updated = session.matchedHoldingIDs
+        if session.missing.contains(where: { !updated.contains($0.id) }) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(tr("Not in this screenshot"))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Text(tr("Tick the ones you no longer hold. They are marked as sold on the valuation date; their history is kept."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(DS.textTertiary)
+                ForEach($session.missing) { $item in
+                    if !updated.contains(item.id) {
+                        HStack(spacing: 8) {
+                            Toggle("", isOn: $item.close)
+                                .toggleStyle(LimeCheckboxStyle())
+                                .labelsHidden()
+                            Text(item.label)
+                                .font(DS.body)
+                                .foregroundStyle(DS.textPrimary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(item.lastValue)
+                                .font(DS.moneySmall)
+                                .foregroundStyle(DS.textSecondary)
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.bgSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(DS.border, lineWidth: 1))
+        }
+    }
+}
+
 // MARK: - Editable draft card
 
 private struct DraftCard: View {
@@ -371,20 +438,23 @@ private struct DraftCard: View {
                         .help("Stablecoins are cash, not positions — tick the box to import anyway")
                 }
                 if let matched = holding.matchedLabel {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 11))
-                        Text("\(tr("updates")) \(matched)")
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(DS.finBlue)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2.5)
-                    .background(DS.finBlue.opacity(0.12))
-                    .clipShape(Capsule())
-                    .help("Matched an existing holding — this valuation will be added to it")
+                    chip(icon: "link",
+                         text: "\(tr(holding.reopens ? "reopens" : "updates")) \(matched)",
+                         color: DS.finBlue)
+                        .help(tr("Matched an existing holding — this valuation will be added to it"))
                 } else {
+                    if let suggested = holding.suggestedLabel {
+                        Button {
+                            holding.matchedHoldingID = holding.suggestedHoldingID
+                            holding.matchedLabel = suggested
+                            holding.suggestedHoldingID = nil
+                            holding.suggestedLabel = nil
+                        } label: {
+                            chip(icon: "questionmark.circle", text: trf("Same as %@?", suggested), color: DS.warning)
+                        }
+                        .buttonStyle(.plain)
+                        .help(tr("Similar name, not identical. Click to update that holding instead of adding a new one."))
+                    }
                     Text(tr("new"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(DS.positive)
@@ -418,6 +488,21 @@ private struct DraftCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(DS.border, lineWidth: 1))
         .opacity(holding.include ? 1 : 0.45)
+    }
+
+    private func chip(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+            Text(text)
+                .font(.system(size: 12))
+                .lineLimit(1)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2.5)
+        .background(color.opacity(0.12))
+        .clipShape(Capsule())
     }
 
     @ViewBuilder

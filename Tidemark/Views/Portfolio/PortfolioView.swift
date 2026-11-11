@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 // MARK: - Portfolio — the app's single screen
 //
@@ -8,14 +9,17 @@ import SwiftData
 // the individual holdings. Each holding keeps its own currency (a Binance
 // coin in USD, an Alipay fund in CNY); totals, shares and the donut convert
 // everything to the chosen display currency (CNY or USD) with the dated rate
-// of each valuation. Values come from the latest valuation snapshot — nothing
-// is projected or fabricated. Right-click: exposure override, manual balance
-// correction, delete.
+// of today. Values come from the latest valuation snapshot — nothing is
+// projected or fabricated; the numbers themselves are computed by
+// PortfolioValuation. Right-click: exposure override, manual balance
+// correction, mark as sold (history kept), delete.
 
 struct PortfolioView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Holding> { $0.isActive }) private var holdings: [Holding]
+    /// Every holding, sold ones included: history needs them.
+    @Query private var allHoldings: [Holding]
+    private var holdings: [Holding] { allHoldings.filter(\.isActive) }
     @Query private var rates: [CurrencyRate]
 
     @State private var editingHolding: Holding?
@@ -45,10 +49,22 @@ struct PortfolioView: View {
         var baseValue: Decimal { rows.filter { $0.nativeValue != nil }.reduce(0) { $0 + $1.baseValue } }
     }
 
+    /// Latest valuation of every active holding, at today's rate.
+    private var valuation: PortfolioValuation {
+        PortfolioValuation(inputs: holdings.map(\.valuationInput),
+                           converter: CurrencyConverter(rates: rates, base: app.baseCurrency))
+    }
+
+    /// One total per valuation day; sold holdings count until they were sold.
+    private var history: [PortfolioValuation.HistoryPoint] {
+        PortfolioValuation.history(inputs: allHoldings.map(\.valuationInput),
+                                   converter: CurrencyConverter(rates: rates, base: app.baseCurrency))
+    }
+
     private var rows: [Row] {
-        let converter = CurrencyConverter(rates: rates, base: app.baseCurrency)
+        let valuation = self.valuation
         var built: [Row] = holdings.map { holding in
-            let latest = holding.snapshots.max(by: { $0.date < $1.date })
+            let position = valuation.position(holding.id)
             let currency = holding.asset?.currencyCode ?? "CNY"
             let meta = [holding.asset?.symbol, holding.account?.name]
                 .compactMap { $0?.isEmpty == false ? $0 : nil }
@@ -58,9 +74,9 @@ struct PortfolioView: View {
                        name: holding.asset?.displayName ?? "—",
                        meta: meta,
                        currency: currency,
-                       nativeValue: latest?.marketValue,
-                       baseValue: latest.map { converter.toBase($0.marketValue, currency, at: $0.date) } ?? 0,
-                       updated: latest?.date,
+                       nativeValue: position?.nativeValue,
+                       baseValue: position?.baseValue ?? 0,
+                       updated: position?.date,
                        exposure: holding.asset?.exposure ?? .other)
         }
         built.sort { lhs, rhs in
@@ -102,6 +118,7 @@ struct PortfolioView: View {
                         overview(compact: compact) { id in
                             withAnimation(.easeInOut(duration: 0.35)) { proxy.scrollTo(id, anchor: .top) }
                         }
+                        historyPanel
                         holdingsCard(compact: compact)
                     }
                 }
@@ -131,7 +148,7 @@ struct PortfolioView: View {
             }
             Button(tr("Cancel"), role: .cancel) { pendingDelete = nil }
         } message: {
-            Text(tr("Its valuation history is removed too."))
+            Text(tr("Its valuation history is removed too. To keep the history, use Mark as sold."))
         }
     }
 
@@ -218,12 +235,59 @@ struct PortfolioView: View {
                     Button { jump(group.id) } label: {
                         ExposureCard(group: group,
                                      share: total > 0 ? (group.baseValue / total).doubleValue : 0,
-                                     baseCurrency: app.baseCurrency)
+                                     baseCurrency: app.baseCurrency,
+                                     drift: drift(for: group))
                     }
                     .buttonStyle(.plain)
                     .help(tr("Show these holdings"))
                 }
             }
+        }
+    }
+
+    /// Actual weight against the target set in Settings, if there is one.
+    private func drift(for group: ExposureGroup) -> AllocationDrift? {
+        guard total > 0, let target = app.target(for: group.exposure) else { return nil }
+        return AllocationDrift(target: target, actual: (group.baseValue / total).doubleValue)
+    }
+
+    /// "18% of value is older than 7 days": the total mixes valuation dates,
+    /// so say how much of it is not fresh.
+    private var staleNote: String? {
+        let share = valuation.freshness().staleShare
+        guard share >= 0.005 else { return nil }
+        return trf("%@ of value is older than 7 days", Fmt.percent(share, decimals: 0, showSign: false))
+    }
+
+    @ViewBuilder
+    private var historyPanel: some View {
+        let points = history
+        if points.count >= 2 {
+            HistoryPanel(points: points, currency: app.baseCurrency)
+        }
+    }
+
+    @ViewBuilder
+    private var profitLine: some View {
+        if let profit = valuation.profit {
+            let color = profit.profit >= 0 ? DS.positive : DS.negative
+            HStack(spacing: 5) {
+                Text(tr("Unrealized P/L"))
+                    .foregroundStyle(DS.textSecondary)
+                Text(Fmt.money(profit.profit, app.baseCurrency, showSign: true))
+                    .foregroundStyle(color)
+                if let rate = profit.rate {
+                    Text("(\(Fmt.percent(rate)))")
+                        .foregroundStyle(color)
+                }
+                if profit.coverage < 0.995 {
+                    Text("· " + trf("covers %@ of value", Fmt.percent(profit.coverage, decimals: 0, showSign: false)))
+                        .foregroundStyle(DS.textTertiary)
+                }
+            }
+            .font(.system(size: 13).monospacedDigit())
+            .lineLimit(1)
+            .help(tr("Profit reported by each source on its latest valuation; cost is value minus profit."))
         }
     }
 
@@ -238,10 +302,17 @@ struct PortfolioView: View {
 
     private var totalPanel: some View {
         Panel(title: tr("Total value"), icon: "chart.pie.fill") {
-            if let asOf {
-                Text("\(tr("As of")) \(Fmt.dateMedium.string(from: asOf))")
-                    .font(DS.caption)
-                    .foregroundStyle(DS.textSecondary)
+            HStack(spacing: 10) {
+                if let staleNote {
+                    Text(staleNote)
+                        .font(DS.caption)
+                        .foregroundStyle(DS.warning)
+                }
+                if let asOf {
+                    Text("\(tr("As of")) \(Fmt.dateMedium.string(from: asOf))")
+                        .font(DS.caption)
+                        .foregroundStyle(DS.textSecondary)
+                }
             }
         } content: {
             VStack(alignment: .leading, spacing: 14) {
@@ -277,6 +348,7 @@ struct PortfolioView: View {
                         .font(.system(size: 13).monospacedDigit())
                     }
                     Spacer()
+                    profitLine
                 }
             }
         }
@@ -286,6 +358,7 @@ struct PortfolioView: View {
         let group: ExposureGroup
         let share: Double
         let baseCurrency: String
+        var drift: AllocationDrift? = nil
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -297,6 +370,21 @@ struct PortfolioView: View {
                 Text("\(tr("Share")) \(Fmt.percent(share, showSign: false))")
                     .font(.system(size: 13).monospacedDigit())
                     .foregroundStyle(group.exposure.ink.opacity(0.65))
+                if let drift {
+                    // Target and distance from it; bold once outside the
+                    // rebalancing band (see AllocationDrift).
+                    HStack(spacing: 4) {
+                        if drift.outOfBand {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 11))
+                        }
+                        Text("\(tr("Target")) \(Fmt.percent(drift.target, decimals: 0, showSign: false)) · \(String(format: "%+.1f", drift.drift * 100)) pt")
+                    }
+                    .font(.system(size: 12, weight: drift.outOfBand ? .semibold : .regular).monospacedDigit())
+                    .foregroundStyle(group.exposure.ink.opacity(drift.outOfBand ? 1 : 0.65))
+                    .padding(.top, 2)
+                    .padding(.bottom, 3)
+                }
                 HStack(alignment: .bottom) {
                     Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
                         .font(DS.money(26, weight: .bold))
@@ -385,6 +473,10 @@ struct PortfolioView: View {
         }
         Button(tr("Rename…")) { renamingID = row.id }
         Button(tr("Update balance…")) { editingHolding = row.holding }
+        Button(tr("Mark as sold")) {
+            row.holding.close(on: Date(), source: .manual, in: context)
+            try? context.save()
+        }
         Divider()
         Button(tr("Delete holding"), role: .destructive) {
             pendingDelete = row.holding
@@ -666,5 +758,69 @@ private struct BalanceSheet: View {
         holding.lastUpdated = Date()
         try? context.save()
         dismiss()
+    }
+}
+
+// MARK: - History
+//
+// Total value on every day something was valued. Points are the recorded
+// days; the line between them only joins them.
+
+private struct HistoryPanel: View {
+    let points: [PortfolioValuation.HistoryPoint]
+    let currency: String
+
+    private var domain: ClosedRange<Double> {
+        let values = points.map { $0.total.doubleValue }
+        let low = values.min() ?? 0
+        let high = values.max() ?? 1
+        let pad = max((high - low) * 0.15, high * 0.01, 1)
+        return max(0, low - pad)...(high + pad)
+    }
+
+    var body: some View {
+        let domain = self.domain
+        Panel(title: tr("History"), icon: "chart.xyaxis.line") {
+            Text(trf("%d valuation days", points.count))
+                .font(DS.caption)
+                .foregroundStyle(DS.textSecondary)
+        } content: {
+            Chart(points) { point in
+                AreaMark(x: .value("Date", point.date),
+                         yStart: .value("Base", domain.lowerBound),
+                         yEnd: .value("Value", point.total.doubleValue))
+                    .foregroundStyle(LinearGradient(colors: [DS.accent.opacity(0.22), DS.accent.opacity(0.02)],
+                                                    startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("Date", point.date),
+                         y: .value("Value", point.total.doubleValue))
+                    .foregroundStyle(DS.accent)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                PointMark(x: .value("Date", point.date),
+                          y: .value("Value", point.total.doubleValue))
+                    .foregroundStyle(DS.accent)
+                    .symbolSize(22)
+            }
+            .chartYScale(domain: domain)
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine().foregroundStyle(DS.border)
+                    AxisValueLabel {
+                        if let amount = value.as(Double.self) {
+                            Text(Fmt.moneyCompact(Decimal(amount), currency))
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.textTertiary)
+                }
+            }
+            .frame(height: 170)
+        }
     }
 }

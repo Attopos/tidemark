@@ -72,7 +72,6 @@ enum L10n {
         "Update balance…": "更新余额…", "Update balance": "更新余额",
         "Delete holding": "删除持仓",
         "Delete “%@”?": "删除「%@」?",
-        "Its valuation history is removed too.": "其估值历史也会一并删除。",
         "No holdings yet": "暂无持仓",
         "Import an Alipay screenshot to get started.": "导入一张支付宝持仓截图即可开始。",
 
@@ -112,6 +111,23 @@ enum L10n {
         "Weekly": "每周", "Monthly": "每月", "Quarterly": "每季", "Every 6 months": "每半年", "Yearly": "每年",
         "Imported": "已导入", "Partial": "部分", "Failed": "失败",
 
+        // Valuation, history, targets
+        "History": "历史", "%d valuation days": "%d 个估值日",
+        "Unrealized P/L": "浮动盈亏", "covers %@ of value": "覆盖 %@ 的市值",
+        "Profit reported by each source on its latest valuation; cost is value minus profit.": "各来源在最新估值上报告的收益；成本按市值减收益计算。",
+        "%@ of value is older than 7 days": "%@ 的市值超过 7 天未更新",
+        "Target": "目标", "Target allocation": "目标配置",
+        "Whole percentages. Leave empty for no target.": "填整数百分比，留空表示不设目标。",
+        "Mark as sold": "标记为已卖出",
+        "Its valuation history is removed too. To keep the history, use Mark as sold.": "其估值历史也会一并删除。想保留历史，请用「标记为已卖出」。",
+        "matches the rows": "与各行之和一致",
+        "rows add up to %@ — a row may be missing or misread": "各行之和为 %@，可能漏了一行或有识别错误",
+        "Not in this screenshot": "截图里没有的持仓",
+        "Tick the ones you no longer hold. They are marked as sold on the valuation date; their history is kept.": "勾选已经不再持有的。它们会在估值日期标记为已卖出，历史保留。",
+        "reopens": "重新持有", "Same as %@?": "和 %@ 是同一只？",
+        "Similar name, not identical. Click to update that holding instead of adding a new one.": "名称相近但不完全相同。点击后更新那只持仓，而不是新增。",
+        "Matched an existing holding — this valuation will be added to it": "已匹配到现有持仓，这次估值会记到它名下",
+
         // Settings
         "Language": "语言",
     ]
@@ -136,7 +152,6 @@ enum L10n {
         "Update balance…": "Actualizar saldo…", "Update balance": "Actualizar saldo",
         "Delete holding": "Eliminar posición",
         "Delete “%@”?": "¿Eliminar «%@»?",
-        "Its valuation history is removed too.": "Su historial de valoraciones también se elimina.",
         "No holdings yet": "Sin posiciones aún",
         "Import an Alipay screenshot to get started.": "Importa una captura de Alipay para empezar.",
 
@@ -175,6 +190,23 @@ enum L10n {
         "Manual": "Manual", "Alipay OCR": "OCR de Alipay", "Market data": "Datos de mercado", "Sample data": "Datos de ejemplo",
         "Weekly": "Semanal", "Monthly": "Mensual", "Quarterly": "Trimestral", "Every 6 months": "Semestral", "Yearly": "Anual",
         "Imported": "Importado", "Partial": "Parcial", "Failed": "Fallido",
+
+        // Valuation, history, targets
+        "History": "Historial", "%d valuation days": "%d días valorados",
+        "Unrealized P/L": "P/G no realizada", "covers %@ of value": "cubre el %@ del valor",
+        "Profit reported by each source on its latest valuation; cost is value minus profit.": "Ganancia que informa cada fuente en su última valoración; el coste es el valor menos la ganancia.",
+        "%@ of value is older than 7 days": "El %@ del valor tiene más de 7 días",
+        "Target": "Objetivo", "Target allocation": "Asignación objetivo",
+        "Whole percentages. Leave empty for no target.": "Porcentajes enteros. Vacío = sin objetivo.",
+        "Mark as sold": "Marcar como vendida",
+        "Its valuation history is removed too. To keep the history, use Mark as sold.": "Su historial también se elimina. Para conservarlo, usa Marcar como vendida.",
+        "matches the rows": "coincide con las filas",
+        "rows add up to %@ — a row may be missing or misread": "las filas suman %@: puede faltar una fila o haberse leído mal",
+        "Not in this screenshot": "No aparecen en la captura",
+        "Tick the ones you no longer hold. They are marked as sold on the valuation date; their history is kept.": "Marca las que ya no tienes. Se registran como vendidas en la fecha de valoración y se conserva su historial.",
+        "reopens": "reabre", "Same as %@?": "¿Es %@?",
+        "Similar name, not identical. Click to update that holding instead of adding a new one.": "Nombre parecido, no idéntico. Haz clic para actualizar esa posición en vez de crear otra.",
+        "Matched an existing holding — this valuation will be added to it": "Coincide con una posición existente: la valoración se añade a ella",
 
         // Settings
         "Language": "Idioma",

@@ -14,19 +14,30 @@ No Electron, no web views, no third-party dependencies.
 
 ## What it does
 
-1. **Portfolio board** — total value in CNY, an allocation donut, and a
-   holdings table (value, share, last update) with a total row. Values come
-   from dated valuation snapshots; nothing is projected or fabricated.
-2. **Alipay screenshot OCR** (`⌘I`, drag-drop, or paste) — Vision reads your
-   fund list, you review every parsed field next to the screenshot, then
-   confirm. A recognized fund that already exists gets its balance updated
-   (same-day re-imports update in place, new dates keep history); an unknown
-   fund becomes a new entry. Low-confidence fields are flagged, never silently
-   written.
+1. **Portfolio board** — total value in CNY or USD, allocation by risk
+   exposure, and the holdings under each exposure. Every number is the whole
+   portfolio at one moment: each holding carried from its latest dated
+   valuation and converted at today's rate. The board says how much of the
+   total is older than a week, shows the unrealized profit the sources
+   report, and, if you set target weights in Settings, how far each exposure
+   has drifted (flagged once outside the 5/25 rebalancing band).
+2. **History** — total value on every day something was valued. Values are
+   carried forward between valuations, never interpolated or projected.
+3. **Screenshot OCR** (`⌘I`, drag-drop, or paste) — Vision reads an Alipay
+   fund list or a Binance asset list; you review every parsed field next to
+   the screenshot, then confirm. An existing holding gets a new dated
+   valuation (same-day re-imports update in place); an unknown one becomes a
+   new entry. Low-confidence fields are flagged. A similar but not identical
+   name is only offered as a suggestion. When the screenshot shows an account
+   total, it is checked against the rows. Holdings the screenshot no longer
+   shows are listed so you can mark them as sold.
+4. **Sold holdings keep their history** — "Mark as sold" records a zero
+   valuation and takes the holding off the board; past totals stay right, and
+   importing the asset again reopens it. Delete is for mistaken entries.
 
-Settings has exactly one option: language (English / 中文 / Español), switching
-live without relaunch. Right-click a holding to correct its balance by hand or
-delete it.
+Settings: language (English / 中文 / Español, switching live) and target
+allocation. Right-click a holding to change its exposure, rename it, correct
+its balance, mark it as sold or delete it.
 
 To work alongside iCost, use macOS
 window tiling (Window → Move & Resize → Left & Right, or `fn ⌃ ←` / `fn ⌃ →`).
