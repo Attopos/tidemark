@@ -172,10 +172,7 @@ struct TransactionEditor: View {
                     .opacity(canSave ? 1 : 0.45)
             }
         }
-        .padding(24)
-        .frame(width: 460)
-        .background(DS.panel)
-        .preferredColorScheme(.dark)
+        .editorSheet(width: 460)
     }
 
     private func label(_ text: String) -> some View {

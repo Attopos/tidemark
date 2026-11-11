@@ -7,6 +7,10 @@
 #   ./build.sh run   [--keep]   Build, install to ~/Applications/Tidemark.app,
 #                               launch it. Intermediates are deleted only after
 #                               the app has been copied to its final location.
+#   ./build.sh ios   [--keep]   Build the iPhone app, install it on the
+#                               connected iPhone and launch it (never a
+#                               simulator). Needs the signing team's account
+#                               in Xcode › Settings › Accounts.
 #   ./build.sh clean            Only clean up.
 #
 # --keep skips the cleanup (for debugging a build).
@@ -28,6 +32,9 @@ ROOT="$(pwd -P)"
 PROJECT="Tidemark.xcodeproj"
 SCHEME="Tidemark"
 DD="${HOME}/Library/Caches/tidemark-dd"   # outside any cloud-synced folder
+IOS_DD="${HOME}/Library/Caches/tidemark-dd-ios"
+IOS_SCHEME="TidemarkiOS"
+IOS_BUNDLE_ID="com.shizhengcao.Tidemark"
 XCODE_DD="${HOME}/Library/Developer/Xcode/DerivedData"
 DEST="platform=macOS"                       # macOS app: the Mac is the device
 INSTALL_DIR="${HOME}/Applications"
@@ -37,8 +44,8 @@ CMD=""
 for arg in "$@"; do
   case "$arg" in
     --keep) KEEP=1 ;;
-    build|test|run|clean) CMD="$arg" ;;
-    *) echo "usage: $0 {build|test|run|clean} [--keep]" >&2; exit 2 ;;
+    build|test|run|ios|clean) CMD="$arg" ;;
+    *) echo "usage: $0 {build|test|run|ios|clean} [--keep]" >&2; exit 2 ;;
   esac
 done
 CMD="${CMD:-build}"
@@ -55,6 +62,8 @@ cleanup() {
     find "$DD" -mindepth 1 -maxdepth 1 ! -name ModuleCache.noindex \
       -exec rm -rf {} +
   fi
+
+  rm -rf "$IOS_DD"
 
   # Xcode's default DerivedData for this project (from ⌘B/⌘R in Xcode).
   local d wp
@@ -108,6 +117,21 @@ case "$CMD" in
     ditto "$DD/Build/Products/Debug/Tidemark.app" "$INSTALL_DIR/Tidemark.app"
     open "$INSTALL_DIR/Tidemark.app"
     echo "==> installed and launched $INSTALL_DIR/Tidemark.app"
+    ;;
+  ios)
+    # First connected physical iPhone or iPad.
+    DEVICE="$(xcrun devicectl list devices 2>/dev/null |
+      awk '/connected/ && /physical/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')"
+    if [[ -z "$DEVICE" ]]; then
+      echo "No connected iPhone found (check: xcrun devicectl list devices)." >&2
+      exit 1
+    fi
+    xcodebuild -project "$PROJECT" -scheme "$IOS_SCHEME" -destination "id=$DEVICE" \
+      -derivedDataPath "$IOS_DD" -configuration Debug -allowProvisioningUpdates build
+    xcrun devicectl device install app --device "$DEVICE" \
+      "$IOS_DD/Build/Products/Debug-iphoneos/TidemarkiOS.app"
+    xcrun devicectl device process launch --device "$DEVICE" --terminate-existing "$IOS_BUNDLE_ID"
+    echo "==> installed and launched on $DEVICE"
     ;;
   clean)
     : # cleanup runs from the EXIT trap

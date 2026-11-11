@@ -50,7 +50,9 @@ struct Panel<Content: View, Accessory: View>: View {
                     Text(title)
                         .font(DS.title(18))
                         .foregroundStyle(DS.textPrimary)
-                    Spacer()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Spacer(minLength: 8)
                     accessory
                 }
             }
@@ -164,6 +166,8 @@ struct CapsuleSwitch<Value: Hashable>: View {
                 Button { selection = option } label: {
                     Text(label(option))
                         .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(selected ? DS.ink : DS.textSecondary)
                         .padding(.horizontal, 11)
                         .padding(.vertical, 5)

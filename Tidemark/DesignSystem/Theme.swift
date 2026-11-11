@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(AppKit)
 import AppKit
+#endif
 
 // MARK: - Color hex helpers
 
@@ -13,6 +15,7 @@ extension Color {
     }
 }
 
+#if canImport(AppKit)
 extension NSColor {
     convenience init(hex: UInt32) {
         self.init(
@@ -23,6 +26,7 @@ extension NSColor {
         )
     }
 }
+#endif
 
 // MARK: - Design tokens
 //

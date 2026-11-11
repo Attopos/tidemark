@@ -88,6 +88,14 @@ struct PeriodBar: View {
     }
 
     var body: some View {
+        // The "Today" shortcut is the first thing to go when space is short.
+        ViewThatFits(in: .horizontal) {
+            bar(withToday: true)
+            bar(withToday: false)
+        }
+    }
+
+    private func bar(withToday: Bool) -> some View {
         HStack(spacing: 10) {
             CapsuleSwitch(options: CashPeriod.Unit.allCases, selection: Binding(
                 get: { period.unit },
@@ -98,10 +106,13 @@ struct PeriodBar: View {
             Text(title)
                 .font(.system(size: 15, weight: .semibold).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
-                .frame(minWidth: 96)
+                .lineLimit(1)
+                .frame(minWidth: 88)
             arrow("chevron.right") { period = period.shifted(by: 1) }
-            Button(tr("Today")) { period = CashPeriod(unit: period.unit, containing: Date()) }
-                .buttonStyle(GhostButtonStyle())
+            if withToday {
+                Button(tr("Today")) { period = CashPeriod(unit: period.unit, containing: Date()) }
+                    .buttonStyle(GhostButtonStyle())
+            }
         }
     }
 
@@ -391,14 +402,14 @@ struct CategoryPanel: View {
     var body: some View {
         let stats = self.stats
         let total = stats.reduce(Decimal(0)) { $0 + $1.amount }
-        Panel(title: tr("Categories"), accessory: {
+        Panel(title: tr("Categories")) {
             HStack(spacing: 8) {
+                CapsuleSwitch(options: [TransactionKind.expense, .income], selection: $kind) { $0.displayName }
+                Spacer(minLength: 4)
                 CapsuleSwitch(options: CategoryLevel.allCases, selection: $level) {
                     $0 == .first ? tr("Level 1") : tr("Level 2")
                 }
-                CapsuleSwitch(options: [TransactionKind.expense, .income], selection: $kind) { $0.displayName }
             }
-        }) {
             if stats.isEmpty {
                 Text(tr("No records in this period"))
                     .font(DS.caption)
@@ -467,15 +478,11 @@ struct CategoryPanel: View {
                         .font(.system(size: 12).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                     Spacer(minLength: 6)
-                    if stat.change != 0 {
-                        // Against the previous period; more spending is not "good".
-                        Text("\(stat.change > 0 ? "▲" : "▼") \(Fmt.money(abs(stat.change), code))")
-                            .font(.system(size: 11, weight: .medium).monospacedDigit())
-                            .foregroundStyle(DS.textTertiary)
-                    }
                     Text(Fmt.money(stat.amount, code))
                         .font(DS.money(14, weight: .semibold))
                         .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 HStack(spacing: 8) {
                     GeometryReader { geometry in
@@ -486,10 +493,13 @@ struct CategoryPanel: View {
                         }
                     }
                     .frame(height: 4)
-                    Text("\(stat.count)")
+                    // Change against the previous period, then the record count.
+                    Text((stat.change == 0 ? "" : "\(stat.change > 0 ? "▲" : "▼") \(Fmt.money(abs(stat.change), code)) · ")
+                         + "\(stat.count)")
                         .font(.system(size: 11).monospacedDigit())
                         .foregroundStyle(DS.textTertiary)
-                        .frame(minWidth: 18, alignment: .trailing)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
             }
             .padding(.horizontal, 10)
@@ -575,6 +585,7 @@ struct RecordRow: View {
                     .font(DS.money(14, weight: .semibold))
                     .foregroundStyle(FlowPalette.amountColor(transaction.kind))
                     .lineLimit(1)
+                    .fixedSize()
                 Text(accountText)
                     .font(.system(size: 11.5))
                     .foregroundStyle(DS.textTertiary)
@@ -604,7 +615,7 @@ struct RecordList: View {
             LazyVStack(spacing: 0) {
                 ForEach(transactions.prefix(limit)) { transaction in
                     RecordRow(transaction: transaction, showsDate: showsDate)
-                        .onTapGesture(count: 2) { editing = transaction }
+                        .onOpenGesture { editing = transaction }
                         .contextMenu {
                             Button(tr("Edit…")) { editing = transaction }
                             Button(tr("Delete"), role: .destructive) {

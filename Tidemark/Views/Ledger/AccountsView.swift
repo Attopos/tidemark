@@ -86,18 +86,30 @@ struct AccountsView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Text(tr("Accounts"))
-                .font(DS.title(30))
-                .foregroundStyle(DS.textPrimary)
-            Spacer()
+        let title = Text(tr("Accounts"))
+            .font(DS.title(30))
+            .foregroundStyle(DS.textPrimary)
+            .lineLimit(1)
+            .fixedSize()
+        let controls = HStack(spacing: 12) {
             Toggle(tr("Show archived"), isOn: $showArchived)
                 .toggleStyle(LimeCheckboxStyle())
                 .foregroundStyle(DS.textSecondary)
+                .lineLimit(1)
+                .fixedSize()
             Button(tr("Reconcile…")) { reconciling = true }
                 .buttonStyle(GhostButtonStyle())
+                .fixedSize()
             Button { creating = true } label: { Label(tr("Add account"), systemImage: "plus") }
                 .buttonStyle(AccentButtonStyle())
+                .fixedSize()
+        }
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { title; Spacer(minLength: 12); controls }
+            VStack(alignment: .leading, spacing: 12) {
+                title
+                ScrollView(.horizontal, showsIndicators: false) { controls }
+            }
         }
         .padding(.bottom, 6)
     }
@@ -160,6 +172,8 @@ struct AccountsView: View {
                 Text(Fmt.money(balance, account.currencyCode))
                     .font(DS.money(15, weight: .semibold))
                     .foregroundStyle(balance < 0 ? FlowPalette.expense : DS.textPrimary)
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
@@ -284,10 +298,7 @@ struct AccountEditor: View {
                     .opacity(canSave ? 1 : 0.45)
             }
         }
-        .padding(24)
-        .frame(width: 440)
-        .background(DS.panel)
-        .preferredColorScheme(.dark)
+        .editorSheet(width: 440)
     }
 
     private func row<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -419,10 +430,7 @@ struct ReconcileSheet: View {
                     .opacity(valid ? 1 : 0.45)
             }
         }
-        .padding(24)
-        .frame(width: 600)
-        .background(DS.panel)
-        .preferredColorScheme(.dark)
+        .editorSheet(width: 600)
         .onAppear {
             for account in accounts {
                 texts[account.id] = NSDecimalNumber(decimal: computed(account)).stringValue

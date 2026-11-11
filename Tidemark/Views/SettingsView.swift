@@ -47,6 +47,9 @@ struct SettingsView: View {
                 .font(DS.caption)
                 .foregroundStyle(DS.textTertiary)
             }
+            Section(tr("iCloud")) {
+                SyncStatusView()
+            }
             Section {
                 Button(tr("Import bookkeeping export…")) { app.pickLedgerExport(into: context) }
             } header: {

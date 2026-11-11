@@ -221,6 +221,12 @@ enum L10n {
         "Reconcile accounts": "账户对账",
         "Ledger says": "账面余额",
         "Enter what each account really holds today. The difference goes into its opening balance; records are not touched. Archived accounts leave the totals but keep their records.": "填入每个账户今天的真实余额。差额会记入期初余额，记录本身不变。归档的账户不再计入合计，但记录保留。",
+        "iCloud sync is off (local database could not be opened).": "iCloud 同步已关闭（本地数据库无法打开）。",
+        "iCloud sync is off.": "iCloud 同步已关闭。",
+        "Syncing…": "同步中…",
+        "iCloud sync is on.": "iCloud 同步已开启。",
+        "Synced": "已同步",
+        "Sync now": "立即同步",
     ]
 
     // MARK: Español
@@ -390,5 +396,11 @@ enum L10n {
         "Reconcile accounts": "Conciliar cuentas",
         "Ledger says": "Según el libro",
         "Enter what each account really holds today. The difference goes into its opening balance; records are not touched. Archived accounts leave the totals but keep their records.": "Escribe lo que cada cuenta tiene hoy. La diferencia va al saldo inicial; los movimientos no cambian. Las cuentas archivadas salen de los totales pero conservan sus movimientos.",
+        "iCloud sync is off (local database could not be opened).": "La sincronización con iCloud está desactivada (no se pudo abrir la base de datos).",
+        "iCloud sync is off.": "La sincronización con iCloud está desactivada.",
+        "Syncing…": "Sincronizando…",
+        "iCloud sync is on.": "La sincronización con iCloud está activa.",
+        "Synced": "Sincronizado",
+        "Sync now": "Sincronizar",
     ]
 }

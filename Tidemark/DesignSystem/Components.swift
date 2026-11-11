@@ -250,3 +250,36 @@ struct IssueBanner: View {
         )
     }
 }
+
+// MARK: - Sheet sizing
+
+extension View {
+    /// Editor sheets: a fixed-width panel on the Mac, a full-width scrolling
+    /// page on the iPhone (the keyboard takes half the screen).
+    @ViewBuilder
+    func editorSheet(width: CGFloat) -> some View {
+        #if os(macOS)
+        self.padding(24)
+            .frame(width: width)
+            .background(DS.panel)
+            .preferredColorScheme(.dark)
+        #else
+        ScrollView {
+            self.padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(DS.panel)
+        .preferredColorScheme(.dark)
+        #endif
+    }
+
+    /// Opens on a double-click on the Mac and on a tap on the iPhone.
+    func onOpenGesture(perform action: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        onTapGesture(count: 2, perform: action)
+        #else
+        onTapGesture(perform: action)
+        #endif
+    }
+}
