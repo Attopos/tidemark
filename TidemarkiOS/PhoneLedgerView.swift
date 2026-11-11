@@ -220,6 +220,8 @@ struct PhoneLedgerView: View {
             }
             .font(.system(size: 13, weight: .semibold).monospacedDigit())
             .foregroundStyle(DS.textTertiary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .padding(.horizontal, 4)
 
             VStack(spacing: 0) {

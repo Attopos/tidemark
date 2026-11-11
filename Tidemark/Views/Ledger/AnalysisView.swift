@@ -32,12 +32,21 @@ struct AnalysisView: View {
             let columns = geometry.size.width >= 1180 ? 3 : (geometry.size.width >= 780 ? 2 : 1)
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.gridGap) {
-                    HStack(spacing: 12) {
-                        Text(tr("Analysis"))
-                            .font(DS.title(30))
-                            .foregroundStyle(DS.textPrimary)
-                        Spacer(minLength: 12)
-                        PeriodBar(period: $app.cashPeriod)
+                    let title = Text(tr("Analysis"))
+                        .font(DS.title(30))
+                        .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                        .fixedSize()
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            title
+                            Spacer(minLength: 12)
+                            PeriodBar(period: $app.cashPeriod)
+                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            title
+                            PeriodBar(period: $app.cashPeriod)
+                        }
                     }
                     .padding(.bottom, 6)
 

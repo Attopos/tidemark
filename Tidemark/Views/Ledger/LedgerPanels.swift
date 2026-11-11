@@ -107,6 +107,7 @@ struct PeriodBar: View {
                 .font(.system(size: 15, weight: .semibold).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
+                .fixedSize()
                 .frame(minWidth: 88)
             arrow("chevron.right") { period = period.shifted(by: 1) }
             if withToday {
@@ -252,13 +253,17 @@ struct FlowBarsPanel: View {
     }
 
     var body: some View {
-        Panel(title: tr("Statistics"), accessory: {
-            CapsuleSwitch(options: FlowMode.allCases, selection: $mode) { $0.label }
-        }) {
+        Panel(title: tr("Statistics")) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(focusLabel)
-                    .font(.system(size: 13, weight: .medium).monospacedDigit())
-                    .foregroundStyle(DS.textSecondary)
+                HStack(spacing: 8) {
+                    CapsuleSwitch(options: FlowMode.allCases, selection: $mode) { $0.label }
+                    Spacer(minLength: 4)
+                    Text(focusLabel)
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .foregroundStyle(DS.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
                 Chart {
                     ForEach(buckets) { bucket in
                         BarMark(x: .value("Date", bucket.start, unit: unit),
@@ -327,20 +332,24 @@ struct NetTrendPanel: View {
     }
 
     var body: some View {
-        Panel(title: tr("Cash net assets"), accessory: {
-            CapsuleSwitch(options: Series.allCases, selection: $series) {
-                switch $0 {
-                case .net: return tr("Net")
-                case .assets: return tr("Assets")
-                case .debts: return tr("Debts")
-                }
-            }
-        }) {
+        Panel(title: tr("Cash net assets")) {
             VStack(alignment: .leading, spacing: 10) {
-                if let focus {
-                    Text("\(Fmt.dateShort.string(from: focus.date))  \(Fmt.money(value(focus), code))")
-                        .font(.system(size: 13, weight: .medium).monospacedDigit())
-                        .foregroundStyle(DS.textSecondary)
+                HStack(spacing: 8) {
+                    CapsuleSwitch(options: Series.allCases, selection: $series) {
+                        switch $0 {
+                        case .net: return tr("Net")
+                        case .assets: return tr("Assets")
+                        case .debts: return tr("Debts")
+                        }
+                    }
+                    Spacer(minLength: 4)
+                    if let focus {
+                        Text("\(Fmt.dateShort.string(from: focus.date))  \(Fmt.money(value(focus), code))")
+                            .font(.system(size: 13, weight: .medium).monospacedDigit())
+                            .foregroundStyle(DS.textSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
                 Chart(points) { point in
                     AreaMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))

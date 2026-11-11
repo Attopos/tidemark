@@ -270,7 +270,7 @@ struct AccountEditor: View {
                 row(tr("Currency")) { field($currency).frame(width: 90) }
                 row(tr("Balance now")) {
                     VStack(alignment: .leading, spacing: 4) {
-                        field($balanceText)
+                        field($balanceText).signedAmountKeyboard()
                         Text(tr("Changing this moves the opening balance; records stay as they are."))
                             .font(.system(size: 11.5))
                             .foregroundStyle(DS.textTertiary)
@@ -380,38 +380,41 @@ struct ReconcileSheet: View {
                 .foregroundStyle(DS.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView {
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                    GridRow {
-                        Text(tr("Account"))
-                        Text(tr("Ledger says")).gridColumnAlignment(.trailing)
-                        Text(tr("Balance now"))
-                        Text(tr("Archived"))
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(DS.textTertiary)
+                // Name on its own line, so long account names are never cut
+                // to make room for the figures (the sheet is narrow on a phone).
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(accounts) { account in
-                        GridRow {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("\(account.name) · \(account.currencyCode)")
-                                .font(.system(size: 13.5, weight: .medium))
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(DS.textPrimary)
                                 .lineLimit(1)
-                            Text(Fmt.money(computed(account), account.currencyCode))
-                                .font(.system(size: 13).monospacedDigit())
-                                .foregroundStyle(DS.textSecondary)
-                            TextField("", text: Binding(get: { texts[account.id] ?? "" },
-                                                        set: { texts[account.id] = $0 }))
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 13.5).monospacedDigit())
-                                .foregroundStyle(DS.textPrimary)
-                                .padding(.horizontal, 9)
-                                .frame(width: 130, height: 28)
-                                .background(DS.tile)
-                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                            Toggle("", isOn: Binding(
-                                get: { archived.contains(account.id) },
-                                set: { if $0 { archived.insert(account.id) } else { archived.remove(account.id) } }))
-                                .toggleStyle(LimeCheckboxStyle())
-                                .labelsHidden()
+                            HStack(spacing: 10) {
+                                Text("\(tr("Ledger says")) \(Fmt.money(computed(account), account.currencyCode))")
+                                    .font(.system(size: 12.5).monospacedDigit())
+                                    .foregroundStyle(DS.textSecondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                Spacer(minLength: 4)
+                                TextField("", text: Binding(get: { texts[account.id] ?? "" },
+                                                            set: { texts[account.id] = $0 }))
+                                    .textFieldStyle(.plain)
+                                    .signedAmountKeyboard()
+                                    .font(.system(size: 14).monospacedDigit())
+                                    .foregroundStyle(DS.textPrimary)
+                                    .padding(.horizontal, 9)
+                                    .frame(width: 120, height: 30)
+                                    .background(DS.tile)
+                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                                Toggle(tr("Archived"), isOn: Binding(
+                                    get: { archived.contains(account.id) },
+                                    set: { if $0 { archived.insert(account.id) } else { archived.remove(account.id) } }))
+                                    .toggleStyle(LimeCheckboxStyle())
+                                    .font(.system(size: 12.5))
+                                    .foregroundStyle(DS.textSecondary)
+                                    .lineLimit(1)
+                                    .fixedSize()
+                            }
                         }
                     }
                 }

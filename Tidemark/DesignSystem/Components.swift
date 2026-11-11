@@ -293,4 +293,13 @@ extension View {
         self
         #endif
     }
+
+    /// Like `amountKeyboard`, with a minus sign (a balance can be a debt).
+    func signedAmountKeyboard() -> some View {
+        #if os(iOS)
+        keyboardType(.numbersAndPunctuation)
+        #else
+        self
+        #endif
+    }
 }
