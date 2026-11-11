@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import Combine
 
 // MARK: - Root window: the portfolio, full stop
 
@@ -41,8 +42,14 @@ struct RootView: View {
         .onAppear {
             NSApp.appearance = NSAppearance(named: .darkAqua)
         }
+        // Every saved change refreshes today's backup (see BackupService).
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
+            .debounce(for: .seconds(2), scheduler: RunLoop.main)) { _ in
+            app.backUp(context)
+        }
         .task {
             CurrencyService.ensureSeeds(in: context)
+            app.backUp(context)
             // Daily rate: check hourly while the app is open; only fetches
             // when today's rate is missing, so it's one request per day.
             while !Task.isCancelled {

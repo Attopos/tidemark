@@ -128,6 +128,13 @@ enum L10n {
         "Similar name, not identical. Click to update that holding instead of adding a new one.": "名称相近但不完全相同。点击后更新那只持仓，而不是新增。",
         "Matched an existing holding — this valuation will be added to it": "已匹配到现有持仓，这次估值会记到它名下",
 
+        // Backup
+        "Backup": "备份", "Back up now": "立即备份", "Export…": "导出…", "Restore…": "恢复…",
+        "Restore from backup…": "从备份恢复…", "Last backup": "上次备份",
+        "Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, rates and settings. Restoring merges the file in; nothing is deleted.": "自动保存到 iCloud 云盘 › Tidemark，每天一个文件：持仓、每一次估值、汇率和设置。恢复是把文件合并进来，不会删除任何数据。",
+        "Backup failed: %@": "备份失败：%@", "Restore failed: %@": "恢复失败：%@",
+        "Restored: %d added, %d updated": "已恢复：新增 %d 条，更新 %d 条",
+
         // Settings
         "Language": "语言",
     ]
@@ -207,6 +214,13 @@ enum L10n {
         "reopens": "reabre", "Same as %@?": "¿Es %@?",
         "Similar name, not identical. Click to update that holding instead of adding a new one.": "Nombre parecido, no idéntico. Haz clic para actualizar esa posición en vez de crear otra.",
         "Matched an existing holding — this valuation will be added to it": "Coincide con una posición existente: la valoración se añade a ella",
+
+        // Backup
+        "Backup": "Copia de seguridad", "Back up now": "Copiar ahora", "Export…": "Exportar…", "Restore…": "Restaurar…",
+        "Restore from backup…": "Restaurar desde copia…", "Last backup": "Última copia",
+        "Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, rates and settings. Restoring merges the file in; nothing is deleted.": "Se guarda sola en iCloud Drive › Tidemark, un archivo por día: posiciones, cada valoración, tipos de cambio y ajustes. Restaurar fusiona el archivo; no se borra nada.",
+        "Backup failed: %@": "Falló la copia: %@", "Restore failed: %@": "Falló la restauración: %@",
+        "Restored: %d added, %d updated": "Restaurado: %d añadidos, %d actualizados",
 
         // Settings
         "Language": "Idioma",

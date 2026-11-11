@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 import Observation
+import SwiftData
+import UniformTypeIdentifiers
 
 // MARK: - App state
 //
@@ -38,6 +40,12 @@ final class AppState {
         return value
     }
 
+    // Backup (see BackupService)
+    var lastBackup: Date?
+    /// Why the last automatic backup or restore failed, or what a restore did.
+    var backupMessage: String?
+    var backupFailed = false
+
     // Alipay OCR import flow
     var pendingOCRImages: [NSImage] = []
     var ocrImportPresented = false
@@ -58,5 +66,69 @@ final class AppState {
               let image = NSImage(contentsOf: url) else { return }
         pendingOCRImages = [image]
         ocrImportPresented = true
+    }
+
+    // MARK: Backup & restore
+
+    private var backupSettings: BackupFile.Settings {
+        .init(baseCurrency: baseCurrency, language: language.rawValue, targets: targets)
+    }
+
+    /// Write today's backup to iCloud Drive › Tidemark. An empty store is
+    /// never backed up: on a new device that would shadow the real backup.
+    @MainActor
+    func backUp(_ context: ModelContext) {
+        do {
+            let backup = try BackupService.makeBackup(from: context, settings: backupSettings)
+            guard !backup.holdings.isEmpty else { return }
+            try BackupService.writeBackup(backup, to: BackupService.automaticFolder)
+            lastBackup = Date()
+            backupMessage = nil
+            backupFailed = false
+        } catch {
+            backupMessage = trf("Backup failed: %@", error.localizedDescription)
+            backupFailed = true
+        }
+    }
+
+    /// Save a backup wherever the user chooses.
+    @MainActor
+    func exportBackup(_ context: ModelContext) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = BackupService.fileName()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let backup = try BackupService.makeBackup(from: context, settings: backupSettings)
+            try BackupService.encode(backup).write(to: url, options: .atomic)
+            backupMessage = nil
+            backupFailed = false
+        } catch {
+            backupMessage = trf("Backup failed: %@", error.localizedDescription)
+            backupFailed = true
+        }
+    }
+
+    /// Pick a backup file and merge it into the store (nothing is deleted).
+    @MainActor
+    func restoreBackup(_ context: ModelContext) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = BackupService.automaticFolder
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let backup = try BackupService.decode(try Data(contentsOf: url))
+            let stats = try BackupService.restore(backup, into: context)
+            if let code = backup.settings.baseCurrency, Self.baseCurrencies.contains(code) { baseCurrency = code }
+            if let raw = backup.settings.language, let restored = AppLanguage(rawValue: raw) { language = restored }
+            if let restored = backup.settings.targets { targets = restored }
+            backupMessage = trf("Restored: %d added, %d updated", stats.added, stats.updated)
+            backupFailed = false
+        } catch {
+            context.rollback()
+            backupMessage = trf("Restore failed: %@", error.localizedDescription)
+            backupFailed = true
+        }
     }
 }

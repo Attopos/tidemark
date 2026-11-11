@@ -217,6 +217,9 @@ struct PortfolioView: View {
                 .frame(maxWidth: 420)
             importButton
                 .padding(.top, 4)
+            // A new device starts empty: the backup is in iCloud Drive › Tidemark.
+            Button(tr("Restore from backup…")) { app.restoreBackup(context) }
+                .buttonStyle(GhostButtonStyle())
         }
         .frame(maxWidth: .infinity, minHeight: 320)
         .padding(32)

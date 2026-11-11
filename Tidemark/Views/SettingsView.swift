@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.modelContext) private var context
 
     private var targetSum: Int {
         Int((app.targets.values.reduce(0, +) * 100).rounded())
@@ -46,10 +47,33 @@ struct SettingsView: View {
                 .font(DS.caption)
                 .foregroundStyle(DS.textTertiary)
             }
+            Section {
+                HStack(spacing: 8) {
+                    Button(tr("Back up now")) { app.backUp(context) }
+                    Button(tr("Export…")) { app.exportBackup(context) }
+                    Spacer()
+                    Button(tr("Restore…")) { app.restoreBackup(context) }
+                }
+            } header: {
+                Text(tr("Backup"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, rates and settings. Restoring merges the file in; nothing is deleted."))
+                        .foregroundStyle(DS.textTertiary)
+                    if let message = app.backupMessage {
+                        Text(message)
+                            .foregroundStyle(app.backupFailed ? DS.warning : DS.textSecondary)
+                    } else if let last = app.lastBackup {
+                        Text("\(tr("Last backup")) \(Fmt.relative(last))")
+                            .foregroundStyle(DS.textSecondary)
+                    }
+                }
+                .font(DS.caption)
+            }
         }
         .formStyle(.grouped)
         .tint(DS.accent)
-        .frame(width: 440, height: 560)
+        .frame(width: 460, height: 700)
         .id(app.language)
         .environment(\.locale, app.language.locale)
     }

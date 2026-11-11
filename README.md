@@ -35,6 +35,12 @@ No Electron, no web views, no third-party dependencies.
    valuation and takes the holding off the board; past totals stay right, and
    importing the asset again reopens it. Delete is for mistaken entries.
 
+5. **Backup** — every saved change refreshes a plain JSON backup in iCloud
+   Drive › Tidemark (one file per day, the last 60 kept). On another Mac,
+   "Restore from backup…" merges it back in; nothing is ever deleted. Export
+   and restore by hand from Settings. The backup holds your real amounts:
+   it lives in your iCloud Drive, never in this repository.
+
 Settings: language (English / 中文 / Español, switching live) and target
 allocation. Right-click a holding to change its exposure, rename it, correct
 its balance, mark it as sold or delete it.
