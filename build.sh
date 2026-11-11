@@ -99,7 +99,7 @@ trap 'exit 143' TERM
 
 xb() {
   xcodebuild -project "$PROJECT" -scheme "$SCHEME" -destination "$DEST" \
-    -derivedDataPath "$DD" "$@"
+    -derivedDataPath "$DD" -allowProvisioningUpdates "$@"
 }
 
 case "$CMD" in

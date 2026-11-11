@@ -99,11 +99,12 @@ test is skipped; the other OCR/parser/commit tests run independently.
 ## Data
 
 Everything is stored locally in SwiftData
-(`~/Library/Containers/com.tidemark.app/…/default.store`). Builds from before
-the rename used the bundle identifier `com.personalfinanceos.app`; to carry that
-data over, quit Tidemark and copy `default.store*` from
-`~/Library/Containers/com.personalfinanceos.app/Data/Library/Application Support/`
-into the same path under `com.tidemark.app`. The schema
+(`~/Library/Containers/com.shizhengcao.Tidemark/…/default.store`). Earlier
+builds used the bundle identifiers `com.tidemark.app` and, before that,
+`com.personalfinanceos.app`; to carry that data over, quit Tidemark and copy
+`default.store*` from
+`~/Library/Containers/<old identifier>/Data/Library/Application Support/`
+into the same path under `com.shizhengcao.Tidemark`. The schema
 still carries the tables of earlier, broader versions of the app (transactions
 imported from iCost, FX rate history, import records), so existing databases
 open unchanged; the UI reads and writes only assets, holdings, and their

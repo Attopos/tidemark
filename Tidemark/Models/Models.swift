@@ -539,7 +539,10 @@ enum TidemarkSchema {
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
         let schema = Schema(models)
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+        // Sync is our own (see CloudSync). SwiftData's built-in CloudKit mirroring
+        // must stay off: with an iCloud entitlement it turns itself on, and it
+        // rejects this schema (unique ids, non-optional attributes).
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
 }

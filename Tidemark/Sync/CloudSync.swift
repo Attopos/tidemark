@@ -92,6 +92,11 @@ final class CloudSync: CKSyncEngineDelegate {
 
     func start() {
         guard engine == nil else { return }
+        // The unit-test host is the real app on the real store; it must not sync.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            phase = .off("Running under tests.")
+            return
+        }
         guard Self.isEntitled else {
             phase = .off("This build is not signed for iCloud.")
             return
@@ -131,8 +136,8 @@ final class CloudSync: CKSyncEngineDelegate {
                 self?.fetchNow()
             }
         }
+        // The engine fetches by itself as soon as it knows the iCloud account.
         scheduleScan()
-        fetchNow()
         runProbeIfAsked()
     }
 
@@ -285,7 +290,8 @@ final class CloudSync: CKSyncEngineDelegate {
         case .willFetchChanges, .willSendChanges:
             phase = .syncing
         case .didFetchChanges, .didSendChanges:
-            if case .syncing = phase { phase = .idle }
+            if case .off = phase { break }
+            phase = .idle
         case .sentDatabaseChanges, .willFetchRecordZoneChanges, .didFetchRecordZoneChanges:
             break
         @unknown default:
@@ -534,7 +540,7 @@ final class CloudSync: CKSyncEngineDelegate {
 
     private func note(_ error: Error, doing what: String) {
         let message = "\(what) failed: \(error.localizedDescription)"
-        log(message)
+        log("\(message) — \(String(describing: error).prefix(600))")
         if let cloud = error as? CKError, cloud.code == .notAuthenticated {
             phase = .off("Not signed in to iCloud.")
         } else {
