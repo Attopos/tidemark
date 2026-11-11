@@ -74,18 +74,6 @@ extension Panel where Accessory == EmptyView {
     }
 }
 
-/// Round black badge with an arrow, bottom-right of a category card.
-struct ArrowBadge: View {
-    var body: some View {
-        Image(systemName: "arrow.up.right")
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 36, height: 36)
-            .background(Color.black)
-            .clipShape(Circle())
-    }
-}
-
 /// Small tinted chip ("US equity" tag).
 struct TagChip: View {
     let text: String

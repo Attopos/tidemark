@@ -388,15 +388,11 @@ struct PortfolioView: View {
                     .padding(.top, 2)
                     .padding(.bottom, 3)
                 }
-                HStack(alignment: .bottom) {
-                    Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
-                        .font(DS.money(26, weight: .bold))
-                        .foregroundStyle(group.exposure.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Spacer(minLength: 8)
-                    ArrowBadge()
-                }
+                Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
+                    .font(DS.money(26, weight: .bold))
+                    .foregroundStyle(group.exposure.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
             .padding(18)
             .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
