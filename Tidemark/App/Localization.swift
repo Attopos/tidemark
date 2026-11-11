@@ -230,6 +230,7 @@ enum L10n {
         "Calendar": "日历",
         "Exp": "支",
         "Inc": "收",
+        "Settings…": "设置…",
     ]
 
     // MARK: Español
@@ -408,5 +409,6 @@ enum L10n {
         "Calendar": "Calendario",
         "Exp": "Gasto",
         "Inc": "Ingreso",
+        "Settings…": "Ajustes…",
     ]
 }

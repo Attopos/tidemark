@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct TidemarkApp: App {
     @State private var appState = AppState()
+    @NSApplicationDelegateAdaptor(SyncPushDelegate.self) private var pushDelegate
     private let container: ModelContainer
     private let storageError: String?
     /// Nil when the store could not be opened: an empty in-memory store must
@@ -36,13 +37,6 @@ struct TidemarkApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1120, height: 820)
         .commands { AppCommands(app: appState) }
-
-        Settings {
-            SettingsView()
-                .environment(appState)
-                .environment(sync)
-        }
-        .modelContainer(container)
     }
 }
 
@@ -52,6 +46,11 @@ struct AppCommands: Commands {
     let app: AppState
 
     var body: some Commands {
+        // Settings are a page of the main window, not a separate one.
+        CommandGroup(replacing: .appSettings) {
+            Button(tr("Settings…")) { app.section = .settings }
+                .keyboardShortcut(",", modifiers: .command)
+        }
         CommandGroup(after: .newItem) {
             Divider()
             Button(tr("Import Holdings Screenshot…")) {

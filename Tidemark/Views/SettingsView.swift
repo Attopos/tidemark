@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - App settings (language, target allocation)
+// MARK: - Settings page (a page of the main window, like the others)
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
@@ -12,6 +12,12 @@ struct SettingsView: View {
 
     var body: some View {
         @Bindable var app = app
+        VStack(alignment: .leading, spacing: 0) {
+            Text(tr("Settings"))
+                .font(DS.title(30))
+                .foregroundStyle(DS.textPrimary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
         Form {
             Section(tr("Language")) {
                 CapsuleSwitch(options: AppLanguage.allCases, selection: $app.language) { $0.displayName }
@@ -90,10 +96,13 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .tint(DS.accent)
-        .frame(width: 460, height: 700)
-        .id(app.language)
-        .environment(\.locale, app.language.locale)
+        }
+        .padding(.top, 38)
+        .frame(maxWidth: 760, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity)
+        .background(DS.page)
     }
 
     /// Whole percent in the field, fraction in the store; empty or 0 clears.

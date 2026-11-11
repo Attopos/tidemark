@@ -11,15 +11,21 @@ import AppKit
 // MARK: - iCloud sync
 //
 // Ledger records and cash accounts are kept in step between devices through
-// the user's private iCloud database (CKSyncEngine, one record zone).
+// the user's private iCloud database, in one record zone.
+//
+// One sync cycle is: make sure the zone exists, send what changed here, fetch
+// what changed elsewhere (by change token, so only the difference travels).
 //
 // How it stays fast and honest:
 //  * Every save of the store is followed by a scan that compares each row's
 //    digest with what the server is known to hold (see SyncPlanner); what
-//    differs is sent at once rather than on the engine's own schedule.
-//  * The other device hears about it through a silent push and fetches. A
-//    slow timer and every return to the foreground fetch as well, so a lost
-//    push costs seconds, not correctness.
+//    differs is sent at once.
+//  * The other device learns of it by a silent push when the server grants a
+//    push subscription, and otherwise by a short poll while the app is in
+//    front. The transport is plain CloudKit operations rather than
+//    CKSyncEngine: the engine insists on creating its own subscription first
+//    and fails the whole cycle when the server refuses it, which the China
+//    iCloud gateway did (HTTP 500 on the subscription alone, records fine).
 //  * Two edits of the same row: the later `updatedAt` wins.
 //  * Nothing is ever deleted here because the store looks empty: a sweep that
 //    would remove most known records is refused (a failed store open must
@@ -27,9 +33,14 @@ import AppKit
 
 @MainActor
 @Observable
-final class CloudSync: CKSyncEngineDelegate {
+final class CloudSync {
     static let containerID = "iCloud.com.shizhengcao.Tidemark"
+    private static let subscriptionID = "ledger-changes"
     private static let zoneID = CKRecordZone.ID(zoneName: "Ledger", ownerName: CKCurrentUserDefaultName)
+    private static let batchSize = 200
+
+    /// The running instance, for the app delegates that receive pushes.
+    private(set) static weak var current: CloudSync?
 
     enum Phase: Equatable {
         case off(String)
@@ -43,6 +54,8 @@ final class CloudSync: CKSyncEngineDelegate {
     private(set) var lastActivity: Date?
     private(set) var sentCount = 0
     private(set) var receivedCount = 0
+    /// Whether the push subscription is known to exist on the server.
+    private(set) var pushReady = UserDefaults.standard.bool(forKey: "syncPushReady")
 
     /// Whether this build may talk to iCloud at all. An unsigned or ad-hoc
     /// build has no iCloud entitlement, and touching CloudKit would crash it.
@@ -57,22 +70,26 @@ final class CloudSync: CKSyncEngineDelegate {
     }
 
     private struct StateFile: Codable {
-        var engine: CKSyncEngine.State.Serialization?
+        /// Server change token of the zone, archived.
+        var token: Data?
+        var zoneReady = false
         var records: [String: SyncEntry] = [:]
         /// Records that name an account which has not arrived yet.
         var orphans: [String: SyncFields] = [:]
         /// Account ids that lost an identity merge → the id that survived.
         var aliases: [String: String] = [:]
+        /// Record names to delete on the server.
+        var pendingDeletes: [String] = []
     }
 
     private let context: ModelContext
-    private var engine: CKSyncEngine?
+    private var database: CKDatabase?
     private var state = StateFile()
-    /// Digests handed to the engine and not yet confirmed by the server.
+    /// Rows to send, and the digest each had when it was queued.
     private var queued: [String: String] = [:]
     private var scanTask: Task<Void, Never>?
-    private var sending = false
-    private var sendAgain = false
+    private var syncing = false
+    private var again = false
     private var observers: [NSObjectProtocol] = []
     private var pollTask: Task<Void, Never>?
 
@@ -81,7 +98,7 @@ final class CloudSync: CKSyncEngineDelegate {
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }
-    private static var stateURL: URL { folder.appending(path: "sync-state.json") }
+    private static var stateURL: URL { folder.appending(path: "sync-state-v2.json") }
     static var logURL: URL { folder.appending(path: "sync.log") }
 
     init(container: ModelContainer) {
@@ -91,7 +108,7 @@ final class CloudSync: CKSyncEngineDelegate {
     // MARK: Lifecycle
 
     func start() {
-        guard engine == nil else { return }
+        guard database == nil else { return }
         // The unit-test host is the real app on the real store; it must not sync.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
             phase = .off("Running under tests.")
@@ -106,13 +123,8 @@ final class CloudSync: CKSyncEngineDelegate {
             state = saved
         }
         let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
-        let configuration = CKSyncEngine.Configuration(database: database, stateSerialization: state.engine,
-                                                       delegate: self)
-        let engine = CKSyncEngine(configuration)
-        self.engine = engine
-        if state.records.isEmpty {
-            engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
-        }
+        self.database = database
+        Self.current = self
         log("start: \(state.records.count) records known to the server")
 
         observers.append(NotificationCenter.default.addObserver(
@@ -129,35 +141,135 @@ final class CloudSync: CKSyncEngineDelegate {
         observers.append(NotificationCenter.default.addObserver(forName: active, object: nil, queue: .main) {
             [weak self] _ in Task { @MainActor in self?.fetchNow() }
         })
-        // Safety net for a push that never arrives.
+        // Pushes are the fast path when the subscription exists. Until then,
+        // and as a safety net after, a poll while the app is in front.
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(20))
-                self?.fetchNow()
+                try? await Task.sleep(for: .seconds(self?.pushReady == true ? 30 : 3))
+                if self?.isActive == true { self?.fetchNow() }
             }
         }
-        // The engine fetches by itself as soon as it knows the iCloud account.
-        scheduleScan()
+        if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_DIAG"] != nil {
+            Task { await self.diagnose(database) }
+            return
+        }
+        ensureSubscription(in: database)
+        scan()
+        fetchNow()
         runProbeIfAsked()
     }
 
-    func fetchNow() {
-        guard let engine else { return }
+    /// Step-by-step check of what the server accepts (TIDEMARK_SYNC_DIAG=1).
+    private func diagnose(_ database: CKDatabase) async {
+        func step(_ name: String, _ work: () async throws -> String) async {
+            do { log("diag \(name): ok \(try await work())") }
+            catch { log("diag \(name): FAILED \(String(describing: error).prefix(160))") }
+        }
+        let container = CKContainer(identifier: Self.containerID)
+        await step("account status") { "\(try await container.accountStatus().rawValue)" }
+        await step("user record id") { try await container.userRecordID().recordName.prefix(6) + "…" }
+        await step("list zones") { try await database.allRecordZones().map(\.zoneID.zoneName).joined(separator: ",") }
+        await step("fetch zone changes") {
+            let changes = try await database.recordZoneChanges(inZoneWith: Self.zoneID, since: nil)
+            return "\(changes.modificationResultsByID.count) records"
+        }
+        await step("save empty record, custom zone") {
+            let record = CKRecord(recordType: "Ping", recordID: CKRecord.ID(recordName: "ping-1", zoneID: Self.zoneID))
+            return try await database.save(record).recordID.recordName
+        }
+        await step("save one-field record, custom zone") {
+            let record = CKRecord(recordType: "Ping", recordID: CKRecord.ID(recordName: "ping-2", zoneID: Self.zoneID))
+            record["text"] = "hello"
+            return try await database.save(record).recordID.recordName
+        }
+        await step("save record, default zone") {
+            let record = CKRecord(recordType: "Ping", recordID: CKRecord.ID(recordName: "ping-3"))
+            record["text"] = "hello"
+            return try await database.save(record).recordID.recordName
+        }
+        await step("save record, public database") {
+            let record = CKRecord(recordType: "Ping", recordID: CKRecord.ID(recordName: "ping-\(UUID().uuidString.prefix(8))"))
+            record["text"] = "hello"
+            return try await container.publicCloudDatabase.save(record).recordID.recordName
+        }
+        log("diag done")
+    }
+
+    private var isActive: Bool {
+        #if canImport(UIKit)
+        UIApplication.shared.applicationState == .active
+        #else
+        NSApplication.shared.windows.contains { $0.isVisible && !$0.isMiniaturized }
+        #endif
+    }
+
+    /// Ask the server to push when the zone changes. Failing is not fatal:
+    /// polling covers it, and the next launch tries again.
+    private func ensureSubscription(in database: CKDatabase) {
+        guard !pushReady else { return }
         Task {
-            do { try await engine.fetchChanges() } catch { self.note(error, doing: "fetch") }
+            let subscription = CKDatabaseSubscription(subscriptionID: Self.subscriptionID)
+            let info = CKSubscription.NotificationInfo()
+            info.shouldSendContentAvailable = true
+            subscription.notificationInfo = info
+            do {
+                _ = try await database.modifySubscriptions(saving: [subscription], deleting: [])
+                self.pushReady = true
+                UserDefaults.standard.set(true, forKey: "syncPushReady")
+                self.log("push subscription created")
+            } catch {
+                self.log("push subscription refused by the server (\(error.localizedDescription)); polling instead")
+            }
         }
     }
 
-    private func sendNow() {
-        guard let engine else { return }
-        if sending { sendAgain = true; return }
-        sending = true
+    /// Run a sync cycle now (or right after the one in flight).
+    func fetchNow() {
+        guard database != nil else { return }
+        if syncing { again = true; return }
+        syncing = true
         Task {
+            var rounds = 0
             repeat {
-                sendAgain = false
-                do { try await engine.sendChanges() } catch { self.note(error, doing: "send") }
-            } while sendAgain
-            sending = false
+                again = false
+                rounds += 1
+                await cycle()
+            } while again && rounds < 5
+            syncing = false
+        }
+    }
+
+    private func cycle() async {
+        guard let database else { return }
+        do {
+            if !state.zoneReady {
+                let result = try await database.modifyRecordZones(
+                    saving: [CKRecordZone(zoneID: Self.zoneID)], deleting: [])
+                // The call succeeds even when the one zone in it was refused.
+                for outcome in result.saveResults.values { _ = try outcome.get() }
+                state.zoneReady = true
+                persist()
+                log("zone ready")
+            }
+            try await push(to: database)
+            try await pull(from: database)
+            if case .off = phase { return }
+            phase = .idle
+        } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
+            // The zone went away (or never existed here): start over from local data.
+            log("zone missing on the server; creating it and uploading again")
+            state.zoneReady = false
+            state.token = nil
+            state.records = [:]
+            queued = [:]
+            persist()
+            scan()
+            again = true
+        } catch let error as CKError where error.code == .changeTokenExpired {
+            state.token = nil
+            again = true
+        } catch {
+            note(error, doing: "sync")
         }
     }
 
@@ -170,6 +282,7 @@ final class CloudSync: CKSyncEngineDelegate {
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             self?.scan()
+            self?.fetchNow()
         }
     }
 
@@ -191,8 +304,9 @@ final class CloudSync: CKSyncEngineDelegate {
 
     private func recordID(_ name: String) -> CKRecord.ID { CKRecord.ID(recordName: name, zoneID: Self.zoneID) }
 
+    /// Compare the store with what the server holds and queue the difference.
     private func scan() {
-        guard let engine else { return }
+        guard database != nil else { return }
         let index = loadIndex()
         var local: [String: String] = [:]
         for (id, account) in index.accounts {
@@ -205,6 +319,8 @@ final class CloudSync: CKSyncEngineDelegate {
         if plan.refusedDeletes {
             log("refused to delete most of the server's records; the local store looks incomplete")
         }
+        // A queued row that no longer exists is no longer queued.
+        for name in queued.keys where local[name] == nil { queued[name] = nil }
         guard !plan.saves.isEmpty || !plan.deletes.isEmpty else { return }
 
         // A row that changed without anyone stamping it gets stamped now, so
@@ -228,25 +344,117 @@ final class CloudSync: CKSyncEngineDelegate {
             }
         }
         if stamped { try? context.save() }
-
-        engine.state.add(pendingRecordZoneChanges:
-            plan.saves.map { .saveRecord(recordID($0)) } + plan.deletes.map { .deleteRecord(recordID($0)) })
+        for name in plan.deletes where !state.pendingDeletes.contains(name) { state.pendingDeletes.append(name) }
+        persist()
         log("queued \(plan.saves.count) saves, \(plan.deletes.count) deletes")
-        sendNow()
     }
 
-    func nextRecordZoneChangeBatch(_ context: CKSyncEngine.SendChangesContext,
-                                   syncEngine: CKSyncEngine) async -> CKSyncEngine.RecordZoneChangeBatch? {
-        let scope = context.options.scope
-        let pending = syncEngine.state.pendingRecordZoneChanges.filter { scope.contains($0) }
-        guard !pending.isEmpty else { return nil }
+    private func push(to database: CKDatabase) async throws {
+        guard !queued.isEmpty || !state.pendingDeletes.isEmpty else { return }
+        phase = .syncing
         let index = loadIndex()
-        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { recordID in
-            await MainActor.run { self.record(for: recordID, index: index, engine: syncEngine) }
+        var saves = queued.keys.sorted()
+        var deletes = state.pendingDeletes
+        var conflicts: [CKRecord] = []
+        var saved = 0, deleted = 0, failed = 0
+
+        while !saves.isEmpty || !deletes.isEmpty {
+            let saveNames = Array(saves.prefix(Self.batchSize))
+            saves.removeFirst(saveNames.count)
+            let deleteNames = Array(deletes.prefix(Self.batchSize - saveNames.count))
+            deletes.removeFirst(deleteNames.count)
+
+            var records: [CKRecord] = []
+            var sentDigest: [String: String] = [:]
+            for name in saveNames {
+                guard let record = record(for: recordID(name), index: index) else {
+                    queued[name] = nil
+                    continue
+                }
+                sentDigest[name] = SyncCodec.digest(Self.fields(from: record))
+                records.append(record)
+            }
+            let result = try await database.modifyRecords(
+                saving: records, deleting: deleteNames.map(recordID),
+                savePolicy: .ifServerRecordUnchanged, atomically: false)
+
+            for (id, outcome) in result.saveResults {
+                let name = id.recordName
+                switch outcome {
+                case .success(let record):
+                    state.records[name] = SyncEntry(digest: sentDigest[name] ?? "", system: Self.systemFields(of: record))
+                    // Edited again while in flight: stays queued with its new digest.
+                    if queued[name] == sentDigest[name] { queued[name] = nil }
+                    saved += 1
+                case .failure(let error):
+                    failed += 1
+                    guard let cloud = error as? CKError else { continue }
+                    switch cloud.code {
+                    case .serverRecordChanged:
+                        guard let server = cloud.serverRecord else { continue }
+                        let mine = records.first { $0.recordID == id }
+                            .flatMap { SyncCodec.date(Self.fields(from: $0)["updatedAt"]) } ?? .distantPast
+                        let theirs = SyncCodec.date(Self.fields(from: server)["updatedAt"]) ?? .distantPast
+                        if mine > theirs {
+                            // Ours is the later edit: send it again on top of the server's version.
+                            state.records[name] = SyncEntry(digest: SyncCodec.digest(Self.fields(from: server)),
+                                                            system: Self.systemFields(of: server))
+                            again = true
+                        } else {
+                            queued[name] = nil
+                            conflicts.append(server)
+                        }
+                    case .unknownItem:
+                        state.records[name] = nil
+                        again = true
+                    case .zoneNotFound, .userDeletedZone:
+                        throw cloud
+                    default:
+                        log("could not save \(name): \(cloud.localizedDescription)")
+                    }
+                }
+            }
+            for (id, outcome) in result.deleteResults {
+                let name = id.recordName
+                var done = true
+                if case .failure(let error) = outcome, (error as? CKError)?.code != .unknownItem {
+                    done = false
+                    log("could not delete \(name): \(error.localizedDescription)")
+                }
+                if done {
+                    state.records[name] = nil
+                    state.pendingDeletes.removeAll { $0 == name }
+                    deleted += 1
+                }
+            }
+            persist()
+        }
+        if !conflicts.isEmpty { applyFetched(modifications: conflicts, deletions: []) }
+        if saved + deleted > 0 {
+            sentCount += saved + deleted
+            lastActivity = Date()
+        }
+        log("sent \(saved) saves, \(deleted) deletes" + (failed > 0 ? ", \(failed) to settle" : ""))
+    }
+
+    private func pull(from database: CKDatabase) async throws {
+        var token = state.token.flatMap {
+            try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+        }
+        var more = true
+        while more {
+            let changes = try await database.recordZoneChanges(inZoneWith: Self.zoneID, since: token)
+            let modifications = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+            applyFetched(modifications: modifications, deletions: changes.deletions.map(\.recordID.recordName))
+            token = changes.changeToken
+            state.token = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken,
+                                                            requiringSecureCoding: true)
+            more = changes.moreComing
+            persist()
         }
     }
 
-    private func record(for recordID: CKRecord.ID, index: Index, engine: CKSyncEngine) -> CKRecord? {
+    private func record(for recordID: CKRecord.ID, index: Index) -> CKRecord? {
         let name = recordID.recordName
         var fields: SyncFields?
         if let key = SyncKey(name: name) {
@@ -257,7 +465,6 @@ final class CloudSync: CKSyncEngineDelegate {
         }
         guard let key = SyncKey(name: name), let fields else {
             // Deleted since it was queued.
-            engine.state.remove(pendingRecordZoneChanges: [.saveRecord(recordID)])
             return nil
         }
         let record = state.records[name]?.system.flatMap(Self.record(fromSystemFields:))
@@ -267,70 +474,17 @@ final class CloudSync: CKSyncEngineDelegate {
         return record
     }
 
-    // MARK: Engine events
-
-    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
-        switch event {
-        case .stateUpdate(let update):
-            state.engine = update.stateSerialization
-            persist()
-        case .accountChange(let change):
-            handleAccountChange(change, engine: syncEngine)
-        case .fetchedDatabaseChanges(let changes):
-            if changes.deletions.contains(where: { $0.zoneID == Self.zoneID }) {
-                // The zone was removed elsewhere: forget what the server had and send everything again.
-                log("zone deleted on the server; uploading again")
-                resetServerKnowledge(engine: syncEngine)
-            }
-        case .fetchedRecordZoneChanges(let changes):
-            applyFetched(modifications: changes.modifications.map(\.record),
-                         deletions: changes.deletions.map(\.recordID.recordName), engine: syncEngine)
-        case .sentRecordZoneChanges(let sent):
-            handleSent(sent, engine: syncEngine)
-        case .willFetchChanges, .willSendChanges:
-            phase = .syncing
-        case .didFetchChanges, .didSendChanges:
-            if case .off = phase { break }
-            phase = .idle
-        case .sentDatabaseChanges, .willFetchRecordZoneChanges, .didFetchRecordZoneChanges:
-            break
-        @unknown default:
-            break
-        }
-    }
-
-    private func handleAccountChange(_ change: CKSyncEngine.Event.AccountChange, engine: CKSyncEngine) {
-        switch change.changeType {
-        case .signIn:
-            log("iCloud account signed in")
-            resetServerKnowledge(engine: engine)
-        case .signOut:
-            log("iCloud account signed out")
-            state = StateFile()
-            queued = [:]
-            persist()
-            phase = .off("Not signed in to iCloud.")
-        case .switchAccounts:
-            log("iCloud account switched")
-            resetServerKnowledge(engine: engine)
-        @unknown default:
-            break
-        }
-    }
-
-    /// Local data stays; everything is treated as never sent.
-    private func resetServerKnowledge(engine: CKSyncEngine) {
-        state.records = [:]
-        state.orphans = [:]
-        queued = [:]
-        engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
-        persist()
-        scheduleScan()
-    }
-
     // MARK: Server → local
 
-    private func applyFetched(modifications: [CKRecord], deletions: [String], engine: CKSyncEngine) {
+    private func applyFetched(modifications fetched: [CKRecord], deletions: [String]) {
+        // What we sent comes back in the next fetch; skip what is already here.
+        let modifications = fetched.filter { record in
+            let name = record.recordID.recordName
+            guard let entry = state.records[name],
+                  entry.digest == SyncCodec.digest(Self.fields(from: record)) else { return true }
+            state.records[name] = SyncEntry(digest: entry.digest, system: Self.systemFields(of: record))
+            return false
+        }
         guard !modifications.isEmpty || !deletions.isEmpty else { return }
         var index = loadIndex()
         var byFingerprint: [String: Transaction] = [:]
@@ -445,67 +599,14 @@ final class CloudSync: CKSyncEngineDelegate {
 
         do { try context.save() } catch { note(error, doing: "save fetched changes") }
         if !retired.isEmpty {
-            engine.state.add(pendingRecordZoneChanges: retired.map { .deleteRecord(recordID($0)) })
-            sendNow()
+            for name in retired where !state.pendingDeletes.contains(name) { state.pendingDeletes.append(name) }
+            again = true
         }
         receivedCount += modifications.count + deletions.count
         lastActivity = now
         persist()
         log("received \(modifications.count) changes, \(deletions.count) deletions"
             + (lags.isEmpty ? "" : " [" + lags.joined(separator: "; ") + "]"))
-    }
-
-    private func handleSent(_ sent: CKSyncEngine.Event.SentRecordZoneChanges, engine: CKSyncEngine) {
-        for record in sent.savedRecords {
-            let name = record.recordID.recordName
-            state.records[name] = SyncEntry(digest: SyncCodec.digest(Self.fields(from: record)),
-                                            system: Self.systemFields(of: record))
-            queued[name] = nil
-        }
-        for recordID in sent.deletedRecordIDs {
-            state.records[recordID.recordName] = nil
-        }
-        var conflicts: [CKRecord] = []
-        var retry: [CKSyncEngine.PendingRecordZoneChange] = []
-        for failure in sent.failedRecordSaves {
-            let name = failure.record.recordID.recordName
-            queued[name] = nil
-            switch failure.error.code {
-            case .serverRecordChanged:
-                guard let server = failure.error.serverRecord else { continue }
-                let mine = SyncCodec.date(Self.fields(from: failure.record)["updatedAt"]) ?? .distantPast
-                let theirs = SyncCodec.date(Self.fields(from: server)["updatedAt"]) ?? .distantPast
-                if mine > theirs {
-                    // Ours is the later edit: send it again on top of the server's version.
-                    state.records[name] = SyncEntry(digest: SyncCodec.digest(Self.fields(from: server)),
-                                                    system: Self.systemFields(of: server))
-                    retry.append(.saveRecord(failure.record.recordID))
-                } else {
-                    conflicts.append(server)
-                }
-            case .zoneNotFound, .userDeletedZone:
-                engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: Self.zoneID))])
-                retry.append(.saveRecord(failure.record.recordID))
-            case .unknownItem:
-                state.records[name] = nil
-                retry.append(.saveRecord(failure.record.recordID))
-            default:
-                log("could not save \(name): \(failure.error.localizedDescription)")
-            }
-        }
-        if !conflicts.isEmpty { applyFetched(modifications: conflicts, deletions: [], engine: engine) }
-        if !retry.isEmpty {
-            engine.state.add(pendingRecordZoneChanges: retry)
-            sendNow()
-        }
-        let count = sent.savedRecords.count + sent.deletedRecordIDs.count
-        if count > 0 {
-            sentCount += count
-            lastActivity = Date()
-            log("sent \(sent.savedRecords.count) saves, \(sent.deletedRecordIDs.count) deletes"
-                + (sent.failedRecordSaves.isEmpty ? "" : ", \(sent.failedRecordSaves.count) failed"))
-        }
-        persist()
     }
 
     // MARK: Record plumbing
@@ -603,3 +704,23 @@ final class CloudSync: CKSyncEngineDelegate {
         }
     }
 }
+
+// MARK: - Push delivery
+//
+// A silent push from the subscription means "the zone changed": fetch now.
+
+#if canImport(UIKit)
+final class SyncPushDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        await MainActor.run { CloudSync.current?.fetchNow() }
+        return .newData
+    }
+}
+#elseif canImport(AppKit)
+final class SyncPushDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        Task { @MainActor in CloudSync.current?.fetchNow() }
+    }
+}
+#endif

@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct TidemarkiOSApp: App {
     @State private var appState = AppState()
+    @UIApplicationDelegateAdaptor(SyncPushDelegate.self) private var pushDelegate
     private let container: ModelContainer
     private let storageError: String?
     /// Nil when the store could not be opened: an empty in-memory store must

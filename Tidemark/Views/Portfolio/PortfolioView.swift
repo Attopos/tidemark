@@ -188,7 +188,7 @@ struct PortfolioView: View {
     }
 
     private var settingsButton: some View {
-        SettingsLink {
+        Button { app.section = .settings } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(DS.textSecondary)

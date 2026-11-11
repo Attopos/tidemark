@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 
 /// Pages of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case portfolio, ledger, accounts, analysis
+    case portfolio, ledger, accounts, analysis, settings
 
     var id: String { rawValue }
 
@@ -23,6 +23,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .ledger: return tr("Ledger")
         case .accounts: return tr("Accounts")
         case .analysis: return tr("Analysis")
+        case .settings: return tr("Settings")
         }
     }
 
@@ -32,6 +33,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .ledger: return "list.bullet.rectangle.fill"
         case .accounts: return "square.stack.3d.up.fill"
         case .analysis: return "chart.bar.fill"
+        case .settings: return "gearshape.fill"
         }
     }
 }

@@ -24,6 +24,7 @@ struct RootView: View {
                     case .ledger: LedgerView()
                     case .accounts: AccountsView()
                     case .analysis: AnalysisView()
+                    case .settings: SettingsView()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -102,7 +103,7 @@ struct RootView: View {
 
 // MARK: - Section rail
 
-/// Narrow icon rail on the left edge: one button per page, settings at the bottom.
+/// Narrow icon rail on the left edge: one button per page, settings included.
 private struct SectionRail: View {
     @Binding var selection: AppSection
 
@@ -129,15 +130,6 @@ private struct SectionRail: View {
                 .help(section.title)
             }
             Spacer()
-            SettingsLink {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(DS.textSecondary)
-                    .frame(width: 60, height: 40)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(tr("Settings"))
         }
         .padding(.top, 44)
         .padding(.bottom, 14)
