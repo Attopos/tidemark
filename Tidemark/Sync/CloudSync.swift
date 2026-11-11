@@ -141,11 +141,14 @@ final class CloudSync {
         observers.append(NotificationCenter.default.addObserver(forName: active, object: nil, queue: .main) {
             [weak self] _ in Task { @MainActor in self?.fetchNow() }
         })
-        // Pushes are the fast path when the subscription exists. Until then,
-        // and as a safety net after, a poll while the app is in front.
+        // While the app is in front, ask for changes every 2 seconds: a fetch
+        // with a change token is one small request, and silent pushes are
+        // delivered late or not at all (measured: none arrived on the phone,
+        // records showed up only on the next poll). Pushes still wake the app
+        // in the background.
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(self?.pushReady == true ? 30 : 3))
+                try? await Task.sleep(for: .seconds(2))
                 if self?.isActive == true { self?.fetchNow() }
             }
         }
@@ -221,6 +224,11 @@ final class CloudSync {
                 self.log("push subscription refused by the server (\(error.localizedDescription)); polling instead")
             }
         }
+    }
+
+    func pushArrived() {
+        log("push received")
+        fetchNow()
     }
 
     /// Run a sync cycle now (or right after the one in flight).
@@ -435,6 +443,7 @@ final class CloudSync {
             lastActivity = Date()
         }
         log("sent \(saved) saves, \(deleted) deletes" + (failed > 0 ? ", \(failed) to settle" : ""))
+        // Latency check: the edit time travels in the record.
     }
 
     private func pull(from database: CKDatabase) async throws {
@@ -713,14 +722,14 @@ final class CloudSync {
 final class SyncPushDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        await MainActor.run { CloudSync.current?.fetchNow() }
+        await MainActor.run { CloudSync.current?.pushArrived() }
         return .newData
     }
 }
 #elseif canImport(AppKit)
 final class SyncPushDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
-        Task { @MainActor in CloudSync.current?.fetchNow() }
+        Task { @MainActor in CloudSync.current?.pushArrived() }
     }
 }
 #endif
