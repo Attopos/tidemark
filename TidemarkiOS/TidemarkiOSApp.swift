@@ -41,7 +41,7 @@ struct PhoneRootView: View {
 
     var body: some View {
         TabView {
-            LedgerView()
+            PhoneLedgerView()
                 .tabItem { Label(tr("Ledger"), systemImage: "list.bullet.rectangle.fill") }
             AccountsView()
                 .tabItem { Label(tr("Accounts"), systemImage: "square.stack.3d.up.fill") }

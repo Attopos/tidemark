@@ -540,7 +540,12 @@ final class CloudSync: CKSyncEngineDelegate {
 
     private func note(_ error: Error, doing what: String) {
         let message = "\(what) failed: \(error.localizedDescription)"
-        log("\(message) — \(String(describing: error).prefix(600))")
+        // The server's own explanation, when it gives one.
+        let info = (error as NSError).userInfo
+        let detail = ["ServerErrorDescription", "NSUnderlyingError", "CKErrorDescription", "NSDebugDescription"]
+            .compactMap { key in info[key].map { "\(key)=\(String(describing: $0).prefix(400))" } }
+            .joined(separator: " | ")
+        log("\(message) — \(detail)")
         if let cloud = error as? CKError, cloud.code == .notAuthenticated {
             phase = .off("Not signed in to iCloud.")
         } else {

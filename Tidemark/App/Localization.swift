@@ -227,6 +227,9 @@ enum L10n {
         "iCloud sync is on.": "iCloud 同步已开启。",
         "Synced": "已同步",
         "Sync now": "立即同步",
+        "Calendar": "日历",
+        "Exp": "支",
+        "Inc": "收",
     ]
 
     // MARK: Español
@@ -402,5 +405,8 @@ enum L10n {
         "iCloud sync is on.": "La sincronización con iCloud está activa.",
         "Synced": "Sincronizado",
         "Sync now": "Sincronizar",
+        "Calendar": "Calendario",
+        "Exp": "Gasto",
+        "Inc": "Ingreso",
     ]
 }

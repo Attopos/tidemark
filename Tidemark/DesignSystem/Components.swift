@@ -283,3 +283,14 @@ extension View {
         #endif
     }
 }
+
+extension View {
+    /// Number pad with a decimal point on the iPhone; nothing on the Mac.
+    func amountKeyboard() -> some View {
+        #if os(iOS)
+        keyboardType(.decimalPad)
+        #else
+        self
+        #endif
+    }
+}

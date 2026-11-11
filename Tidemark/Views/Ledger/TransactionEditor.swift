@@ -30,6 +30,7 @@ struct TransactionEditor: View {
     @State private var tags: String
     @State private var refundText: String
     @State private var excluded: Bool
+    @FocusState private var amountFocused: Bool
 
     init(transaction: Transaction?, defaultDate: Date? = nil) {
         self.transaction = transaction
@@ -103,6 +104,8 @@ struct TransactionEditor: View {
                     label(tr("Amount"))
                     HStack(spacing: 8) {
                         field(tr("0.00"), text: $amountText)
+                            .amountKeyboard()
+                            .focused($amountFocused)
                         field(resolvedCurrency, text: $currency).frame(width: 70)
                     }
                 }
@@ -173,6 +176,8 @@ struct TransactionEditor: View {
             }
         }
         .editorSheet(width: 460)
+        // A new record starts at the amount, keypad up.
+        .onAppear { if transaction == nil { amountFocused = true } }
     }
 
     private func label(_ text: String) -> some View {
