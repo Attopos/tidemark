@@ -445,3 +445,101 @@ extension Exposure {
         self == .crypto || self == .chinaEquity ? .white : DS.ink
     }
 }
+
+// MARK: - Account groups (cash side)
+//
+// How the Accounts page sorts cash-side accounts, the way bookkeeping apps
+// do: money you hold, credit you use, prepaid cards, money owed to you and
+// money you owe.
+
+enum AccountGroup: String, CaseIterable, Identifiable {
+    case fund, credit, recharge, receivable, payable
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .fund: return tr("Fund Accounts")
+        case .credit: return tr("Credit Accounts")
+        case .recharge: return tr("Recharge Accounts")
+        case .receivable: return tr("Receivable Accounts")
+        case .payable: return tr("Payable Accounts")
+        }
+    }
+
+    var shortName: String {
+        switch self {
+        case .fund: return tr("Fund")
+        case .credit: return tr("Credit")
+        case .recharge: return tr("Recharge")
+        case .receivable: return tr("Lent out")
+        case .payable: return tr("Borrowed")
+        }
+    }
+
+    /// The account kind that carries the money semantics for this group.
+    var kind: AccountKind {
+        switch self {
+        case .fund: return .payment
+        case .credit, .payable: return .liability
+        case .recharge: return .payment
+        case .receivable: return .other
+        }
+    }
+
+    static func guess(kind: AccountKind, name: String) -> AccountGroup {
+        let n = name.lowercased()
+        switch kind {
+        case .liability:
+            let credit = ["visa", "master", "credit", "信用", "amex", "unionpay", "花呗", "白条", "card"]
+            return credit.contains(where: n.contains) ? .credit : .payable
+        case .other:
+            return .receivable
+        default:
+            let recharge = ["shop", "coffee", "t-money", "card", "会员", "充值", "储值", "卡"]
+            let banks = ["bank", "银行", "boc", "icbc", "abc", "cmb", "ccb", "citic"]
+            if recharge.contains(where: n.contains) && !banks.contains(where: n.contains) { return .recharge }
+            return .fund
+        }
+    }
+}
+
+extension Account {
+    var group: AccountGroup {
+        get { AccountGroup(rawValue: groupRaw) ?? AccountGroup.guess(kind: kind, name: name) }
+        set { groupRaw = newValue.rawValue }
+    }
+
+    /// What kind of account this looks like, until the user names it.
+    var guessedTypeLabel: String {
+        let n = name.lowercased()
+        switch group {
+        case .credit: return tr("Credit Card")
+        case .recharge: return tr("Membership Card")
+        case .receivable: return tr("Lend")
+        case .payable: return tr("Borrow")
+        case .fund:
+            if kind == .cash || n.contains("cash") || n.contains("现金") { return tr("Cash") }
+            if n.contains("wechat") || n.contains("微信") { return tr("WeChat Wallet") }
+            if n.contains("yeb") || n.contains("余额宝") { return tr("Yu'E Bao") }
+            if n.contains("alipay") || n.contains("支付宝") { return tr("Alipay") }
+            return tr("Debit Card")
+        }
+    }
+
+    /// Days until the next statement, for credit cards with a billing day.
+    func daysToBilling(from now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard let day = billingDay, (1...31).contains(day) else { return nil }
+        let today = calendar.startOfDay(for: now)
+        for offset in 0..<2 {
+            guard let month = calendar.date(byAdding: .month, value: offset, to: today) else { continue }
+            var parts = calendar.dateComponents([.year, .month], from: month)
+            let range = calendar.range(of: .day, in: .month, for: month) ?? 1..<29
+            parts.day = Swift.min(day, range.upperBound - 1)
+            if let date = calendar.date(from: parts), date >= today {
+                return calendar.dateComponents([.day], from: today, to: date).day
+            }
+        }
+        return nil
+    }
+}

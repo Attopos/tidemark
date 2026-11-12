@@ -69,7 +69,13 @@ enum SyncCodec {
          "note": account.note,
          "archived": string(account.isArchived),
          "createdAt": string(account.createdAt),
-         "updatedAt": string(account.updatedAt)]
+         "updatedAt": string(account.updatedAt),
+         "group": account.groupRaw,
+         "cardNumber": account.cardNumber,
+         "typeLabel": account.typeLabel,
+         "creditLimit": account.creditLimit.map(string) ?? "",
+         "billingDay": account.billingDay.map(String.init) ?? "",
+         "repaymentDay": account.repaymentDay.map(String.init) ?? ""]
     }
 
     static func apply(_ fields: SyncFields, to account: Account) {
@@ -83,6 +89,12 @@ enum SyncCodec {
         account.isArchived = fields["archived"] == "1"
         account.createdAt = date(fields["createdAt"]) ?? account.createdAt
         account.updatedAt = date(fields["updatedAt"]) ?? account.updatedAt
+        account.groupRaw = fields["group"] ?? ""
+        account.cardNumber = fields["cardNumber"] ?? ""
+        account.typeLabel = fields["typeLabel"] ?? ""
+        account.creditLimit = fields["creditLimit"].flatMap { $0.isEmpty ? nil : decimal($0) }
+        account.billingDay = fields["billingDay"].flatMap { Int($0) }
+        account.repaymentDay = fields["repaymentDay"].flatMap { Int($0) }
     }
 
     // MARK: Ledger record

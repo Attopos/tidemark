@@ -27,6 +27,17 @@ final class Account {
     var createdAt: Date
     var updatedAt: Date
     var isArchived: Bool
+    // Cash-side details (all default so older stores migrate).
+    /// AccountGroup raw value; "" = guessed from the kind and name.
+    var groupRaw: String = ""
+    /// Card or account number, shown under the name.
+    var cardNumber: String = ""
+    /// "Debit Card", "WeChat Wallet", "Membership Card"…
+    var typeLabel: String = ""
+    /// Credit cards: limit, statement day and payment-due day of the month.
+    var creditLimit: Decimal? = nil
+    var billingDay: Int? = nil
+    var repaymentDay: Int? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \Transaction.account)
     var transactions: [Transaction] = []

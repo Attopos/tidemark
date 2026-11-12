@@ -56,6 +56,8 @@ struct BackupFile: Codable {
         var isArchived: Bool
         var createdAt: Date
         var openingBalance: String? = nil
+        /// Cash-side details, in their sync form.
+        var details: [String: String]? = nil
     }
 
     struct TransactionRecord: Codable {
@@ -177,6 +179,12 @@ enum BackupService {
 
     // MARK: Store -> backup
 
+    static func details(of account: Account) -> [String: String] {
+        SyncCodec.fields(of: account).filter {
+            ["group", "cardNumber", "typeLabel", "creditLimit", "billingDay", "repaymentDay"].contains($0.key)
+        }
+    }
+
     static func makeBackup(from context: ModelContext, settings: BackupFile.Settings) throws -> BackupFile {
         let holdings = try context.fetch(FetchDescriptor<Holding>())
         let assets = try context.fetch(FetchDescriptor<Asset>())
@@ -202,7 +210,8 @@ enum BackupService {
                 .init(id: $0.id, name: $0.name, kind: $0.kindRaw, currency: $0.currencyCode,
                       source: $0.sourceRaw, note: $0.note, includeInNetWorth: $0.includeInNetWorth,
                       isArchived: $0.isArchived, createdAt: $0.createdAt,
-                      openingBalance: string($0.openingBalance))
+                      openingBalance: string($0.openingBalance),
+                      details: Self.details(of: $0))
             },
             assets: assets.sorted { $0.createdAt < $1.createdAt }.map {
                 .init(id: $0.id, name: $0.name, symbol: $0.symbol, assetClass: $0.classRaw,
@@ -313,6 +322,14 @@ enum BackupService {
             account.isArchived = record.isArchived
             account.createdAt = record.createdAt
             if let opening = record.openingBalance { account.openingBalance = decimal(opening) }
+            if let details = record.details {
+                account.groupRaw = details["group"] ?? ""
+                account.cardNumber = details["cardNumber"] ?? ""
+                account.typeLabel = details["typeLabel"] ?? ""
+                account.creditLimit = details["creditLimit"].flatMap { $0.isEmpty ? nil : decimal($0) }
+                account.billingDay = details["billingDay"].flatMap { Int($0) }
+                account.repaymentDay = details["repaymentDay"].flatMap { Int($0) }
+            }
         }
 
         for record in backup.assets {

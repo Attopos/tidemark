@@ -3,12 +3,15 @@ import SwiftData
 
 // MARK: - Accounts — where the cash is
 //
-// Cash-side accounts grouped by kind, each with its balance in its own
-// currency. A balance is the opening balance plus every record that touched
-// the account; "Set balance" re-anchors the opening balance so the computed
-// figure matches what the bank shows today. Investment and crypto accounts
-// are valued on the Portfolio page and appear here only as one line, so the
-// two halves add up to a total net worth without double counting.
+// Laid out like a bookkeeping app's asset page: net assets on top (what you
+// hold minus what you owe), money lent out and borrowed beside it, then the
+// accounts in groups — funds, credit cards, prepaid cards, money owed to you,
+// money you owe — each with its own total and collapsible. A row shows the
+// account's description, card number and type; a credit card shows what is
+// owed, the credit left and the days to its statement. Balances are the
+// opening balance plus every record that touched the account; Reconcile sets
+// them to what the bank shows. Investment and crypto accounts live on the
+// Portfolio page, not here.
 
 struct AccountsView: View {
     @Environment(AppState.self) private var app
@@ -16,7 +19,6 @@ struct AccountsView: View {
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
     @Query(sort: \Account.createdAt) private var accounts: [Account]
     @Query private var rates: [CurrencyRate]
-    @Query private var holdings: [Holding]
 
     @State private var selectedID: UUID?
     @State private var editingAccount: Account?
@@ -24,68 +26,44 @@ struct AccountsView: View {
     @State private var editingRecord: Transaction?
     @State private var showArchived = false
     @State private var reconciling = false
+    /// Groups folded shut (remembered).
+    @AppStorage("collapsedAccountGroups") private var collapsedRaw = ""
 
-    private var portfolioVisible: Bool {
-        #if os(macOS)
-        app.portfolioUnlocked
-        #else
-        true
-        #endif
+    private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
+
+    private func toggle(_ group: AccountGroup) {
+        var set = collapsed
+        if set.contains(group.rawValue) { set.remove(group.rawValue) } else { set.insert(group.rawValue) }
+        collapsedRaw = set.sorted().joined(separator: ",")
     }
-
-    private static let kindOrder: [AccountKind] = [.payment, .cash, .liability, .other]
 
     var body: some View {
         let snapshot = LedgerSnapshot(transactions: transactions, accounts: accounts, rates: rates,
                                       code: app.baseCurrency)
-        let net = snapshot.netAssets
-        let portfolio = PortfolioValuation(inputs: holdings.filter(\.isActive).map(\.valuationInput),
-                                           converter: snapshot.converter).total
         let visible = snapshot.accounts.filter { showArchived || !$0.isArchived }
 
         GeometryReader { geometry in
             let wide = geometry.size.width >= 900
             ScrollView {
-                VStack(alignment: .leading, spacing: DS.gridGap) {
+                VStack(alignment: .leading, spacing: 12) {
                     header
-                    HStack(alignment: .top, spacing: DS.gridGap) {
-                        if portfolioVisible {
-                            HeroFigure(title: tr("Net worth"), value: net.assets - net.debts + portfolio,
-                                       code: snapshot.code,
-                                       details: [(tr("Cash"), Fmt.money(net.assets - net.debts, snapshot.code)),
-                                                 (tr("Portfolio"), Fmt.money(portfolio, snapshot.code))])
-                        } else {
-                            // The portfolio is locked: its value is not shown here either.
-                            HeroFigure(title: tr("Net worth"), value: nil, code: snapshot.code,
-                                       details: [(tr("Cash"), Fmt.money(net.assets - net.debts, snapshot.code)),
-                                                 (tr("Portfolio"), Fmt.privacyMask)])
-                        }
-                        if wide {
-                            HeroFigure(title: tr("Cash net assets"), value: net.assets - net.debts,
-                                       code: snapshot.code,
-                                       details: [(tr("Assets"), Fmt.money(net.assets, snapshot.code)), (tr("Debts"), Fmt.money(net.debts, snapshot.code))])
-                        }
-                    }
-                    if visible.isEmpty {
-                        Panel {
-                            Text(tr("No accounts yet. They are created when you import records, or add one here."))
-                                .font(DS.body)
-                                .foregroundStyle(DS.textSecondary)
-                                .frame(maxWidth: .infinity, minHeight: 120)
-                        }
-                    } else if wide {
+                    if wide {
                         HStack(alignment: .top, spacing: DS.gridGap) {
-                            accountList(visible, snapshot: snapshot)
+                            VStack(spacing: 12) {
+                                summary(snapshot)
+                                groups(visible, snapshot: snapshot)
+                            }
+                            .frame(maxWidth: 560)
                             detail(snapshot: snapshot)
                         }
                     } else {
-                        accountList(visible, snapshot: snapshot)
-                        detail(snapshot: snapshot)
+                        summary(snapshot)
+                        groups(visible, snapshot: snapshot)
                     }
                 }
-                .padding(.horizontal, wide ? DS.pagePadding : 20)
-                .padding(.top, wide ? 38 : 24)
-                .padding(.bottom, DS.pagePadding)
+                .padding(.horizontal, wide ? DS.pagePadding : 16)
+                .padding(.top, wide ? 38 : 12)
+                .padding(.bottom, 110)
                 .frame(maxWidth: 1300, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
@@ -99,104 +77,258 @@ struct AccountsView: View {
             ReconcileSheet(accounts: snapshot.accounts, balances: snapshot.balances)
         }
         .sheet(item: $editingRecord) { TransactionEditor(transaction: $0) }
+        #if os(iOS)
+        // On the phone an account opens as its own sheet.
+        .sheet(item: Binding(get: { snapshot.accounts.first { $0.id == selectedID } },
+                             set: { selectedID = $0?.id })) { account in
+            ScrollView { accountDetail(account, snapshot: snapshot).padding(16) }
+                .background(DS.page)
+                .presentationDetents([.medium, .large])
+        }
+        #endif
     }
+
+    // MARK: Header
 
     private var header: some View {
-        let title = Text(tr("Accounts"))
-            .font(DS.title(30))
-            .foregroundStyle(DS.textPrimary)
-            .lineLimit(1)
-            .fixedSize()
         @Bindable var app = app
-        let controls = HStack(spacing: 12) {
-            AmountsToggle(hidden: $app.amountsHidden)
-            Toggle(tr("Show archived"), isOn: $showArchived)
-                .toggleStyle(LimeCheckboxStyle())
-                .foregroundStyle(DS.textSecondary)
+        return HStack(spacing: 10) {
+            Text(tr("Accounts"))
+                .font(DS.title(30))
+                .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .fixedSize()
-            Button(tr("Reconcile…")) { reconciling = true }
-                .buttonStyle(GhostButtonStyle())
-                .fixedSize()
-            Button { creating = true } label: { Label(tr("Add account"), systemImage: "plus") }
-                .buttonStyle(AccentButtonStyle())
-                .fixedSize()
-        }
-        return ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) { title; Spacer(minLength: 12); controls }
-            VStack(alignment: .leading, spacing: 12) {
-                title
-                ScrollView(.horizontal, showsIndicators: false) { controls }
+            Spacer(minLength: 8)
+            Menu {
+                Button(tr("Reconcile…")) { reconciling = true }
+                Toggle(tr("Show archived"), isOn: $showArchived)
+            } label: {
+                Text(tr("More"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(DS.textSecondary)
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background(DS.tile)
+                    .clipShape(Capsule())
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            Button { creating = true } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(DS.ink)
+                    .frame(width: 30, height: 30)
+                    .background(DS.accent)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help(tr("Add account"))
         }
-        .padding(.bottom, 6)
+        .padding(.bottom, 4)
     }
 
-    private func accountList(_ visible: [Account], snapshot: LedgerSnapshot) -> some View {
-        VStack(spacing: DS.gridGap) {
-            ForEach(Self.kindOrder, id: \.self) { kind in
-                let group = visible.filter { $0.kind == kind }
-                    .sorted { abs(baseValue($0, snapshot)) > abs(baseValue($1, snapshot)) }
-                if !group.isEmpty {
-                    let total = group.filter { $0.includeInNetWorth && !$0.isArchived }
-                        .reduce(Decimal(0)) { $0 + baseValue($1, snapshot) }
-                    Panel(title: "\(kind.displayName) (\(group.count))", accessory: {
-                        Text(Fmt.money(total, snapshot.code))
-                            .font(.system(size: 13).monospacedDigit())
+    // MARK: Summary
+
+    private func summary(_ snapshot: LedgerSnapshot) -> some View {
+        @Bindable var app = app
+        let net = snapshot.netAssets
+        var lent: Decimal = 0
+        var borrowed: Decimal = 0
+        for account in snapshot.accounts where account.includeInNetWorth && !account.isArchived {
+            let value = snapshot.converter.toBase(snapshot.balances[account.id] ?? 0, account.currencyCode)
+            if account.group == .receivable { lent += value }
+            if account.group == .payable { borrowed += -value }
+        }
+        return VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(tr("Net Assets"))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DS.textSecondary)
+                    Button { app.amountsHidden.toggle() } label: {
+                        Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(DS.textSecondary)
-                    }) {
-                        VStack(spacing: 2) {
-                            ForEach(group) { account in
-                                accountRow(account, snapshot: snapshot)
-                            }
-                        }
                     }
+                    .buttonStyle(.plain)
+                }
+                Text(Fmt.money(net.assets - net.debts, snapshot.code))
+                    .font(DS.money(30, weight: .bold))
+                    .foregroundStyle(DS.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                HStack(spacing: 16) {
+                    figure(tr("Total"), Fmt.money(net.assets, snapshot.code))
+                    figure(tr("Debts"), Fmt.money(net.debts, snapshot.code))
                 }
             }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.panel)
+            .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
+            HStack(spacing: 10) {
+                smallCard(tr("Total Borrowing"), Fmt.money(Swift.max(0, borrowed), snapshot.code),
+                          icon: "arrow.down", tint: DS.textTertiary)
+                smallCard(tr("Total Lending"), Fmt.money(Swift.max(0, lent), snapshot.code),
+                          icon: "arrow.up", tint: DS.lime)
+            }
         }
-        .frame(maxWidth: .infinity)
     }
+
+    private func figure(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(label).foregroundStyle(DS.textTertiary)
+            Text(value).foregroundStyle(DS.textSecondary)
+        }
+        .font(.system(size: 13).monospacedDigit())
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+
+    private func smallCard(_ title: String, _ value: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(DS.ink)
+                .frame(width: 28, height: 28)
+                .background(tint)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(DS.textTertiary)
+                    .lineLimit(1)
+                Text(value)
+                    .font(DS.money(15, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(DS.panel)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: Groups
 
     private func baseValue(_ account: Account, _ snapshot: LedgerSnapshot) -> Decimal {
         snapshot.converter.toBase(snapshot.balances[account.id] ?? 0, account.currencyCode)
     }
 
+    @ViewBuilder
+    private func groups(_ visible: [Account], snapshot: LedgerSnapshot) -> some View {
+        if visible.isEmpty {
+            Text(tr("No accounts yet. They are created when you import records, or add one here."))
+                .font(DS.body)
+                .foregroundStyle(DS.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 120)
+        }
+        ForEach(AccountGroup.allCases) { group in
+            let members = visible.filter { $0.group == group }
+                .sorted { Swift.abs(baseValue($0, snapshot).doubleValue) > Swift.abs(baseValue($1, snapshot).doubleValue) }
+            if !members.isEmpty {
+                let total = members.filter { $0.includeInNetWorth && !$0.isArchived }
+                    .reduce(Decimal(0)) { $0 + baseValue($1, snapshot) }
+                let folded = collapsed.contains(group.rawValue)
+                VStack(alignment: .leading, spacing: 8) {
+                    Button { withAnimation(.easeInOut(duration: 0.2)) { toggle(group) } } label: {
+                        HStack(spacing: 4) {
+                            Text(group.displayName)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(DS.textPrimary)
+                            Text("(\(members.count))")
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(DS.textTertiary)
+                            Spacer(minLength: 8)
+                            Text("\(tr("Balance")): \(Fmt.money(total, snapshot.code))")
+                                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                                .foregroundStyle(DS.textTertiary)
+                                .lineLimit(1)
+                            Image(systemName: folded ? "chevron.right" : "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                        .padding(.horizontal, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    if !folded {
+                        VStack(spacing: 0) {
+                            ForEach(Array(members.enumerated()), id: \.element.id) { index, account in
+                                accountRow(account, snapshot: snapshot)
+                                if index < members.count - 1 {
+                                    Divider().overlay(DS.border.opacity(0.5)).padding(.leading, 60)
+                                }
+                            }
+                        }
+                        .background(DS.panel)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    private func subtitleLines(_ account: Account) -> [String] {
+        var lines: [String] = []
+        if !account.note.isEmpty { lines.append(account.note) }
+        if !account.cardNumber.isEmpty { lines.append(account.cardNumber) }
+        var type = account.typeLabel.isEmpty ? account.guessedTypeLabel : account.typeLabel
+        if account.group == .credit, let days = account.daysToBilling() {
+            type = "\(type.isEmpty ? "" : "[\(type)] ")\(trf("Billing in %d days", days))"
+        }
+        if !type.isEmpty { lines.append(type) }
+        return lines
+    }
+
     private func accountRow(_ account: Account, snapshot: LedgerSnapshot) -> some View {
         let selected = selectedID == account.id
         let balance = snapshot.balances[account.id] ?? 0
+        let isCredit = account.group == .credit
+        let owed = Swift.max(0, -balance)
         return Button { selectedID = selected ? nil : account.id } label: {
-            HStack(spacing: 12) {
-                Text(String(account.name.prefix(1)).uppercased())
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(DS.ink)
-                    .frame(width: 32, height: 32)
-                    .background(account.kind == .liability ? DS.violet : DS.lime)
-                    .clipShape(Circle())
+            HStack(alignment: .center, spacing: 12) {
+                AccountIcon(account: account)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(account.name)
-                            .font(.system(size: 14.5, weight: .semibold))
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         if !account.includeInNetWorth { TagChip(text: tr("Not counted"), color: DS.textSecondary) }
                         if account.isArchived { TagChip(text: tr("Archived"), color: DS.textSecondary) }
                     }
-                    Text(account.note.isEmpty ? account.currencyCode : "\(account.currencyCode) · \(account.note)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(DS.textTertiary)
-                        .lineLimit(1)
+                    ForEach(subtitleLines(account), id: \.self) { line in
+                        Text(line)
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.textTertiary)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 8)
-                Text(Fmt.money(balance, account.currencyCode))
-                    .font(DS.money(15, weight: .semibold))
-                    .foregroundStyle(balance < 0 ? FlowPalette.expense : DS.textPrimary)
-                    .lineLimit(1)
-                    .fixedSize()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(Fmt.money(isCredit ? owed : balance, account.currencyCode))
+                        .font(DS.money(15, weight: .semibold))
+                        .foregroundStyle(!isCredit && balance < 0 ? FlowPalette.expense : DS.textPrimary)
+                        .lineLimit(1)
+                        .fixedSize()
+                    if isCredit, let limit = account.creditLimit {
+                        Text("\(tr("Avl Credit")): \(Fmt.money(limit - owed, account.currencyCode))")
+                            .font(.system(size: 11.5).monospacedDigit())
+                            .foregroundStyle(DS.textTertiary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
             .background(selected ? DS.tile : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -205,33 +337,61 @@ struct AccountsView: View {
         }
     }
 
+    // MARK: Detail
+
     @ViewBuilder
     private func detail(snapshot: LedgerSnapshot) -> some View {
         if let account = snapshot.accounts.first(where: { $0.id == selectedID }) {
-            let records = transactions.filter { $0.account?.id == account.id || $0.transferAccount?.id == account.id }
-            Panel(title: account.name, accessory: {
-                Button(tr("Edit…")) { editingAccount = account }
-                    .buttonStyle(GhostButtonStyle())
-            }) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 10) {
-                        StatTile(title: tr("Balance"), value: snapshot.balances[account.id] ?? 0,
-                                 code: account.currencyCode)
-                        StatTile(title: tr("Records"), value: Decimal(records.count), code: "", isCount: true)
-                    }
-                    RecordList(transactions: records, showsDate: true, editing: $editingRecord)
-                }
-            }
-            .frame(maxWidth: .infinity)
+            accountDetail(account, snapshot: snapshot)
+                .frame(maxWidth: .infinity)
         } else {
-            Panel {
-                Text(tr("Select an account to see its records"))
-                    .font(DS.body)
-                    .foregroundStyle(DS.textTertiary)
-                    .frame(maxWidth: .infinity, minHeight: 200)
-            }
-            .frame(maxWidth: .infinity)
+            Text(tr("Select an account to see its records"))
+                .font(DS.body)
+                .foregroundStyle(DS.textTertiary)
+                .frame(maxWidth: .infinity, minHeight: 300)
         }
+    }
+
+    private func accountDetail(_ account: Account, snapshot: LedgerSnapshot) -> some View {
+        let records = transactions.filter { $0.account?.id == account.id || $0.transferAccount?.id == account.id }
+        return Panel(title: account.name, accessory: {
+            Button(tr("Edit…")) { editingAccount = account }
+                .buttonStyle(GhostButtonStyle())
+        }) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    StatTile(title: tr("Balance"), value: snapshot.balances[account.id] ?? 0,
+                             code: account.currencyCode)
+                    StatTile(title: tr("Records"), value: Decimal(records.count), code: "", isCount: true)
+                }
+                RecordList(transactions: records, showsDate: true, editing: $editingRecord)
+            }
+        }
+    }
+}
+
+/// Round account badge: the first letter on the group's color.
+struct AccountIcon: View {
+    let account: Account
+    var size: CGFloat = 36
+
+    private var tint: Color {
+        switch account.group {
+        case .fund: return DS.lime
+        case .credit: return DS.violet
+        case .recharge: return DS.violetSoft
+        case .receivable: return DS.limeSoft
+        case .payable: return DS.violetDeep
+        }
+    }
+
+    var body: some View {
+        Text(String(account.name.prefix(1)).uppercased())
+            .font(.system(size: size * 0.4, weight: .bold))
+            .foregroundStyle(account.group == .payable ? Color.white : DS.ink)
+            .frame(width: size, height: size)
+            .background(tint)
+            .clipShape(Circle())
     }
 }
 
@@ -245,10 +405,13 @@ struct AccountEditor: View {
     /// Balance computed from the ledger when the sheet opened.
     let currentBalance: Decimal
 
-    private static let kinds: [AccountKind] = [.payment, .cash, .liability, .other]
-
     @State private var name: String
-    @State private var kind: AccountKind
+    @State private var group: AccountGroup
+    @State private var cardNumber: String
+    @State private var typeLabel: String
+    @State private var limitText: String
+    @State private var billingText: String
+    @State private var repaymentText: String
     @State private var currency: String
     @State private var balanceText: String
     @State private var note: String
@@ -259,7 +422,12 @@ struct AccountEditor: View {
         self.account = account
         self.currentBalance = currentBalance
         _name = State(initialValue: account?.name ?? "")
-        _kind = State(initialValue: account?.kind ?? .payment)
+        _group = State(initialValue: account?.group ?? .fund)
+        _cardNumber = State(initialValue: account?.cardNumber ?? "")
+        _typeLabel = State(initialValue: account?.typeLabel ?? "")
+        _limitText = State(initialValue: account?.creditLimit.map { NSDecimalNumber(decimal: $0).stringValue } ?? "")
+        _billingText = State(initialValue: account?.billingDay.map(String.init) ?? "")
+        _repaymentText = State(initialValue: account?.repaymentDay.map(String.init) ?? "")
         _currency = State(initialValue: account?.currencyCode ?? "CNY")
         _balanceText = State(initialValue: NSDecimalNumber(decimal: currentBalance.rounded(2)).stringValue)
         _note = State(initialValue: account?.note ?? "")
@@ -282,7 +450,9 @@ struct AccountEditor: View {
             Text(account == nil ? tr("Add account") : tr("Edit account"))
                 .font(DS.title(20))
                 .foregroundStyle(DS.textPrimary)
-            CapsuleSwitch(options: Self.kinds, selection: $kind) { $0.displayName }
+            ScrollView(.horizontal, showsIndicators: false) {
+                CapsuleSwitch(options: AccountGroup.allCases, selection: $group) { $0.shortName }
+            }
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
                 row(tr("Name")) { field($name) }
                 row(tr("Currency")) { field($currency).frame(width: 90) }
@@ -294,7 +464,14 @@ struct AccountEditor: View {
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
-                row(tr("Note")) { field($note) }
+                row(tr("Description")) { field($note) }
+                row(tr("Card number")) { field($cardNumber) }
+                row(tr("Type")) { field($typeLabel) }
+                if group == .credit {
+                    row(tr("Credit limit")) { field($limitText).amountKeyboard() }
+                    row(tr("Statement day")) { field($billingText).frame(width: 70) }
+                    row(tr("Payment day")) { field($repaymentText).frame(width: 70) }
+                }
                 row("") {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle(tr("Count in net worth"), isOn: $counted)
@@ -344,9 +521,18 @@ struct AccountEditor: View {
     private func save() {
         guard let balance else { return }
         let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
-        let target = account ?? Account(name: name, kind: kind, currencyCode: code)
+        let target = account ?? Account(name: name, kind: group.kind, currencyCode: code)
         target.name = name.trimmingCharacters(in: .whitespaces)
-        target.kind = kind
+        target.group = group
+        target.kind = group == .fund && account?.kind == .cash ? .cash : group.kind
+        target.cardNumber = cardNumber.trimmingCharacters(in: .whitespaces)
+        target.typeLabel = typeLabel.trimmingCharacters(in: .whitespaces)
+        func day(_ text: String) -> Int? { Int(text.trimmingCharacters(in: .whitespaces)).flatMap { (1...31).contains($0) ? $0 : nil } }
+        target.creditLimit = group == .credit
+            ? Decimal(string: limitText.replacingOccurrences(of: ",", with: ""), locale: Locale(identifier: "en_US_POSIX"))
+            : nil
+        target.billingDay = group == .credit ? day(billingText) : nil
+        target.repaymentDay = group == .credit ? day(repaymentText) : nil
         target.currencyCode = code
         target.note = note
         target.includeInNetWorth = counted
