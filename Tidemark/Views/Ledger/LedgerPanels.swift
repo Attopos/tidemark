@@ -572,12 +572,6 @@ struct RecordRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: transaction.kind.icon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(transaction.kind == .income ? DS.ink : DS.textPrimary)
-                .frame(width: 30, height: 30)
-                .background(transaction.kind == .income ? FlowPalette.income : DS.tile)
-                .clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))

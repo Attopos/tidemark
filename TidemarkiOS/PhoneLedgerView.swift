@@ -234,7 +234,7 @@ struct PhoneLedgerView: View {
                             Button(tr("Delete"), role: .destructive) { delete(record) }
                         }
                     if index < group.records.count - 1 {
-                        Divider().overlay(DS.border.opacity(0.5)).padding(.leading, 42)
+                        Divider().overlay(DS.border.opacity(0.5))
                     }
                 }
             }
