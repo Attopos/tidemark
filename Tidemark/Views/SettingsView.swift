@@ -69,7 +69,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
-        .tint(DS.accent)
+        .tint(DS.accentText)
         }
         .padding(.top, 38)
         .frame(maxWidth: 760, maxHeight: .infinity, alignment: .topLeading)
