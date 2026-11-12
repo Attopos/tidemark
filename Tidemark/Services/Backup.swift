@@ -41,7 +41,8 @@ struct BackupFile: Codable {
     struct Settings: Codable {
         var baseCurrency: String?
         var language: String?
-        var targets: [String: Double]?
+        /// Target allocation, a removed feature; still read from old backups.
+        var targets: [String: Double]? = nil
     }
 
     struct AccountRecord: Codable {

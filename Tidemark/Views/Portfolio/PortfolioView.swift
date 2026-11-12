@@ -238,20 +238,13 @@ struct PortfolioView: View {
                     Button { jump(group.id) } label: {
                         ExposureCard(group: group,
                                      share: total > 0 ? (group.baseValue / total).doubleValue : 0,
-                                     baseCurrency: app.baseCurrency,
-                                     drift: drift(for: group))
+                                     baseCurrency: app.baseCurrency)
                     }
                     .buttonStyle(.plain)
                     .help(tr("Show these holdings"))
                 }
             }
         }
-    }
-
-    /// Actual weight against the target set in Settings, if there is one.
-    private func drift(for group: ExposureGroup) -> AllocationDrift? {
-        guard total > 0, let target = app.target(for: group.exposure) else { return nil }
-        return AllocationDrift(target: target, actual: (group.baseValue / total).doubleValue)
     }
 
     /// "18% of value is older than 7 days": the total mixes valuation dates,
@@ -361,7 +354,6 @@ struct PortfolioView: View {
         let group: ExposureGroup
         let share: Double
         let baseCurrency: String
-        var drift: AllocationDrift? = nil
 
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
@@ -373,21 +365,6 @@ struct PortfolioView: View {
                 Text("\(tr("Share")) \(Fmt.percent(share, showSign: false))")
                     .font(.system(size: 13).monospacedDigit())
                     .foregroundStyle(group.exposure.ink.opacity(0.65))
-                if let drift {
-                    // Target and distance from it; bold once outside the
-                    // rebalancing band (see AllocationDrift).
-                    HStack(spacing: 4) {
-                        if drift.outOfBand {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.system(size: 11))
-                        }
-                        Text("\(tr("Target")) \(Fmt.percent(drift.target, decimals: 0, showSign: false)) · \(String(format: "%+.1f", drift.drift * 100)) pt")
-                    }
-                    .font(.system(size: 12, weight: drift.outOfBand ? .semibold : .regular).monospacedDigit())
-                    .foregroundStyle(group.exposure.ink.opacity(drift.outOfBand ? 1 : 0.65))
-                    .padding(.top, 2)
-                    .padding(.bottom, 3)
-                }
                 Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
                     .font(DS.money(26, weight: .bold))
                     .foregroundStyle(group.exposure.ink)

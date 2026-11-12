@@ -133,23 +133,6 @@ struct PortfolioValuation {
     }
 }
 
-// MARK: - Target allocation
-
-/// Actual weight against a target weight (both fractions of the portfolio).
-struct AllocationDrift {
-    let target: Double
-    let actual: Double
-
-    var drift: Double { actual - target }
-
-    /// The 5/25 rebalancing rule: a large target (20% or more) may drift 5
-    /// points either way, a small one a quarter of its own size.
-    var outOfBand: Bool {
-        let band = target >= 0.20 ? 0.05 : target * 0.25
-        return Swift.abs(drift) > band
-    }
-}
-
 // MARK: - SwiftData bridge
 
 extension Holding {

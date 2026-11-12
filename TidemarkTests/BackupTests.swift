@@ -42,7 +42,7 @@ final class BackupTests: XCTestCase {
     }
 
     private func roundTrip(_ context: ModelContext) throws -> BackupFile {
-        let settings = BackupFile.Settings(baseCurrency: "USD", language: "zh", targets: ["usEquity": 0.6])
+        let settings = BackupFile.Settings(baseCurrency: "USD", language: "zh")
         let backup = try BackupService.makeBackup(from: context, settings: settings)
         return try BackupService.decode(try BackupService.encode(backup))
     }
@@ -130,7 +130,6 @@ final class BackupTests: XCTestCase {
         XCTAssertEqual(coin.asset?.currencyCode, "USD")
 
         XCTAssertEqual(backup.settings.baseCurrency, "USD")
-        XCTAssertEqual(backup.settings.targets?["usEquity"], 0.6)
     }
 
     func testRestoringTwiceAddsNothing() throws {

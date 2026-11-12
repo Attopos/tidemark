@@ -73,13 +73,6 @@ final class PortfolioValuationTests: XCTestCase {
         XCTAssertEqual(freshness.staleShare, 0.25, accuracy: 1e-9)
         XCTAssertEqual(freshness.oldest, day(0))
     }
-
-    func testDriftBandFollowsTheFiveTwentyFiveRule() {
-        XCTAssertFalse(AllocationDrift(target: 0.40, actual: 0.44).outOfBand)
-        XCTAssertTrue(AllocationDrift(target: 0.40, actual: 0.46).outOfBand)
-        XCTAssertFalse(AllocationDrift(target: 0.10, actual: 0.12).outOfBand)
-        XCTAssertTrue(AllocationDrift(target: 0.10, actual: 0.07).outOfBand)
-    }
 }
 
 // Import review: nothing uncertain is applied silently, and a holding that

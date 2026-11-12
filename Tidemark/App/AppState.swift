@@ -58,17 +58,6 @@ final class AppState {
         }
     }
 
-    /// Target weight per exposure (Exposure.rawValue → fraction, 0.30 = 30%).
-    /// Empty means no targets; the board then shows no drift.
-    var targets: [String: Double] {
-        didSet { UserDefaults.standard.set(targets, forKey: "targetAllocation") }
-    }
-
-    func target(for exposure: Exposure) -> Double? {
-        guard let value = targets[exposure.rawValue], value > 0 else { return nil }
-        return value
-    }
-
     /// Page on screen; remembered across launches (the portfolio is not:
     /// it is locked, so the app opens on the ledger).
     var section: AppSection {
@@ -201,7 +190,6 @@ final class AppState {
         self.language = AppLanguage(rawValue: savedLanguage) ?? .english
         let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
         self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
-        self.targets = (UserDefaults.standard.dictionary(forKey: "targetAllocation") as? [String: Double]) ?? [:]
         let savedSection = AppSection(rawValue: UserDefaults.standard.string(forKey: "appSection") ?? "") ?? .ledger
         self.section = savedSection == .portfolio ? .ledger : savedSection
         L10n.current = self.language
@@ -251,7 +239,7 @@ final class AppState {
     // MARK: Backup & restore
 
     private var backupSettings: BackupFile.Settings {
-        .init(baseCurrency: baseCurrency, language: language.rawValue, targets: targets)
+        .init(baseCurrency: baseCurrency, language: language.rawValue)
     }
 
     /// Write today's backup to iCloud Drive › Tidemark. An empty store is
@@ -302,7 +290,6 @@ final class AppState {
             let stats = try BackupService.restore(backup, into: context)
             if let code = backup.settings.baseCurrency, Self.baseCurrencies.contains(code) { baseCurrency = code }
             if let raw = backup.settings.language, let restored = AppLanguage(rawValue: raw) { language = restored }
-            if let restored = backup.settings.targets { targets = restored }
             backupMessage = trf("Restored: %d added, %d updated", stats.added, stats.updated)
             backupFailed = false
         } catch {
