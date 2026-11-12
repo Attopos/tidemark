@@ -80,7 +80,12 @@ final class CloudSync {
         var aliases: [String: String] = [:]
         /// Record names to delete on the server.
         var pendingDeletes: [String] = []
+        var environment: String?
     }
+
+    /// Every build talks to the Production database, so TestFlight and local builds share data.
+    private static let environment = "production"
+
 
     private let context: ModelContext
     private var database: CKDatabase?
@@ -122,6 +127,13 @@ final class CloudSync {
            let saved = try? JSONDecoder().decode(StateFile.self, from: data) {
             state = saved
         }
+        if state.environment != Self.environment {
+            state = StateFile()
+            state.environment = Self.environment
+            UserDefaults.standard.set(false, forKey: "syncPushReady")
+            pushReady = false
+            persist()
+        }
         let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
         self.database = database
         Self.current = self
@@ -152,6 +164,10 @@ final class CloudSync {
                 if self?.isActive == true { self?.fetchNow() }
             }
         }
+        if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_SCHEMA"] != nil {
+            Task { await self.seedSchema(database) }
+            return
+        }
         if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_DIAG"] != nil {
             Task { await self.diagnose(database) }
             return
@@ -160,6 +176,43 @@ final class CloudSync {
         scan()
         fetchNow()
         runProbeIfAsked()
+    }
+
+    /// Writes one record of each type with every field filled, then removes
+    /// them, so the Development schema has all fields before it is deployed
+    /// to Production (TIDEMARK_SYNC_SCHEMA=1).
+    private func seedSchema(_ database: CKDatabase) async {
+        let account = Account(name: "schema", kind: .liability, currencyCode: "CNY")
+        account.cardNumber = "0000"; account.typeLabel = "t"; account.groupRaw = "credit"
+        account.creditLimit = 1; account.billingDay = 1; account.repaymentDay = 2; account.note = "n"
+        let other = Account(name: "schema-2", kind: .payment)
+        let record = Transaction(date: Date(), kind: .transfer, amount: 1, category: "c", subcategory: "s",
+                                 merchant: "m", note: "n", tags: "t", account: account, transferAccount: other,
+                                 externalID: "e", rawPayload: "{}")
+        record.address = "a"; record.transferAmount = 1; record.claimStatusRaw = "pending"; record.claimAmount = 1
+        record.presetID = UUID(); record.refundAmount = 1; record.discountAmount = 1; record.feeAmount = 1
+        let preset = RecordPreset(name: "schema", kind: .expense, amount: 1)
+        preset.category = "c"; preset.subcategory = "s"; preset.note = "n"; preset.tags = "t"
+        preset.accountID = UUID(); preset.transferAccountID = UUID(); preset.schedule = .monthly
+        preset.endDate = Date(); preset.occurrenceLimit = 2
+        let seeds: [(String, String, SyncFields)] = [
+            ("Account", "schema-seed-A", SyncCodec.fields(of: account)),
+            ("LedgerRecord", "schema-seed-T", SyncCodec.fields(of: record)),
+            ("Preset", "schema-seed-P", SyncCodec.fields(of: preset)),
+        ]
+        do {
+            _ = try await database.modifyRecordZones(saving: [CKRecordZone(zoneID: Self.zoneID)], deleting: [])
+            for (type, name, fields) in seeds {
+                let ckRecord = CKRecord(recordType: type, recordID: recordID(name))
+                for (key, value) in fields { ckRecord[key] = value.isEmpty ? "x" : value }
+                _ = try await database.save(ckRecord)
+                _ = try await database.deleteRecord(withID: ckRecord.recordID)
+                log("schema seed: \(type) with \(fields.count) fields")
+            }
+            log("schema seed done")
+        } catch {
+            log("schema seed failed: \(error)")
+        }
     }
 
     /// Step-by-step check of what the server accepts (TIDEMARK_SYNC_DIAG=1).
