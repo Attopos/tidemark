@@ -118,7 +118,8 @@ struct PhoneLedgerView: View {
             }
         }
         .sheet(isPresented: $creating) {
-            TransactionEditor(transaction: nil, defaultDate: showsCalendar ? selectedDay : nil)
+            QuickEntryView()
+                .presentationDetents([.large])
         }
         .onChange(of: app.cashPeriod) { _, _ in selectedDay = nil }
     }

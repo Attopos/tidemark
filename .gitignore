@@ -20,3 +20,4 @@ TidemarkTests/alipay-fixture-*
 TidemarkTests/binance-fixture-*
 TidemarkTests/ZZSnapshotLocal.swift
 TidemarkTests/ledger-fixture-*
+TidemarkTests/ZZLocal*

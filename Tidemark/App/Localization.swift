@@ -310,6 +310,7 @@ enum L10n {
         "WeChat Wallet": "微信零钱",
         "Yu'E Bao": "余额宝",
         "Debit Card": "借记卡",
+        "Categories you use appear here. Tap More to type a new one.": "你用过的分类会出现在这里。点 “更多” 可以输入新分类。",
     ]
 
     // MARK: Español
@@ -568,5 +569,6 @@ enum L10n {
         "WeChat Wallet": "Monedero WeChat",
         "Yu'E Bao": "Yu'E Bao",
         "Debit Card": "Tarjeta de débito",
+        "Categories you use appear here. Tap More to type a new one.": "Aquí aparecen tus categorías. Toca Más para escribir una nueva.",
     ]
 }
