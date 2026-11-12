@@ -425,6 +425,21 @@ enum RiskFamily: CaseIterable {
 }
 
 extension Exposure {
+    /// Thin marks (share bars, legend squares): the card color in dark mode,
+    /// one step deeper in light mode so pale shades still show on white.
+    var markColor: Color {
+        switch self {
+        case .usEquity: return Color(light: 0x8A6CF0, dark: 0xA98BFA)
+        case .intlEquity: return Color(light: 0xA98BFA, dark: 0xCDBDFD)
+        case .chinaEquity: return Color(light: 0x6A4BD6, dark: 0x7E5FE6)
+        case .crypto: return Color(light: 0x5E43B8, dark: 0x5E43B8)
+        case .gold: return Color(light: 0x9CB84A, dark: 0xD5F56B)
+        case .bond: return Color(light: 0x6B8E12, dark: 0x9CB84A)
+        case .cash: return Color(light: 0xB9D95A, dark: 0xE9FAB0)
+        case .other: return DS.textTertiary
+        }
+    }
+
     /// Text color that reads on `color`.
     var ink: Color {
         self == .crypto || self == .chinaEquity ? .white : DS.ink

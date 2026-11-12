@@ -51,8 +51,8 @@ struct PhoneRootView: View {
             PhoneSettingsView(storageError: storageError)
                 .tabItem { Label(tr("Settings"), systemImage: "gearshape.fill") }
         }
-        .preferredColorScheme(.dark)
-        .tint(DS.accent)
+        .preferredColorScheme(app.appearance.colorScheme)
+        .tint(DS.accentText)
         .id(app.language)
         .environment(\.locale, app.language.locale)
         .task { CurrencyService.ensureSeeds(in: context) }
@@ -72,6 +72,9 @@ struct PhoneSettingsView: View {
                     if let storageError {
                         Text(storageError).font(DS.caption).foregroundStyle(DS.warning)
                     }
+                }
+                Section(tr("Appearance")) {
+                    CapsuleSwitch(options: AppAppearance.allCases, selection: $app.appearance) { $0.title }
                 }
                 Section(tr("Language")) {
                     CapsuleSwitch(options: AppLanguage.allCases, selection: $app.language) { $0.displayName }

@@ -88,7 +88,7 @@ struct AccentButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 15, weight: .semibold))
             .lineLimit(1)
-            .foregroundStyle(prominent ? DS.heroInk : DS.accent)
+            .foregroundStyle(prominent ? DS.heroInk : DS.accentText)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(prominent ? DS.accent : DS.accentDark)
@@ -262,7 +262,6 @@ extension View {
         self.padding(24)
             .frame(width: width)
             .background(DS.panel)
-            .preferredColorScheme(.dark)
         #else
         ScrollView {
             self.padding(20)
@@ -270,7 +269,6 @@ extension View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(DS.panel)
-        .preferredColorScheme(.dark)
         #endif
     }
 

@@ -25,6 +25,14 @@ struct AccountsView: View {
     @State private var showArchived = false
     @State private var reconciling = false
 
+    private var portfolioVisible: Bool {
+        #if os(macOS)
+        app.portfolioUnlocked
+        #else
+        true
+        #endif
+    }
+
     private static let kindOrder: [AccountKind] = [.payment, .cash, .liability, .other]
 
     var body: some View {
@@ -41,9 +49,17 @@ struct AccountsView: View {
                 VStack(alignment: .leading, spacing: DS.gridGap) {
                     header
                     HStack(alignment: .top, spacing: DS.gridGap) {
-                        HeroFigure(title: tr("Net worth"), value: net.assets - net.debts + portfolio,
-                                   code: snapshot.code,
-                                   details: [(tr("Cash"), Fmt.money(net.assets - net.debts, snapshot.code)), (tr("Portfolio"), Fmt.money(portfolio, snapshot.code))])
+                        if portfolioVisible {
+                            HeroFigure(title: tr("Net worth"), value: net.assets - net.debts + portfolio,
+                                       code: snapshot.code,
+                                       details: [(tr("Cash"), Fmt.money(net.assets - net.debts, snapshot.code)),
+                                                 (tr("Portfolio"), Fmt.money(portfolio, snapshot.code))])
+                        } else {
+                            // The portfolio is locked: its value is not shown here either.
+                            HeroFigure(title: tr("Net worth"), value: nil, code: snapshot.code,
+                                       details: [(tr("Cash"), Fmt.money(net.assets - net.debts, snapshot.code)),
+                                                 (tr("Portfolio"), Fmt.privacyMask)])
+                        }
                         if wide {
                             HeroFigure(title: tr("Cash net assets"), value: net.assets - net.debts,
                                        code: snapshot.code,
@@ -152,7 +168,7 @@ struct AccountsView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(DS.ink)
                     .frame(width: 32, height: 32)
-                    .background(account.kind == .liability ? FlowPalette.expense : FlowPalette.income)
+                    .background(account.kind == .liability ? DS.violet : DS.lime)
                     .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {

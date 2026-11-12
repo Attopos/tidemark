@@ -27,7 +27,7 @@ struct SyncStatusView: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: healthy ? "checkmark.icloud" : "exclamationmark.icloud")
-                .foregroundStyle(healthy ? DS.accent : DS.warning)
+                .foregroundStyle(healthy ? DS.accentText : DS.warning)
             Text(text)
                 .foregroundStyle(DS.textSecondary)
             Spacer()

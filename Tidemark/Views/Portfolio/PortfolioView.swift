@@ -505,7 +505,7 @@ struct PortfolioView: View {
                 HStack(spacing: 14) {
                     HStack(spacing: 10) {
                         RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(group.exposure.color)
+                            .fill(group.exposure.markColor)
                             .frame(width: 12, height: 12)
                         Text(group.exposure.displayName)
                             .font(DS.title(16))
@@ -523,7 +523,7 @@ struct PortfolioView: View {
                         .padding(.leading, index == 0 ? 0 : 60)
                     HoldingLine(row: row,
                                 share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
-                                color: group.exposure.color,
+                                color: group.exposure.markColor,
                                 // Bars compare holdings within their exposure: the
                                 // largest in the group fills the bar.
                                 scale: groupRowMax,
@@ -642,7 +642,7 @@ struct PortfolioView: View {
                         if let updated = row.updated {
                             Text("·")
                             Text(Fmt.relative(updated))
-                                .foregroundStyle(stale ? DS.violetSoft : DS.textTertiary)
+                                .foregroundStyle(stale ? DS.warning : DS.textTertiary)
                         }
                     }
                     .font(.system(size: 12).monospacedDigit())
@@ -664,7 +664,7 @@ struct PortfolioView: View {
                     } else {
                         Text(tr("no valuation"))
                             .font(DS.caption)
-                            .foregroundStyle(DS.violetSoft)
+                            .foregroundStyle(DS.warning)
                     }
                 }
                 .frame(width: valueWidth, alignment: .trailing)
@@ -674,7 +674,7 @@ struct PortfolioView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(hovering ? Color.white.opacity(0.03) : .clear)
+            .background(hovering ? DS.textPrimary.opacity(0.04) : .clear)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
         }
@@ -792,11 +792,11 @@ private struct HistoryPanel: View {
                                                     startPoint: .top, endPoint: .bottom))
                 LineMark(x: .value("Date", point.date),
                          y: .value("Value", point.total.doubleValue))
-                    .foregroundStyle(DS.accent)
+                    .foregroundStyle(DS.accentText)
                     .lineStyle(StrokeStyle(lineWidth: 2))
                 PointMark(x: .value("Date", point.date),
                           y: .value("Value", point.total.doubleValue))
-                    .foregroundStyle(DS.accent)
+                    .foregroundStyle(DS.accentText)
                     .symbolSize(22)
             }
             .chartYScale(domain: domain)

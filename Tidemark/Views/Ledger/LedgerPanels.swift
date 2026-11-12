@@ -43,10 +43,11 @@ struct LedgerSnapshot {
 /// Meaning of color on the cash-flow pages: violet is money going out,
 /// lime is money coming in. Shades rank categories inside one family.
 enum FlowPalette {
-    static let expense = DS.violet
-    static let income = DS.lime
-    private static let expenseRamp = [DS.violet, DS.violetSoft, DS.violetDeep, DS.violetDark]
-    private static let incomeRamp = [DS.lime, DS.limeSoft, DS.limeDeep]
+    /// Text, lines and bars: deeper shades in light mode so they read on white.
+    static let expense = Color(light: 0x7458E0, dark: 0xA98BFA)
+    static let income = Color(light: 0x6B8E12, dark: 0xD5F56B)
+    private static let expenseRamp = [expense, DS.violetSoft, DS.violetDeep, DS.violetDark]
+    private static let incomeRamp = [income, Color(light: 0xB9D95A, dark: 0xE9FAB0), DS.limeDeep]
 
     static func color(kind: TransactionKind, rank: Int) -> Color {
         let ramp = kind == .income ? incomeRamp : expenseRamp
@@ -164,7 +165,8 @@ struct StatTile: View {
 
 struct HeroFigure: View {
     let title: String
-    let value: Decimal
+    /// Nil shows the privacy mask.
+    let value: Decimal?
     let code: String
     /// Label and formatted figure.
     let details: [(String, String)]
@@ -175,7 +177,7 @@ struct HeroFigure: View {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(DS.textSecondary)
-                Text(Fmt.money(value, code))
+                Text(value.map { Fmt.money($0, code) } ?? Fmt.privacyMask)
                     .font(DS.money(28, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)

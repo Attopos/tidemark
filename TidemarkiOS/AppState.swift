@@ -22,6 +22,10 @@ final class AppState {
         }
     }
 
+    var appearance: AppAppearance = AppAppearance.saved {
+        didSet { appearance.save() }
+    }
+
     /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())
 

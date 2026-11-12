@@ -54,7 +54,7 @@ struct ScreenshotImportFlow: View {
                             Spacer()
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 36))
-                                .foregroundStyle(DS.accent)
+                                .foregroundStyle(DS.accentText)
                             Text(tr("Saved to Portfolio"))
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(DS.textPrimary)
@@ -172,7 +172,7 @@ struct ScreenshotImportFlow: View {
             Spacer()
             Image(systemName: "text.viewfinder")
                 .font(.system(size: 38, weight: .light))
-                .foregroundStyle(dropTargeted ? DS.accent : DS.textTertiary)
+                .foregroundStyle(dropTargeted ? DS.accentText : DS.textTertiary)
             HStack(spacing: 10) {
                 Button(tr("Choose images…")) { showFilePicker = true }
                     .buttonStyle(AccentButtonStyle())

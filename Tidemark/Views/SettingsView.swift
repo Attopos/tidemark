@@ -22,6 +22,9 @@ struct SettingsView: View {
             Section(tr("Language")) {
                 CapsuleSwitch(options: AppLanguage.allCases, selection: $app.language) { $0.displayName }
             }
+            Section(tr("Appearance")) {
+                CapsuleSwitch(options: AppAppearance.allCases, selection: $app.appearance) { $0.title }
+            }
             Section {
                 ForEach(Exposure.allCases) { exposure in
                     HStack(spacing: 10) {

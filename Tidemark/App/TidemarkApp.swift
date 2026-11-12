@@ -54,7 +54,7 @@ struct AppCommands: Commands {
         CommandGroup(after: .newItem) {
             Divider()
             Button(tr("Import Holdings Screenshot…")) {
-                app.ocrImportPresented = true
+                app.openScreenshotImport()
             }
             .keyboardShortcut("i", modifiers: .command)
         }

@@ -20,7 +20,8 @@ struct RootView: View {
                 SectionRail(selection: $app.section)
                 Group {
                     switch app.section {
-                    case .portfolio: PortfolioView()
+                    case .portfolio:
+                        if app.portfolioUnlocked { PortfolioView() } else { PortfolioLock() }
                     case .ledger: LedgerView()
                     case .accounts: AccountsView()
                     case .analysis: AnalysisView()
@@ -41,22 +42,24 @@ struct RootView: View {
                     .padding(.top, 8)
             }
         }
-        .preferredColorScheme(.dark)
-        .tint(DS.accent)
+        .preferredColorScheme(app.appearance.colorScheme)
+        .tint(DS.accentText)
         .overlay {
             if dropTargeted { DropHint() }
         }
         .sheet(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
-                .tint(DS.accent)
+                .tint(DS.accentText)
         }
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             handleDrop(providers)
         }
         .id(app.language)
         .environment(\.locale, app.language.locale)
-        .onAppear {
-            NSApp.appearance = NSAppearance(named: .darkAqua)
+        .onAppear { app.applyAppearance() }
+        // Switching to another app locks the portfolio again.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            app.lockPortfolio()
         }
         // Every saved change refreshes today's backup (see BackupService).
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
@@ -106,35 +109,82 @@ struct RootView: View {
 /// Narrow icon rail on the left edge: one button per page, settings included.
 private struct SectionRail: View {
     @Binding var selection: AppSection
+    @Environment(AppState.self) private var app
 
     var body: some View {
         VStack(spacing: 6) {
-            ForEach(AppSection.allCases) { section in
-                let selected = section == selection
-                Button { selection = section } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 15, weight: .semibold))
-                        Text(section.title)
-                            .font(.system(size: 10.5, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .foregroundStyle(selected ? DS.ink : DS.textSecondary)
-                    .frame(width: 60, height: 52)
-                    .background(selected ? DS.accent : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(section.title)
-            }
+            ForEach([AppSection.ledger, .accounts, .analysis]) { button($0) }
             Spacer()
+            // The portfolio is its own, locked block, apart from day-to-day cash.
+            Divider().frame(width: 44).padding(.vertical, 6)
+            button(.portfolio, badge: app.portfolioUnlocked ? "lock.open.fill" : "lock.fill")
+            button(.settings)
         }
         .padding(.top, 44)
         .padding(.bottom, 14)
         .frame(width: 76)
         .background(DS.panel)
+    }
+
+    private func button(_ section: AppSection, badge: String? = nil) -> some View {
+        let selected = section == selection
+        return Button { selection = section } label: {
+            VStack(spacing: 4) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .overlay(alignment: .topTrailing) {
+                        if let badge {
+                            Image(systemName: badge)
+                                .font(.system(size: 8, weight: .bold))
+                                .offset(x: 9, y: -5)
+                        }
+                    }
+                Text(section.title)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(selected ? DS.ink : DS.textSecondary)
+            .frame(width: 60, height: 52)
+            .background(selected ? DS.accent : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(section.title)
+    }
+}
+
+/// Shown in place of the portfolio until the system password check passes.
+private struct PortfolioLock: View {
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(DS.textTertiary)
+            Text(tr("Portfolio is locked"))
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(DS.textPrimary)
+            Text(tr("Use your Mac password or Touch ID to open it. It locks again when you leave the page or the app."))
+                .font(DS.body)
+                .foregroundStyle(DS.textSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+            Button(tr("Unlock")) { Task { await app.unlockPortfolio() } }
+                .buttonStyle(AccentButtonStyle())
+                .keyboardShortcut(.defaultAction)
+            if let message = app.unlockMessage {
+                Text(message)
+                    .font(DS.caption)
+                    .foregroundStyle(DS.warning)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DS.page)
+        // Ask straight away; the button is there after a cancel.
+        .task { await app.unlockPortfolio() }
     }
 }
 
@@ -146,7 +196,7 @@ private struct ImportNotice: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                .foregroundStyle(failed ? DS.warning : DS.accent)
+                .foregroundStyle(failed ? DS.warning : DS.accentText)
             Text(message)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(DS.textPrimary)
@@ -172,7 +222,7 @@ private struct DropHint: View {
             VStack(spacing: 10) {
                 Image(systemName: "text.viewfinder")
                     .font(.system(size: 32, weight: .light))
-                    .foregroundStyle(DS.accent)
+                    .foregroundStyle(DS.accentText)
                 Text(tr("Drop screenshots or a bookkeeping export to import"))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)

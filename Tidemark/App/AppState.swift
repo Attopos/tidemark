@@ -3,6 +3,7 @@ import AppKit
 import Observation
 import SwiftData
 import UniformTypeIdentifiers
+import LocalAuthentication
 
 // MARK: - App state
 //
@@ -13,7 +14,7 @@ import UniformTypeIdentifiers
 
 /// Pages of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
-    case portfolio, ledger, accounts, analysis, settings
+    case ledger, accounts, analysis, portfolio, settings
 
     var id: String { rawValue }
 
@@ -68,9 +69,79 @@ final class AppState {
         return value
     }
 
-    /// Page on screen; remembered across launches.
+    /// Page on screen; remembered across launches (the portfolio is not:
+    /// it is locked, so the app opens on the ledger).
     var section: AppSection {
-        didSet { UserDefaults.standard.set(section.rawValue, forKey: "appSection") }
+        didSet {
+            UserDefaults.standard.set(section.rawValue, forKey: "appSection")
+            if oldValue == .portfolio && section != .portfolio { lockPortfolio() }
+        }
+    }
+
+    var appearance: AppAppearance = AppAppearance.saved {
+        didSet {
+            appearance.save()
+            Task { @MainActor in self.applyAppearance() }
+        }
+    }
+
+    @MainActor
+    func applyAppearance() {
+        switch appearance {
+        case .system: NSApp.appearance = nil
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+
+    // MARK: Portfolio lock
+    //
+    // Holdings are looked at rarely and are the most private figures, so the
+    // portfolio page asks for the Mac's login password (or Touch ID) each
+    // time it is opened. Leaving the page or the app locks it again. Nothing
+    // is stored: the check is the system's own (LocalAuthentication).
+
+    private(set) var portfolioUnlocked = false
+    private(set) var unlockMessage: String?
+    /// A screenshot dropped while locked opens the import once unlocked.
+    private var importAfterUnlock = false
+
+    func lockPortfolio() {
+        portfolioUnlocked = false
+        importAfterUnlock = false
+    }
+
+    @MainActor
+    func unlockPortfolio() async {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            unlockMessage = error?.localizedDescription ?? tr("This Mac cannot check a password.")
+            return
+        }
+        do {
+            portfolioUnlocked = try await context.evaluatePolicy(.deviceOwnerAuthentication,
+                                                                 localizedReason: tr("unlock the portfolio"))
+            unlockMessage = nil
+            if portfolioUnlocked && importAfterUnlock {
+                importAfterUnlock = false
+                ocrImportPresented = true
+            }
+        } catch {
+            let quiet: [LAError.Code] = [.userCancel, .systemCancel, .appCancel]
+            unlockMessage = (error as? LAError).map { quiet.contains($0.code) } == true ? nil : error.localizedDescription
+        }
+    }
+
+    /// Open the screenshot import, unlocking the portfolio first if needed.
+    @MainActor
+    func openScreenshotImport() {
+        if portfolioUnlocked {
+            ocrImportPresented = true
+        } else {
+            importAfterUnlock = true
+            section = .portfolio
+        }
     }
 
     /// Month or year the Ledger and Analysis pages show.
@@ -96,7 +167,8 @@ final class AppState {
         let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
         self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
         self.targets = (UserDefaults.standard.dictionary(forKey: "targetAllocation") as? [String: Double]) ?? [:]
-        self.section = AppSection(rawValue: UserDefaults.standard.string(forKey: "appSection") ?? "") ?? .portfolio
+        let savedSection = AppSection(rawValue: UserDefaults.standard.string(forKey: "appSection") ?? "") ?? .ledger
+        self.section = savedSection == .portfolio ? .ledger : savedSection
         L10n.current = self.language
     }
 
@@ -106,7 +178,7 @@ final class AppState {
         guard ["png", "jpg", "jpeg", "heic", "tiff", "webp"].contains(ext),
               let image = NSImage(contentsOf: url) else { return }
         pendingOCRImages = [image]
-        ocrImportPresented = true
+        Task { @MainActor in openScreenshotImport() }
     }
 
     // MARK: Bookkeeping export

@@ -231,6 +231,15 @@ enum L10n {
         "Exp": "支",
         "Inc": "收",
         "Settings…": "设置…",
+        "System": "跟随系统",
+        "Light": "亮色",
+        "Dark": "暗色",
+        "Appearance": "外观",
+        "Portfolio is locked": "投资组合已锁定",
+        "Use your Mac password or Touch ID to open it. It locks again when you leave the page or the app.": "用 Mac 的登录密码或触控 ID 解锁。离开这一页或切到别的应用时会重新锁上。",
+        "Unlock": "解锁",
+        "This Mac cannot check a password.": "这台 Mac 无法验证密码。",
+        "unlock the portfolio": "解锁投资组合",
     ]
 
     // MARK: Español
@@ -410,5 +419,14 @@ enum L10n {
         "Exp": "Gasto",
         "Inc": "Ingreso",
         "Settings…": "Ajustes…",
+        "System": "Sistema",
+        "Light": "Claro",
+        "Dark": "Oscuro",
+        "Appearance": "Apariencia",
+        "Portfolio is locked": "La cartera está bloqueada",
+        "Use your Mac password or Touch ID to open it. It locks again when you leave the page or the app.": "Usa la contraseña del Mac o Touch ID para abrirla. Se vuelve a bloquear al salir de la página o de la app.",
+        "Unlock": "Desbloquear",
+        "This Mac cannot check a password.": "Este Mac no puede comprobar una contraseña.",
+        "unlock the portfolio": "desbloquear la cartera",
     ]
 }

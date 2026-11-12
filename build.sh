@@ -121,7 +121,7 @@ case "$CMD" in
   ios)
     # First connected physical iPhone or iPad.
     DEVICE="$(xcrun devicectl list devices 2>/dev/null |
-      awk '/connected/ && /physical/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')"
+      awk '(/connected/ || /available \(paired\)/) && /physical/ && /iPhone/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')"
     if [[ -z "$DEVICE" ]]; then
       echo "No connected iPhone found (check: xcrun devicectl list devices)." >&2
       exit 1

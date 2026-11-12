@@ -10,9 +10,9 @@ import SwiftUI
 // Gray is "other". Lime is also the interaction color (buttons, selection).
 
 extension DS {
-    static let page = Color(hex: 0x141414)
-    static let panel = Color(hex: 0x1F1F1F)
-    static let tile = Color(hex: 0x2A2A2A)
+    static let page = Color(light: 0xF2F2EE, dark: 0x141414)
+    static let panel = Color(light: 0xFFFFFF, dark: 0x1F1F1F)
+    static let tile = Color(light: 0xEBEBE6, dark: 0x2A2A2A)
     static let panelRadius: CGFloat = 22
     static let tileRadius: CGFloat = 18
 
@@ -52,6 +52,7 @@ struct Panel<Content: View, Accessory: View>: View {
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .layoutPriority(1)
                     Spacer(minLength: 8)
                     accessory
                 }

@@ -280,7 +280,7 @@ struct MonthCalendar: View {
             VStack(spacing: 1) {
                 Text("\(calendar.component(.day, from: bucket.start))")
                     .font(.system(size: 13, weight: isToday ? .bold : .medium))
-                    .foregroundStyle(selected ? DS.ink : (isToday ? DS.accent : DS.textPrimary))
+                    .foregroundStyle(selected ? DS.ink : (isToday ? DS.accentText : DS.textPrimary))
                 Text(bucket.expense > 0 ? "-\(compact(bucket.expense))" : " ")
                     .foregroundStyle(selected ? DS.ink.opacity(0.75) : FlowPalette.expense)
                 Text(bucket.income > 0 ? "+\(compact(bucket.income))" : " ")

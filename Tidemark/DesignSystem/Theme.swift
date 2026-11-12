@@ -1,6 +1,8 @@
 import SwiftUI
 #if canImport(AppKit)
 import AppKit
+#elseif canImport(UIKit)
+import UIKit
 #endif
 
 // MARK: - Color hex helpers
@@ -14,6 +16,30 @@ extension Color {
         )
     }
 }
+
+extension Color {
+    /// One color per appearance, resolved live (light and dark mode).
+    init(light: UInt32, dark: UInt32) {
+        #if canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(hex: dark) : NSColor(hex: light)
+        })
+        #else
+        self.init(uiColor: UIColor { traits in
+            UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
+        })
+        #endif
+    }
+}
+
+#if canImport(UIKit) && !canImport(AppKit)
+extension UIColor {
+    convenience init(hex: UInt32) {
+        self.init(red: CGFloat((hex >> 16) & 0xFF) / 255.0, green: CGFloat((hex >> 8) & 0xFF) / 255.0,
+                  blue: CGFloat(hex & 0xFF) / 255.0, alpha: 1)
+    }
+}
+#endif
 
 #if canImport(AppKit)
 extension NSColor {
@@ -38,28 +64,34 @@ extension NSColor {
 
 enum DS {
     // Surfaces
-    static let bgPrimary    = Color(hex: 0x111111)
-    static let bgSecondary  = Color(hex: 0x1D1D1F)
-    static let bgElevated   = Color(hex: 0x27282A)
+    // Every surface, ink and line token has a light and a dark value. Brand
+    // fills (lime, the violets, the pastel cards) stay the same in both and
+    // always carry dark ink; colors used as *text* get a deeper light-mode
+    // shade so they keep contrast on white.
+    static let bgPrimary    = Color(light: 0xF2F2EE, dark: 0x111111)
+    static let bgSecondary  = Color(light: 0xFFFFFF, dark: 0x1D1D1F)
+    static let bgElevated   = Color(light: 0xFFFFFF, dark: 0x27282A)
 
     // Brand / interaction
     static let accent       = Color(hex: 0xC7FF3D)
-    static let accentDark   = Color(hex: 0x29351B)
+    static let accentDark   = Color(light: 0xE8F7C4, dark: 0x29351B)
+    /// The lime as text or a thin mark (deep olive on white).
+    static let accentText   = Color(light: 0x5E7D10, dark: 0xC7FF3D)
 
     // Ink
-    static let textPrimary  = Color(hex: 0xF5F3EE)
-    static let textSecondary = Color(hex: 0x999A9F)
-    static let textTertiary = Color(hex: 0x6B6C70)
+    static let textPrimary  = Color(light: 0x141414, dark: 0xF5F3EE)
+    static let textSecondary = Color(light: 0x5C5D62, dark: 0x999A9F)
+    static let textTertiary = Color(light: 0x86878C, dark: 0x6B6C70)
 
     // Lines
-    static let border       = Color(hex: 0x303134)
+    static let border       = Color(light: 0xDCDCD6, dark: 0x303134)
 
     // Financial semantics — polarity & status only, never series identity
     // Two-hue palette: only violet and lime exist in the UI.
-    static let finBlue      = Color(hex: 0xA98BFA)   // neutral financial data (violet)
-    static let positive     = Color(hex: 0xD5F56B)   // gains (lime)
-    static let negative     = Color(hex: 0xCDBDFD)   // losses (soft violet)
-    static let warning      = Color(hex: 0xCDBDFD)   // needs attention / stale (soft violet)
+    static let finBlue      = Color(light: 0x6E4FD8, dark: 0xA98BFA)   // neutral financial data (violet)
+    static let positive     = Color(light: 0x5E7D10, dark: 0xD5F56B)   // gains (lime)
+    static let negative     = Color(light: 0x6E4FD8, dark: 0xCDBDFD)   // losses (soft violet)
+    static let warning      = Color(light: 0x6E4FD8, dark: 0xCDBDFD)   // needs attention / stale (soft violet)
 
     /// Categorical identity ramp for charts (allocation, categories).
     /// Fixed assignment order; index ≥ count folds into `categoricalOther`.
