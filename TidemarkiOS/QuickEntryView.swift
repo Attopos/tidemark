@@ -28,6 +28,11 @@ struct QuickEntryView: View {
     @State private var transferAccountID: UUID?
     @State private var showsMore = false
     @State private var showsDate = false
+    @State private var claim = false
+    @State private var tags = ""
+    @State private var showsTags = false
+    /// Records saved in this sitting with "Record" (enter another).
+    @State private var savedCount = 0
 
     private var accounts: [Account] { allAccounts.filter { $0.isLedgerAccount && !$0.isArchived } }
 
@@ -58,46 +63,74 @@ struct QuickEntryView: View {
 
     // MARK: Amount
 
-    /// The typed expression, evaluated left to right (only + and −).
+    /// The typed expression: × and ÷ before + and −.
     private var amount: Decimal? {
-        var total: Decimal = 0
+        let posix = Locale(identifier: "en_US_POSIX")
+        var terms: [Decimal] = []
+        var term: Decimal?
+        var pendingProduct: Character?
         var sign: Decimal = 1
         var number = ""
-        func flush() -> Bool {
-            guard !number.isEmpty else { return true }
-            guard let value = Decimal(string: number, locale: Locale(identifier: "en_US_POSIX")) else { return false }
-            total += sign * value
+        func takeNumber() -> Bool {
+            guard !number.isEmpty, let value = Decimal(string: number, locale: posix) else { return number.isEmpty }
             number = ""
+            switch pendingProduct {
+            case "×": term = (term ?? 0) * value
+            case "÷": guard value != 0 else { return false }; term = (term ?? 0) / value
+            default: term = sign * value
+            }
+            pendingProduct = nil
             return true
         }
         for character in expression {
             switch character {
-            case "+": guard flush() else { return nil }; sign = 1
-            case "−": guard flush() else { return nil }; sign = -1
-            default: number.append(character)
+            case "+", "−":
+                guard takeNumber() else { return nil }
+                if let term { terms.append(term) }
+                term = nil
+                sign = character == "+" ? 1 : -1
+            case "×", "÷":
+                guard takeNumber() else { return nil }
+                pendingProduct = character
+            default:
+                number.append(character)
             }
         }
-        guard flush(), total > 0 else { return nil }
+        guard takeNumber() else { return nil }
+        if let term { terms.append(term) }
+        let total = terms.reduce(0, +)
+        guard total > 0 else { return nil }
         return total.rounded(2)
     }
 
-    private var hasOperator: Bool { expression.contains("+") || expression.contains("−") }
+    private static let operators: Set<Character> = ["+", "−", "×", "÷"]
+    private var hasOperator: Bool { expression.contains { Self.operators.contains($0) } }
+
+    /// The number being typed (after the last operator).
+    private var currentNumber: String {
+        expression.split(whereSeparator: { Self.operators.contains($0) }).last.map(String.init) ?? ""
+    }
 
     private func press(_ key: String) {
         switch key {
         case "⌫":
             if !expression.isEmpty { expression.removeLast() }
-        case "+", "−":
-            guard let last = expression.last, last != "+", last != "−", last != "." else { return }
-            expression.append(key)
+        case "+×", "−÷":
+            // One key, two operators: a second tap swaps them.
+            let pair: (Character, Character) = key == "+×" ? ("+", "×") : ("−", "÷")
+            guard let last = expression.last, last != "." else { return }
+            if last == pair.0 { expression.removeLast(); expression.append(pair.1) }
+            else if last == pair.1 { expression.removeLast(); expression.append(pair.0) }
+            else if Self.operators.contains(last) { expression.removeLast(); expression.append(pair.0) }
+            else { expression.append(pair.0) }
         case ".":
-            let current = expression.split(whereSeparator: { $0 == "+" || $0 == "−" }).last.map(String.init) ?? ""
-            if expression.isEmpty || expression.last == "+" || expression.last == "−" { expression += "0." }
-            else if !current.contains(".") { expression.append(".") }
+            if expression.isEmpty || Self.operators.contains(expression.last!) { expression += "0." }
+            else if !currentNumber.contains(".") { expression.append(".") }
         default:
-            let current = expression.split(whereSeparator: { $0 == "+" || $0 == "−" }).last.map(String.init) ?? ""
-            if let dot = current.firstIndex(of: "."), current.distance(from: dot, to: current.endIndex) > 2 { return }
-            if current == "0" { expression.removeLast() }
+            let current = currentNumber
+            let atStart = expression.isEmpty || Self.operators.contains(expression.last!)
+            if !atStart, let dot = current.firstIndex(of: "."), current.distance(from: dot, to: current.endIndex) > 2 { return }
+            if !atStart && current == "0" { expression.removeLast() }
             expression.append(key)
         }
     }
@@ -113,17 +146,30 @@ struct QuickEntryView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Button(tr("Cancel")) { dismiss() }
-                    .foregroundStyle(DS.textSecondary)
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(DS.textPrimary)
+                        .frame(width: 42, height: 42)
+                        .background(DS.tile)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
                 Spacer()
                 CapsuleSwitch(options: Self.kinds, selection: $kind) { $0.displayName }
                 Spacer()
                 Button(tr("More")) { showsMore = true }
-                    .foregroundStyle(DS.textSecondary)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(DS.accentText)
+                    .frame(width: 42, alignment: .trailing)
             }
-            .font(.system(size: 15, weight: .medium))
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
+            if savedCount > 0 {
+                Text(trf("%d recorded", savedCount))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(DS.textTertiary)
+            }
 
             if kind == .transfer {
                 transferPickers
@@ -152,50 +198,68 @@ struct QuickEntryView: View {
     // MARK: Categories
 
     private var categoryGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 5)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 5)
+        let names = categories
+        let rows = stride(from: 0, to: names.count, by: 5).map { Array(names[$0..<Swift.min($0 + 5, names.count)]) }
         return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(categories, id: \.self) { name in
-                        categoryCell(name, selected: category == name, size: 46) {
-                            if category == name { category = ""; subcategory = "" }
-                            else { category = name; subcategory = "" }
-                        }
-                    }
-                }
-                let subs = category.isEmpty ? [] : subcategories(of: category)
-                if !subs.isEmpty {
-                    Text(CategoryName.label(category))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(DS.textSecondary)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(subs, id: \.self) { name in
-                            categoryCell(name, selected: subcategory == name, size: 38) {
-                                subcategory = subcategory == name ? "" : name
+                        ForEach(row, id: \.self) { name in
+                            categoryCell(name, selected: category == name, size: 50,
+                                         hasChildren: !subcategories(of: name).isEmpty) {
+                                if category == name { category = ""; subcategory = "" }
+                                else { category = name; subcategory = "" }
                             }
                         }
                     }
+                    // The second level opens right under the row it belongs to.
+                    if row.contains(category) {
+                        let subs = subcategories(of: category)
+                        if !subs.isEmpty {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(subs, id: \.self) { name in
+                                    categoryCell(name, selected: subcategory == name, size: 44, hasChildren: false) {
+                                        subcategory = subcategory == name ? "" : name
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 4)
+                            .background(DS.panel)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        }
+                    }
                 }
-                if categories.isEmpty {
+                if names.isEmpty {
                     Text(tr("Categories you use appear here. Tap More to type a new one."))
                         .font(DS.caption)
                         .foregroundStyle(DS.textTertiary)
                         .frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .animation(.easeInOut(duration: 0.18), value: category)
         }
     }
 
-    private func categoryCell(_ name: String, selected: Bool, size: CGFloat,
+    private func categoryCell(_ name: String, selected: Bool, size: CGFloat, hasChildren: Bool,
                               action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
                 CategoryIcon(name: name, kind: kind, size: size)
-                    .overlay(Circle().strokeBorder(selected ? DS.accentText : .clear, lineWidth: 2.5))
+                    .background(Circle().fill(selected ? (kind == .income ? DS.lime : DS.violet) : .clear))
+                    .overlay(alignment: .bottomTrailing) {
+                        if hasChildren {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(DS.textPrimary, DS.panel)
+                                .offset(x: 2, y: 2)
+                        }
+                    }
                 Text(CategoryName.label(name))
-                    .font(.system(size: 11, weight: selected ? .bold : .medium))
+                    .font(.system(size: 11.5, weight: selected ? .bold : .semibold))
                     .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -241,41 +305,36 @@ struct QuickEntryView: View {
 
     private var entryPanel: some View {
         VStack(spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                TextField(tr("Note"), text: $note)
-                    .font(.system(size: 15))
-                    .foregroundStyle(DS.textPrimary)
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 0) {
-                    if hasOperator {
-                        Text(expression)
-                            .font(.system(size: 13).monospacedDigit())
-                            .foregroundStyle(DS.textTertiary)
-                            .lineLimit(1)
-                    }
-                    Text(amount.map { NSDecimalNumber(decimal: $0).stringValue } ?? (expression.isEmpty ? "0" : expression))
-                        .font(DS.money(30, weight: .bold))
-                        .foregroundStyle(kind == .income ? FlowPalette.income : DS.textPrimary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                }
-            }
-            HStack(spacing: 8) {
-                if kind != .transfer {
-                    Menu {
-                        ForEach(accounts) { account in
-                            Button("\(account.name) · \(account.currencyCode)") { accountID = account.id }
+            // Account, tags, reimbursement, date — like the chips above iCost's keypad.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if kind != .transfer {
+                        Menu {
+                            ForEach(accounts) { account in
+                                Button("\(account.name) · \(account.currencyCode)") { accountID = account.id }
+                            }
+                        } label: {
+                            chip(icon: "creditcard", text: accounts.first { $0.id == accountID }?.name ?? tr("Account"))
                         }
-                    } label: {
-                        chip(icon: "creditcard", text: accounts.first { $0.id == accountID }?.name ?? tr("Account"))
                     }
+                    Button { showsTags = true } label: {
+                        chip(icon: "tag", text: tags.isEmpty ? tr("Tags") : tags)
+                    }
+                    .buttonStyle(.plain)
+                    if kind == .expense {
+                        Button { claim.toggle() } label: {
+                            chip(icon: claim ? "checkmark.circle.fill" : "circle", text: tr("Reimburse"),
+                                 active: claim)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Button { showsDate.toggle() } label: {
+                        chip(icon: "calendar", text: Calendar.current.isDateInToday(date)
+                             ? tr("Today") : Fmt.dateMedium.string(from: date), active: showsDate)
+                    }
+                    .buttonStyle(.plain)
                 }
-                Button { showsDate.toggle() } label: {
-                    chip(icon: "calendar", text: Calendar.current.isDateInToday(date)
-                         ? tr("Today") : Fmt.dateMedium.string(from: date))
-                }
-                .buttonStyle(.plain)
-                Spacer()
+                .padding(.horizontal, 2)
             }
             if showsDate {
                 DatePicker("", selection: $date)
@@ -283,69 +342,109 @@ struct QuickEntryView: View {
                     .datePickerStyle(.compact)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .lastTextBaseline) {
+                    Text(Fmt.money(amount ?? 0, accounts.first { $0.id == accountID }?.currencyCode ?? "CNY"))
+                        .font(DS.money(34, weight: .bold))
+                        .foregroundStyle(kind == .income ? FlowPalette.income
+                                         : kind == .expense ? FlowPalette.expense : DS.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .layoutPriority(1)
+                    Spacer(minLength: 8)
+                    if hasOperator {
+                        Text(expression)
+                            .font(.system(size: 14).monospacedDigit())
+                            .foregroundStyle(DS.textTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                    }
+                }
+                Divider().overlay(DS.border)
+                HStack(spacing: 8) {
+                    Text(date.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .foregroundStyle(DS.textSecondary)
+                        .padding(.horizontal, 9)
+                        .frame(height: 26)
+                        .background(DS.tile)
+                        .clipShape(Capsule())
+                    TextField(tr("Add a note"), text: $note)
+                        .font(.system(size: 15))
+                        .foregroundStyle(DS.textPrimary)
+                }
+            }
+            .padding(14)
+            .background(DS.tile.opacity(0.6))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             keypad
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(DS.panel)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22))
+        .padding(.horizontal, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+        .background(DS.page)
+        .alert(tr("Tags"), isPresented: $showsTags) {
+            TextField(tr("Tags"), text: $tags)
+            Button(tr("Done")) {}
+        }
     }
 
-    private func chip(icon: String, text: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
-            Text(text).font(.system(size: 13, weight: .medium)).lineLimit(1)
+    private func chip(icon: String, text: String, active: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+            Text(text).font(.system(size: 15, weight: .semibold)).lineLimit(1)
         }
-        .foregroundStyle(DS.textSecondary)
-        .padding(.horizontal, 11)
-        .frame(height: 30)
-        .background(DS.tile)
+        .foregroundStyle(active ? DS.ink : DS.textPrimary)
+        .padding(.horizontal, 13)
+        .frame(height: 38)
+        .background(active ? DS.accent : DS.tile)
         .clipShape(Capsule())
     }
 
     private var keypad: some View {
-        let rows = [["1", "2", "3", "⌫"], ["4", "5", "6", "+"], ["7", "8", "9", "−"], [".", "0", "00", "✓"]]
+        let rows = [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"], ["7", "8", "9", "again"], [".", "0", "⌫", "done"]]
         return VStack(spacing: 8) {
             ForEach(rows, id: \.self) { row in
                 HStack(spacing: 8) {
-                    ForEach(row, id: \.self) { key in
-                        keyButton(key)
-                    }
+                    ForEach(row, id: \.self) { keyButton($0) }
                 }
             }
         }
     }
 
     private func keyButton(_ key: String) -> some View {
-        let isSave = key == "✓"
+        let isDone = key == "done"
+        let isAgain = key == "again"
         return Button {
-            if isSave { save() }
-            else if key == "00" { press("0"); press("0") }
+            if isDone { save(closing: true) }
+            else if isAgain { save(closing: false) }
             else { press(key) }
         } label: {
             Group {
-                if key == "⌫" {
-                    Image(systemName: "delete.left")
-                } else if isSave {
-                    Text(hasOperator ? "=" : tr("Save"))
-                } else {
-                    Text(key)
+                switch key {
+                case "⌫": Image(systemName: "delete.left")
+                case "+×": Text("+ ×")
+                case "−÷": Text("− ÷")
+                case "again": Text(tr("Record"))
+                case "done": Text(hasOperator ? "=" : tr("Done"))
+                default: Text(key)
                 }
             }
-            .font(.system(size: isSave ? 17 : 22, weight: isSave ? .bold : .medium).monospacedDigit())
-            .foregroundStyle(isSave ? DS.ink : DS.textPrimary)
+            .font(.system(size: isDone || isAgain ? 17 : 24, weight: isDone || isAgain ? .bold : .medium)
+                .monospacedDigit())
+            .foregroundStyle(isDone ? DS.ink : DS.textPrimary)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(isSave ? (canSave || hasOperator ? DS.accent : DS.tile) : DS.tile)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .frame(height: 54)
+            .background(isDone ? DS.accent : DS.tile)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func save() {
-        // "=" first collapses the sum; a second tap saves.
+    /// Done saves and closes; Record saves and clears for the next one.
+    private func save(closing: Bool) {
+        // With a sum on screen the key works as "=" first.
         if hasOperator {
             if let amount { expression = NSDecimalNumber(decimal: amount).stringValue }
             return
@@ -357,13 +456,22 @@ struct QuickEntryView: View {
                                  category: kind == .transfer ? "Transfer" : category,
                                  subcategory: kind == .transfer ? "" : subcategory,
                                  note: note.trimmingCharacters(in: .whitespaces),
+                                 tags: tags.trimmingCharacters(in: .whitespaces),
                                  account: account,
                                  transferAccount: kind == .transfer ? accounts.first { $0.id == transferAccountID } : nil)
+        if kind == .expense && claim { record.claimStatus = .pending }
         context.insert(record)
         try? context.save()
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif
-        dismiss()
+        if closing {
+            dismiss()
+        } else {
+            savedCount += 1
+            expression = ""
+            note = ""
+            claim = false
+        }
     }
 }
