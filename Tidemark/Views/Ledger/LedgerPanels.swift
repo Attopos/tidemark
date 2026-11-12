@@ -269,16 +269,15 @@ struct FlowBarsPanel: View {
             .buttonStyle(.plain)
             .help(asLine ? tr("Show as bars") : tr("Show as a line"))
         }) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    CapsuleSwitch(options: FlowMode.allCases, selection: $mode) { $0.label }
-                    Spacer(minLength: 4)
-                    Text(focusLabel)
-                        .font(.system(size: 13, weight: .medium).monospacedDigit())
-                        .foregroundStyle(DS.textSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
+            VStack(spacing: 10) {
+                Text(focusLabel)
+                    .font(.system(size: 12.5, weight: .medium).monospacedDigit())
+                    .foregroundStyle(DS.textSecondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(DS.tile)
+                    .clipShape(Capsule())
                 Chart {
                     ForEach(buckets) { bucket in
                         if asLine {
@@ -289,10 +288,17 @@ struct FlowBarsPanel: View {
                                     .foregroundStyle(color(1).opacity(0.15))
                                     .interpolationMethod(.monotone)
                                 LineMark(x: .value("Date", bucket.start, unit: unit),
-                                         y: .value("Amount", value(bucket).doubleValue))
+                                         y: .value("Amount", value(bucket).doubleValue),
+                                         series: .value("Part", "past"))
                                     .foregroundStyle(color(1))
                                     .lineStyle(StrokeStyle(lineWidth: 2))
                                     .interpolationMethod(.monotone)
+                            }
+                            if bucket.start > Date() {
+                                LineMark(x: .value("Date", bucket.start, unit: unit), y: .value("Amount", 0),
+                                         series: .value("Part", "ahead"))
+                                    .foregroundStyle(color(1))
+                                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                             }
                             if focus?.start == bucket.start {
                                 PointMark(x: .value("Date", bucket.start, unit: unit),
@@ -335,6 +341,7 @@ struct FlowBarsPanel: View {
                     }
                 }
                 .frame(height: 190)
+                CapsuleSwitch(options: FlowMode.allCases, selection: $mode, compact: true) { $0.label }
             }
         }
     }
@@ -367,33 +374,50 @@ struct NetTrendPanel: View {
     }
 
     var body: some View {
+        // Days still to come: the last value, carried flat and dashed.
+        let ahead: [(Date, Double)] = {
+            guard let last = points.last else { return [] }
+            return period.bucketStarts().filter { $0 >= last.date }.map { ($0, value(last).doubleValue) }
+        }()
         Panel(title: tr("Cash net assets")) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    CapsuleSwitch(options: Series.allCases, selection: $series) {
-                        switch $0 {
-                        case .net: return tr("Net")
-                        case .assets: return tr("Assets")
-                        case .debts: return tr("Debts")
-                        }
-                    }
-                    Spacer(minLength: 4)
-                    if let focus {
-                        Text("\(Fmt.dateShort.string(from: focus.date))  \(Fmt.money(value(focus), code))")
-                            .font(.system(size: 13, weight: .medium).monospacedDigit())
-                            .foregroundStyle(DS.textSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+            VStack(spacing: 10) {
+                if let focus {
+                    Text("\(Fmt.dateShort.string(from: focus.date))  \(Fmt.money(value(focus), code))")
+                        .font(.system(size: 12.5, weight: .medium).monospacedDigit())
+                        .foregroundStyle(DS.textSecondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(DS.tile)
+                        .clipShape(Capsule())
                 }
-                Chart(points) { point in
-                    AreaMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))
-                        .foregroundStyle(color.opacity(0.18))
-                        .interpolationMethod(.monotone)
-                    LineMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))
-                        .foregroundStyle(color)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                        .interpolationMethod(.monotone)
+                Chart {
+                    // A solid area and line for what happened; the days still
+                    // to come carry the last value as a flat dashed line.
+                    ForEach(points) { point in
+                        AreaMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))
+                            .foregroundStyle(color.opacity(0.18))
+                            .interpolationMethod(.monotone)
+                        LineMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))
+                            .foregroundStyle(color)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                            .interpolationMethod(.monotone)
+                    }
+                    if let last = points.last, let end = ahead.last?.0, end > last.date {
+                        RectangleMark(xStart: .value("Date", last.date), xEnd: .value("Date", end),
+                                      yStart: .value("Base", 0), yEnd: .value("Value", value(last).doubleValue))
+                            .foregroundStyle(color.opacity(0.08))
+                        RuleMark(xStart: .value("Date", last.date), xEnd: .value("Date", end),
+                                 y: .value("Value", value(last).doubleValue))
+                            .foregroundStyle(color)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    }
+                    if let focus {
+                        PointMark(x: .value("Date", focus.date), y: .value("Value", value(focus).doubleValue))
+                            .symbol(Circle().strokeBorder(lineWidth: 2))
+                            .symbolSize(60)
+                            .foregroundStyle(color)
+                    }
                 }
                 .chartXSelection(value: $hovered)
                 .chartXScale(domain: period.start...period.end())
@@ -413,12 +437,19 @@ struct NetTrendPanel: View {
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                         AxisValueLabel(format: period.unit == .month
-                                       ? .dateTime.day() : .dateTime.month(.abbreviated))
+                                       ? .dateTime.month(.defaultDigits).day() : .dateTime.month(.abbreviated))
                             .font(.system(size: 10.5))
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
                 .frame(height: 170)
+                CapsuleSwitch(options: Series.allCases, selection: $series, compact: true) {
+                    switch $0 {
+                    case .net: return tr("Net")
+                    case .assets: return tr("Assets")
+                    case .debts: return tr("Debts")
+                    }
+                }
             }
         }
     }

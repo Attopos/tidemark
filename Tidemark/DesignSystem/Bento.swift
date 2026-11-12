@@ -146,6 +146,15 @@ struct CapsuleSwitch<Value: Hashable>: View {
     let options: [Value]
     @Binding var selection: Value
     let label: (Value) -> String
+    /// Smaller, for filters that sit under a chart.
+    var compact = false
+
+    init(options: [Value], selection: Binding<Value>, compact: Bool = false, label: @escaping (Value) -> String) {
+        self.options = options
+        self._selection = selection
+        self.compact = compact
+        self.label = label
+    }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -153,12 +162,12 @@ struct CapsuleSwitch<Value: Hashable>: View {
                 let selected = option == selection
                 Button { selection = option } label: {
                     Text(label(option))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: compact ? 11.5 : 13, weight: .semibold))
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(selected ? DS.ink : DS.textSecondary)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, compact ? 9 : 11)
+                        .padding(.vertical, compact ? 3.5 : 5)
                         .background(selected ? DS.accent : Color.clear)
                         .clipShape(Capsule())
                         .contentShape(Capsule())
@@ -166,7 +175,7 @@ struct CapsuleSwitch<Value: Hashable>: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(3)
+        .padding(compact ? 2.5 : 3)
         .background(DS.tile)
         .clipShape(Capsule())
     }
