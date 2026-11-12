@@ -133,7 +133,7 @@ private struct SectionRail: View {
             Spacer()
             // The portfolio is its own, locked block, apart from day-to-day cash.
             Divider().frame(width: 44).padding(.vertical, 6)
-            button(.portfolio, badge: app.portfolioUnlocked ? "lock.open.fill" : "lock.fill")
+            button(.portfolio, badge: app.portfolioLockEnabled ? (app.portfolioUnlocked ? "lock.open.fill" : "lock.fill") : nil)
             button(.settings)
         }
         .padding(.top, 44)

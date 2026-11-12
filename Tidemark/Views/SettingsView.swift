@@ -22,6 +22,10 @@ struct SettingsView: View {
             Section(tr("Appearance")) {
                 CapsuleSwitch(options: AppAppearance.allCases, selection: $app.appearance) { $0.title }
             }
+            Section(tr("Portfolio")) {
+                Toggle(tr("Ask for the Mac password to open the portfolio"), isOn: $app.portfolioLockEnabled)
+                    .toggleStyle(LimeCheckboxStyle())
+            }
             Section(tr("iCloud")) {
                 SyncStatusView()
             }

@@ -283,6 +283,7 @@ enum L10n {
         "Read a payment screenshot into a new record": "识别付款截图，生成一笔记录",
         "Drop holdings screenshots to import": "拖放持仓截图以导入",
         "Drop a receipt screenshot or a bookkeeping export": "拖放付款截图或记账导出文件",
+        "Ask for the Mac password to open the portfolio": "打开投资组合时需要输入 Mac 密码",
     ]
 
     // MARK: Español
@@ -514,5 +515,6 @@ enum L10n {
         "Read a payment screenshot into a new record": "Leer una captura de pago como nuevo movimiento",
         "Drop holdings screenshots to import": "Suelta capturas de posiciones para importar",
         "Drop a receipt screenshot or a bookkeeping export": "Suelta una captura de pago o una exportación contable",
+        "Ask for the Mac password to open the portfolio": "Pedir la contraseña del Mac para abrir la cartera",
     ]
 }

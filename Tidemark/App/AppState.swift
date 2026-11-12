@@ -90,12 +90,21 @@ final class AppState {
     // time it is opened. Leaving the page or the app locks it again. Nothing
     // is stored: the check is the system's own (LocalAuthentication).
 
-    private(set) var portfolioUnlocked = false
+    /// Whether the portfolio asks for a password at all (off by default for now).
+    var portfolioLockEnabled: Bool = UserDefaults.standard.bool(forKey: "portfolioLockEnabled") {
+        didSet {
+            UserDefaults.standard.set(portfolioLockEnabled, forKey: "portfolioLockEnabled")
+            if !portfolioLockEnabled { portfolioUnlocked = true } else { lockPortfolio() }
+        }
+    }
+
+    private(set) var portfolioUnlocked = !UserDefaults.standard.bool(forKey: "portfolioLockEnabled")
     private(set) var unlockMessage: String?
     /// A screenshot dropped while locked opens the import once unlocked.
     private var importAfterUnlock = false
 
     func lockPortfolio() {
+        guard portfolioLockEnabled else { return }
         portfolioUnlocked = false
         importAfterUnlock = false
     }
