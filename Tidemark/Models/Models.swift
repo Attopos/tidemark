@@ -105,6 +105,28 @@ final class Transaction {
     /// at the dated rate.
     var transferAmount: Decimal? = nil
     var updatedAt: Date = Date()
+    /// Reimbursement: "" (none), "pending" (to be paid back) or "claimed".
+    var claimStatusRaw: String = ""
+    /// What was actually paid back, once claimed.
+    var claimAmount: Decimal = 0
+    /// The preset (template, recurring record, instalment plan) this record
+    /// came from, if any.
+    var presetID: UUID? = nil
+
+    var claimStatus: ClaimStatus {
+        get { ClaimStatus(rawValue: claimStatusRaw) ?? .none }
+        set { claimStatusRaw = newValue.rawValue }
+    }
+
+    /// What this record really cost or brought in: an expense net of its
+    /// refund and of any reimbursement already received.
+    var netAmount: Decimal {
+        guard kind == .expense else { return amount }
+        return amount - refundAmount - (claimStatus == .claimed ? claimAmount : 0)
+    }
+
+    /// Money that came back to the paying account.
+    var returnedAmount: Decimal { amount - netAmount }
 
     var kind: TransactionKind {
         get { TransactionKind(rawValue: kindRaw) ?? .expense }
@@ -123,7 +145,7 @@ final class Transaction {
         case .income:
             return isSource ? amount : 0
         case .expense:
-            return isSource ? -(amount - refundAmount) : 0
+            return isSource ? -netAmount : 0
         case .transfer, .liabilityPayment:
             if isSource && isDestination { return 0 }
             if isSource { return -amount }
@@ -173,6 +195,86 @@ final class Transaction {
         self.rawPayload = rawPayload
         self.createdAt = Date()
         self.excludeFromStats = excludeFromStats
+    }
+}
+
+enum ClaimStatus: String, CaseIterable, Identifiable {
+    case none = ""
+    case pending
+    case claimed
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return tr("Not reimbursable")
+        case .pending: return tr("Pending")
+        case .claimed: return tr("Claimed")
+        }
+    }
+}
+
+/// A record kept for reuse. Without a schedule it is a template (one tap
+/// fills the editor); with one it adds itself on every due date; with an
+/// occurrence limit it is an instalment plan (N payments, then it stops).
+/// Accounts are referenced by id so a preset travels between devices as
+/// plain fields.
+@Model
+final class RecordPreset {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var kindRaw: String
+    var amount: Decimal
+    var currencyCode: String
+    var category: String
+    var subcategory: String
+    var accountID: UUID?
+    var transferAccountID: UUID?
+    var note: String
+    var tags: String
+    /// "" = template only, else a Frequency raw value.
+    var scheduleRaw: String
+    var startDate: Date
+    var endDate: Date?
+    /// Instalments: stop after this many records.
+    var occurrenceLimit: Int?
+    /// Index of the last occurrence already written (−1 = none). Records the
+    /// user deletes later are not written again.
+    var generatedThrough: Int
+    var isActive: Bool
+    var createdAt: Date
+    var updatedAt: Date
+
+    var kind: TransactionKind {
+        get { TransactionKind(rawValue: kindRaw) ?? .expense }
+        set { kindRaw = newValue.rawValue }
+    }
+
+    var schedule: Frequency? {
+        get { Frequency(rawValue: scheduleRaw) }
+        set { scheduleRaw = newValue?.rawValue ?? "" }
+    }
+
+    init(name: String, kind: TransactionKind, amount: Decimal, currencyCode: String = "CNY") {
+        self.id = UUID()
+        self.name = name
+        self.kindRaw = kind.rawValue
+        self.amount = amount
+        self.currencyCode = currencyCode
+        self.category = ""
+        self.subcategory = ""
+        self.accountID = nil
+        self.transferAccountID = nil
+        self.note = ""
+        self.tags = ""
+        self.scheduleRaw = ""
+        self.startDate = Date()
+        self.endDate = nil
+        self.occurrenceLimit = nil
+        self.generatedThrough = -1
+        self.isActive = true
+        self.createdAt = Date()
+        self.updatedAt = Date()
     }
 }
 
@@ -534,7 +636,7 @@ enum TidemarkSchema {
         Account.self, Transaction.self, Asset.self, Holding.self,
         HoldingSnapshot.self, PricePoint.self, BalanceSnapshot.self,
         RecurringCommitment.self, FinancialGoal.self, PlanScenario.self,
-        ImportRecord.self, ImportSourceState.self, CurrencyRate.self,
+        ImportRecord.self, ImportSourceState.self, CurrencyRate.self, RecordPreset.self,
     ]
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {

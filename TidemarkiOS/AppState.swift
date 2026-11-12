@@ -26,6 +26,14 @@ final class AppState {
         didSet { appearance.save() }
     }
 
+    /// Eye toggle: every amount shows as dots (for screens others can see).
+    var amountsHidden: Bool = UserDefaults.standard.bool(forKey: "amountsHidden") {
+        didSet {
+            UserDefaults.standard.set(amountsHidden, forKey: "amountsHidden")
+            Fmt.amountsHidden = amountsHidden
+        }
+    }
+
     /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())
 
@@ -35,5 +43,6 @@ final class AppState {
         let savedBase = UserDefaults.standard.string(forKey: "baseCurrency") ?? ""
         self.baseCurrency = Self.baseCurrencies.contains(savedBase) ? savedBase : "CNY"
         L10n.current = self.language
+        Fmt.amountsHidden = UserDefaults.standard.bool(forKey: "amountsHidden")
     }
 }

@@ -14,7 +14,6 @@ struct AnalysisView: View {
     @Query private var accounts: [Account]
     @Query private var rates: [CurrencyRate]
 
-    @State private var categorySelection: CategorySelection?
     @State private var editing: Transaction?
 
     var body: some View {
@@ -56,17 +55,7 @@ struct AnalysisView: View {
                     let statistics = FlowBarsPanel(buckets: buckets, summary: summary, period: period,
                                                    code: snapshot.code)
                     let table = SummaryTable(buckets: buckets, summary: summary, period: period, code: snapshot.code)
-                    let categories = VStack(spacing: DS.gridGap) {
-                        CategoryPanel(entries: snapshot.entries, period: period, code: snapshot.code,
-                                      selection: $categorySelection)
-                        if let selection = categorySelection {
-                            Panel(title: selection.name) {
-                                RecordList(transactions: transactions.filter {
-                                    period.contains($0.date) && selection.matches($0)
-                                }, showsDate: true, editing: $editing)
-                            }
-                        }
-                    }
+                    let categories = CategoryPanel(entries: snapshot.entries, period: period, code: snapshot.code)
                     switch columns {
                     case 3:
                         HStack(alignment: .top, spacing: DS.gridGap) {
@@ -92,7 +81,6 @@ struct AnalysisView: View {
         }
         .background(DS.page)
         .sheet(item: $editing) { TransactionEditor(transaction: $0) }
-        .onChange(of: app.cashPeriod) { _, _ in categorySelection = nil }
     }
 
     private func figuresPanel(_ summary: CashSummary, code: String) -> some View {

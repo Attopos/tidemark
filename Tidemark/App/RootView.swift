@@ -30,6 +30,12 @@ struct RootView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            if [.ledger, .accounts, .analysis].contains(app.section) {
+                FloatingAddButton { app.addingRecord = true }
+                    .keyboardShortcut("n", modifiers: .command)
+                    .padding(28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            }
             if let message = app.ledgerImportMessage {
                 ImportNotice(message: message, failed: app.ledgerImportFailed) { app.ledgerImportMessage = nil }
                     .padding(.top, 10)
@@ -47,6 +53,7 @@ struct RootView: View {
         .overlay {
             if dropTargeted { DropHint() }
         }
+        .sheet(isPresented: $app.addingRecord) { TransactionEditor(transaction: nil) }
         .sheet(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
                 .tint(DS.accentText)
@@ -54,7 +61,7 @@ struct RootView: View {
         .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
             handleDrop(providers)
         }
-        .id(app.language)
+        .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
         .onAppear { app.applyAppearance() }
         // Switching to another app locks the portfolio again.

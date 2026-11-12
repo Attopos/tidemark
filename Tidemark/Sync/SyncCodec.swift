@@ -14,8 +14,15 @@ import CryptoKit
 enum SyncKind: String {
     case account = "A"
     case transaction = "T"
+    case preset = "P"
 
-    var recordType: String { self == .account ? "Account" : "LedgerRecord" }
+    var recordType: String {
+        switch self {
+        case .account: return "Account"
+        case .transaction: return "LedgerRecord"
+        case .preset: return "Preset"
+        }
+    }
 }
 
 /// "A:<uuid>" or "T:<uuid>" — also the record name on the server.
@@ -93,6 +100,8 @@ enum SyncCodec {
             "tags": transaction.tags,
             "address": transaction.address,
             "refund": string(transaction.refundAmount),
+            "claimStatus": transaction.claimStatusRaw,
+            "claimAmount": string(transaction.claimAmount),
             "discount": string(transaction.discountAmount),
             "fee": string(transaction.feeAmount),
             "source": transaction.sourceRaw,
@@ -106,6 +115,7 @@ enum SyncCodec {
         if let arrival = transaction.transferAmount { fields["transferAmount"] = string(arrival) }
         if let external = transaction.externalID { fields["externalID"] = external }
         if let raw = transaction.rawPayload { fields["rawPayload"] = raw }
+        if let preset = transaction.presetID { fields["preset"] = preset.uuidString }
         return fields
     }
 
@@ -124,6 +134,9 @@ enum SyncCodec {
         transaction.tags = fields["tags"] ?? ""
         transaction.address = fields["address"] ?? ""
         transaction.refundAmount = decimal(fields["refund"])
+        transaction.claimStatusRaw = fields["claimStatus"] ?? ""
+        transaction.claimAmount = decimal(fields["claimAmount"])
+        transaction.presetID = fields["preset"].flatMap(UUID.init(uuidString:))
         transaction.discountAmount = decimal(fields["discount"])
         transaction.feeAmount = decimal(fields["fee"])
         transaction.sourceRaw = fields["source"] ?? transaction.sourceRaw
@@ -144,6 +157,54 @@ enum SyncCodec {
         transaction.account = resolve("account")
         transaction.transferAccount = resolve("transferAccount")
         return complete
+    }
+
+    // MARK: Preset
+
+    static func fields(of preset: RecordPreset) -> SyncFields {
+        var fields: SyncFields = [
+            "name": preset.name,
+            "kind": preset.kindRaw,
+            "amount": string(preset.amount),
+            "currency": preset.currencyCode,
+            "category": preset.category,
+            "subcategory": preset.subcategory,
+            "note": preset.note,
+            "tags": preset.tags,
+            "schedule": preset.scheduleRaw,
+            "start": string(preset.startDate),
+            "through": String(preset.generatedThrough),
+            "active": string(preset.isActive),
+            "createdAt": string(preset.createdAt),
+            "updatedAt": string(preset.updatedAt),
+        ]
+        if let id = preset.accountID { fields["account"] = id.uuidString }
+        if let id = preset.transferAccountID { fields["transferAccount"] = id.uuidString }
+        if let end = preset.endDate { fields["end"] = string(end) }
+        if let limit = preset.occurrenceLimit { fields["limit"] = String(limit) }
+        return fields
+    }
+
+    static func apply(_ fields: SyncFields, to preset: RecordPreset) {
+        preset.name = fields["name"] ?? preset.name
+        preset.kindRaw = fields["kind"] ?? preset.kindRaw
+        preset.amount = decimal(fields["amount"])
+        preset.currencyCode = fields["currency"] ?? preset.currencyCode
+        preset.category = fields["category"] ?? ""
+        preset.subcategory = fields["subcategory"] ?? ""
+        preset.note = fields["note"] ?? ""
+        preset.tags = fields["tags"] ?? ""
+        preset.scheduleRaw = fields["schedule"] ?? ""
+        preset.startDate = date(fields["start"]) ?? preset.startDate
+        // Never go back: an occurrence written on either device stays written.
+        preset.generatedThrough = max(preset.generatedThrough, Int(fields["through"] ?? "") ?? -1)
+        preset.isActive = fields["active"] != "0"
+        preset.createdAt = date(fields["createdAt"]) ?? preset.createdAt
+        preset.updatedAt = date(fields["updatedAt"]) ?? preset.updatedAt
+        preset.accountID = fields["account"].flatMap(UUID.init(uuidString:))
+        preset.transferAccountID = fields["transferAccount"].flatMap(UUID.init(uuidString:))
+        preset.endDate = date(fields["end"])
+        preset.occurrenceLimit = fields["limit"].flatMap { Int($0) }
     }
 
     // MARK: Digest

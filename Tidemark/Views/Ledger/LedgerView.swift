@@ -16,7 +16,6 @@ struct LedgerView: View {
     @Query private var rates: [CurrencyRate]
 
     @State private var selectedDay: Date? = Calendar.current.startOfDay(for: Date())
-    @State private var categorySelection: CategorySelection?
     @State private var search = ""
     @State private var editing: Transaction?
     @State private var creating = false
@@ -45,8 +44,8 @@ struct LedgerView: View {
                                                        code: snapshot.code, selectedDay: selectedDay)
                         let trendPanel = NetTrendPanel(points: trend, period: period, code: snapshot.code)
                         let categories = CategoryPanel(entries: snapshot.entries, period: period,
-                                                       code: snapshot.code, selection: $categorySelection)
-                        let days = dayColumn(period: period, buckets: buckets, code: snapshot.code)
+                                                       code: snapshot.code)
+                        let days = dayColumn(period: period, entries: snapshot.entries, code: snapshot.code)
                         switch columns {
                         case 3:
                             HStack(alignment: .top, spacing: DS.gridGap) {
@@ -77,7 +76,6 @@ struct LedgerView: View {
             TransactionEditor(transaction: nil, defaultDate: selectedDay)
         }
         .onChange(of: app.cashPeriod) { _, period in
-            categorySelection = nil
             let today = Calendar.current.startOfDay(for: Date())
             selectedDay = period.contains(today) ? today : nil
         }
@@ -92,10 +90,10 @@ struct LedgerView: View {
                 Spacer(minLength: 12)
                 PeriodBar(period: period)
                 searchField
-                addButton
+                eye
             }
             VStack(alignment: .leading, spacing: 12) {
-                HStack { title; Spacer(); addButton }
+                HStack { title; Spacer(); eye }
                 PeriodBar(period: period)
                 searchField
             }
@@ -131,12 +129,9 @@ struct LedgerView: View {
         .clipShape(Capsule())
     }
 
-    private var addButton: some View {
-        Button { creating = true } label: {
-            Label(tr("Add record"), systemImage: "plus")
-        }
-        .buttonStyle(AccentButtonStyle())
-        .keyboardShortcut("n", modifiers: .command)
+    private var eye: some View {
+        @Bindable var app = app
+        return AmountsToggle(hidden: $app.amountsHidden)
     }
 
     private var emptyState: some View {
@@ -175,11 +170,13 @@ struct LedgerView: View {
 
     // MARK: Calendar + records
 
-    private func dayColumn(period: CashPeriod, buckets: [CashBucket], code: String) -> some View {
+    private func dayColumn(period: CashPeriod, entries: [CashEntry], code: String) -> some View {
+        @Bindable var app = app
+        return
         VStack(spacing: DS.gridGap) {
             if period.unit == .month {
                 Panel {
-                    MonthCalendar(period: period, buckets: buckets, code: code, selectedDay: $selectedDay)
+                    MonthCalendar(period: $app.cashPeriod, entries: entries, code: code, selectedDay: $selectedDay)
                 }
             }
             recordsPanel(period: period, code: code)
@@ -199,9 +196,6 @@ struct LedgerView: View {
                  transaction.address, transaction.account?.name ?? "", transaction.transferAccount?.name ?? "",
                  "\(transaction.amount)"].contains { $0.lowercased().contains(query) }
             }
-        } else if let selection = categorySelection {
-            title = selection.name
-            shown = transactions.filter { period.contains($0.date) && selection.matches($0) }
         } else if let day = selectedDay, period.unit == .month {
             title = day.formatted(.dateTime.month().day().weekday(.wide).locale(L10n.current.locale))
             shown = transactions.filter { Calendar.current.isDate($0.date, inSameDayAs: day) }
@@ -223,10 +217,15 @@ struct LedgerView: View {
 }
 
 // MARK: - Month calendar
+//
+// Whole weeks, Monday first: the days of the neighbouring months that fill
+// the first and last week are shown dimmed with their own totals, and a tap
+// on one moves to that month. Every day that has begun shows both its
+// spending and its income, zeros included.
 
 struct MonthCalendar: View {
-    let period: CashPeriod
-    let buckets: [CashBucket]
+    @Binding var period: CashPeriod
+    let entries: [CashEntry]
     let code: String
     @Binding var selectedDay: Date?
 
@@ -236,12 +235,26 @@ struct MonthCalendar: View {
         return calendar
     }
 
-    /// Leading blanks, then one cell per day.
-    private var cells: [CashBucket?] {
-        guard let first = buckets.first else { return [] }
-        let weekday = calendar.component(.weekday, from: first.start)
-        let leading = (weekday - calendar.firstWeekday + 7) % 7
-        return Array(repeating: nil, count: leading) + buckets.map { Optional($0) }
+    private struct Cell: Identifiable {
+        let bucket: CashBucket
+        let inMonth: Bool
+        var id: Date { bucket.start }
+    }
+
+    private var cells: [Cell] {
+        let current = CashflowAnalytics.buckets(entries, in: period, calendar: calendar)
+        guard let first = current.first, let last = current.last else { return [] }
+        let leading = (calendar.component(.weekday, from: first.start) - calendar.firstWeekday + 7) % 7
+        let trailing = (calendar.firstWeekday + 6 - calendar.component(.weekday, from: last.start) + 7) % 7
+        let before = leading > 0
+            ? CashflowAnalytics.buckets(entries, in: period.shifted(by: -1, calendar: calendar), calendar: calendar)
+                .suffix(leading).map { Cell(bucket: $0, inMonth: false) }
+            : []
+        let after = trailing > 0
+            ? CashflowAnalytics.buckets(entries, in: period.shifted(by: 1, calendar: calendar), calendar: calendar)
+                .prefix(trailing).map { Cell(bucket: $0, inMonth: false) }
+            : []
+        return before + current.map { Cell(bucket: $0, inMonth: true) } + after
     }
 
     private var weekdaySymbols: [String] {
@@ -262,29 +275,29 @@ struct MonthCalendar: View {
                 }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
-                ForEach(Array(cells.enumerated()), id: \.offset) { _, bucket in
-                    if let bucket {
-                        dayCell(bucket)
-                    } else {
-                        Color.clear.frame(height: 50)
-                    }
-                }
+                ForEach(cells) { dayCell($0) }
             }
         }
     }
 
-    private func dayCell(_ bucket: CashBucket) -> some View {
-        let selected = selectedDay.map { calendar.isDate($0, inSameDayAs: bucket.start) } ?? false
+    private func dayCell(_ cell: Cell) -> some View {
+        let bucket = cell.bucket
+        let selected = cell.inMonth && (selectedDay.map { calendar.isDate($0, inSameDayAs: bucket.start) } ?? false)
         let isToday = calendar.isDateInToday(bucket.start)
-        return Button { selectedDay = bucket.start } label: {
+        let begun = bucket.start <= Date()
+        let ink = selected ? DS.ink.opacity(0.75) : nil
+        return Button {
+            if !cell.inMonth { period = CashPeriod(unit: .month, containing: bucket.start) }
+            selectedDay = bucket.start
+        } label: {
             VStack(spacing: 1) {
                 Text("\(calendar.component(.day, from: bucket.start))")
                     .font(.system(size: 13, weight: isToday ? .bold : .medium))
                     .foregroundStyle(selected ? DS.ink : (isToday ? DS.accentText : DS.textPrimary))
-                Text(bucket.expense > 0 ? "-\(compact(bucket.expense))" : " ")
-                    .foregroundStyle(selected ? DS.ink.opacity(0.75) : FlowPalette.expense)
-                Text(bucket.income > 0 ? "+\(compact(bucket.income))" : " ")
-                    .foregroundStyle(selected ? DS.ink.opacity(0.75) : FlowPalette.income)
+                Text(begun ? "-\(compact(bucket.expense))" : " ")
+                    .foregroundStyle(ink ?? (bucket.expense > 0 ? FlowPalette.expense : DS.textTertiary))
+                Text(begun ? "+\(compact(bucket.income))" : " ")
+                    .foregroundStyle(ink ?? (bucket.income > 0 ? FlowPalette.income : DS.textTertiary))
             }
             .font(.system(size: 9.5, weight: .medium).monospacedDigit())
             .lineLimit(1)
@@ -293,12 +306,14 @@ struct MonthCalendar: View {
             .frame(height: 50)
             .background(selected ? DS.accent : DS.tile.opacity(bucket.expense > 0 || bucket.income > 0 ? 1 : 0.45))
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .opacity(cell.inMonth ? 1 : 0.4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
     private func compact(_ amount: Decimal) -> String {
+        if Fmt.amountsHidden { return "•••" }
         let value = amount.doubleValue
         if value >= 10_000 { return String(format: "%.1fw", value / 10_000) }
         if value >= 1_000 { return String(format: "%.0f", value) }

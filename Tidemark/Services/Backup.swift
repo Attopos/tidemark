@@ -29,6 +29,14 @@ struct BackupFile: Codable {
     var rates: [RateRecord]
     /// Ledger records. Optional so backups made before the ledger still load.
     var transactions: [TransactionRecord]? = nil
+    /// Templates, recurring records and instalment plans, in the same flat
+    /// field form they sync in.
+    var presets: [PresetRecord]? = nil
+
+    struct PresetRecord: Codable {
+        var id: UUID
+        var fields: [String: String]
+    }
 
     struct Settings: Codable {
         var baseCurrency: String?
@@ -65,6 +73,9 @@ struct BackupFile: Codable {
         var transferAccount: UUID?
         var transferAmount: String?
         var refund: String
+        var claimStatus: String? = nil
+        var claimAmount: String? = nil
+        var preset: UUID? = nil
         var discount: String
         var fee: String
         var source: String
@@ -231,11 +242,14 @@ enum BackupService {
                       merchant: $0.merchant, note: $0.note, tags: $0.tags, address: $0.address,
                       account: $0.account?.id, transferAccount: $0.transferAccount?.id,
                       transferAmount: $0.transferAmount.map(string), refund: string($0.refundAmount),
+                      claimStatus: $0.claimStatusRaw, claimAmount: string($0.claimAmount), preset: $0.presetID,
                       discount: string($0.discountAmount), fee: string($0.feeAmount),
                       source: $0.sourceRaw, externalID: $0.externalID, fingerprint: $0.fingerprint,
                       rawPayload: $0.rawPayload, excludeFromStats: $0.excludeFromStats,
                       createdAt: $0.createdAt, updatedAt: $0.updatedAt)
-            })
+            },
+            presets: try context.fetch(FetchDescriptor<RecordPreset>()).sorted { $0.createdAt < $1.createdAt }
+                .map { .init(id: $0.id, fields: SyncCodec.fields(of: $0)) })
     }
 
     static func encode(_ backup: BackupFile) throws -> Data {
@@ -445,6 +459,9 @@ enum BackupService {
             transaction.transferAccount = record.transferAccount.flatMap { accounts[$0] }
             transaction.transferAmount = record.transferAmount.map(decimal)
             transaction.refundAmount = decimal(record.refund)
+            transaction.claimStatusRaw = record.claimStatus ?? ""
+            transaction.claimAmount = record.claimAmount.map(decimal) ?? 0
+            transaction.presetID = record.preset
             transaction.discountAmount = decimal(record.discount)
             transaction.feeAmount = decimal(record.fee)
             transaction.sourceRaw = record.source
@@ -453,6 +470,21 @@ enum BackupService {
             transaction.excludeFromStats = record.excludeFromStats
             transaction.createdAt = record.createdAt
             transaction.updatedAt = record.updatedAt
+        }
+
+        var presets: [UUID: RecordPreset] = [:]
+        for preset in try context.fetch(FetchDescriptor<RecordPreset>()) { presets[preset.id] = preset }
+        for record in backup.presets ?? [] {
+            if let existing = presets[record.id] {
+                SyncCodec.apply(record.fields, to: existing)
+                stats.updated += 1
+            } else {
+                let preset = RecordPreset(name: "", kind: .expense, amount: 0)
+                preset.id = record.id
+                SyncCodec.apply(record.fields, to: preset)
+                context.insert(preset)
+                stats.added += 1
+            }
         }
 
         try context.save()

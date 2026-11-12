@@ -53,7 +53,7 @@ struct PhoneRootView: View {
         }
         .preferredColorScheme(app.appearance.colorScheme)
         .tint(DS.accentText)
-        .id(app.language)
+        .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
         .task { CurrencyService.ensureSeeds(in: context) }
     }

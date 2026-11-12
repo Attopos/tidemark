@@ -27,6 +27,9 @@ struct CashEntry: Identifiable, Equatable {
     var refund: Decimal = 0
     var discount: Decimal = 0
     var fee: Decimal = 0
+    /// Reimbursable spending not yet paid back / what was paid back.
+    var claimPending: Decimal = 0
+    var claimed: Decimal = 0
     var excluded = false
 }
 
@@ -84,6 +87,8 @@ struct CashSummary: Equatable {
     var refund: Decimal = 0
     var discount: Decimal = 0
     var fee: Decimal = 0
+    var claimPending: Decimal = 0
+    var claimed: Decimal = 0
     var count = 0
     /// Buckets (days or months) that have started.
     var elapsedBuckets = 0
@@ -125,6 +130,8 @@ enum CashflowAnalytics {
             case .expense:
                 summary.expense += entry.base
                 summary.refund += entry.refund
+                summary.claimPending += entry.claimPending
+                summary.claimed += entry.claimed
             case .income:
                 summary.income += entry.base
             default:
@@ -316,14 +323,16 @@ extension Transaction {
     func cashEntry(using converter: CurrencyConverter) -> CashEntry {
         func base(_ value: Decimal) -> Decimal { converter.toBase(value, currencyCode, at: date) }
         return CashEntry(id: id, date: date, kind: kind, category: category, subcategory: subcategory,
-                         base: base(kind == .expense ? amount - refundAmount : amount),
+                         base: base(netAmount),
                          refund: base(refundAmount), discount: base(discountAmount), fee: base(feeAmount),
+                         claimPending: claimStatus == .pending ? base(amount - refundAmount) : 0,
+                         claimed: claimStatus == .claimed ? base(claimAmount) : 0,
                          excluded: excludeFromStats)
     }
 
     func movements(using converter: CurrencyConverter) -> [AccountMovement] {
         AccountLedger.movements(
-            kind: kind, amount: amount, refund: refundAmount, currency: currencyCode, date: date,
+            kind: kind, amount: amount, refund: returnedAmount, currency: currencyCode, date: date,
             source: account.map { ($0.id, $0.currencyCode) },
             destination: transferAccount.map { ($0.id, $0.currencyCode) },
             arrival: transferAmount, converter: converter)

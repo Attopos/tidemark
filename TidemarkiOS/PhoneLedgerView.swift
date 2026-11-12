@@ -71,6 +71,7 @@ struct PhoneLedgerView: View {
             }
             .sorted { $0.day > $1.day }
 
+        @Bindable var app = app
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
@@ -79,8 +80,7 @@ struct PhoneLedgerView: View {
                     summaryCard(summary, code: code)
                     if showsCalendar && query.isEmpty && period.unit == .month {
                         Panel {
-                            MonthCalendar(period: period,
-                                          buckets: CashflowAnalytics.buckets(entries, in: period),
+                            MonthCalendar(period: $app.cashPeriod, entries: entries,
                                           code: code, selectedDay: $selectedDay)
                         }
                     }
@@ -118,6 +118,7 @@ struct PhoneLedgerView: View {
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
                 Spacer()
+                roundButton(app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
                 roundButton("magnifyingglass", active: showsSearch) {
                     showsSearch.toggle()
                     if !showsSearch { search = "" }

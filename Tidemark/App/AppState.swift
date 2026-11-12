@@ -144,6 +144,17 @@ final class AppState {
         }
     }
 
+    /// Eye toggle: every amount shows as dots (for screens others can see).
+    var amountsHidden: Bool = UserDefaults.standard.bool(forKey: "amountsHidden") {
+        didSet {
+            UserDefaults.standard.set(amountsHidden, forKey: "amountsHidden")
+            Fmt.amountsHidden = amountsHidden
+        }
+    }
+
+    /// The add-record sheet from the floating button (or ⌘N).
+    var addingRecord = false
+
     /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())
 
@@ -170,6 +181,7 @@ final class AppState {
         let savedSection = AppSection(rawValue: UserDefaults.standard.string(forKey: "appSection") ?? "") ?? .ledger
         self.section = savedSection == .portfolio ? .ledger : savedSection
         L10n.current = self.language
+        Fmt.amountsHidden = UserDefaults.standard.bool(forKey: "amountsHidden")
     }
 
     /// Route a dropped/picked image into the OCR flow.

@@ -301,3 +301,43 @@ extension View {
         #endif
     }
 }
+
+/// Round eye button that hides or shows every amount.
+struct AmountsToggle: View {
+    @Binding var hidden: Bool
+
+    var body: some View {
+        Button { hidden.toggle() } label: {
+            Image(systemName: hidden ? "eye.slash" : "eye")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(DS.textSecondary)
+                .frame(width: 30, height: 30)
+                .background(DS.tile)
+                .clipShape(Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(hidden ? tr("Show amounts") : tr("Hide amounts"))
+    }
+}
+
+/// The large round "add a record" button that floats in the corner.
+struct FloatingAddButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "plus")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(DS.ink)
+                .frame(width: 62, height: 62)
+                .background(DS.accent)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tr("Add record"))
+        .help(tr("Add record"))
+    }
+}

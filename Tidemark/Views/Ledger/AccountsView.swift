@@ -107,7 +107,9 @@ struct AccountsView: View {
             .foregroundStyle(DS.textPrimary)
             .lineLimit(1)
             .fixedSize()
+        @Bindable var app = app
         let controls = HStack(spacing: 12) {
+            AmountsToggle(hidden: $app.amountsHidden)
             Toggle(tr("Show archived"), isOn: $showArchived)
                 .toggleStyle(LimeCheckboxStyle())
                 .foregroundStyle(DS.textSecondary)

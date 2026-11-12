@@ -213,7 +213,11 @@ enum Fmt {
     }()
 
     /// "¥12,345.67", "-$1,200.00", "+€35.00"
+    /// Amounts hidden behind the eye toggle (kept in step by the app state).
+    nonisolated(unsafe) static var amountsHidden = false
+
     static func money(_ amount: Decimal, _ code: String, showSign: Bool = false, wholeDigits: Bool = false) -> String {
+        if amountsHidden { return privacyMask }
         let number = NSDecimalNumber(decimal: abs(amount))
         let formatter = wholeDigits ? wholeFormatter : groupedFormatter
         let digits = formatter.string(from: number) ?? "\(number)"
@@ -223,6 +227,7 @@ enum Fmt {
 
     /// Compact axis/summary form: "¥12.5k", "¥1.24M"
     static func moneyCompact(_ amount: Decimal, _ code: String) -> String {
+        if amountsHidden { return privacyMask }
         let value = (amount as NSDecimalNumber).doubleValue
         let sign = value < 0 ? "-" : ""
         let magnitude = Swift.abs(value)

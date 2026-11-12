@@ -209,6 +209,8 @@ struct FlowBarsPanel: View {
 
     @State private var mode: FlowMode = .expense
     @State private var hovered: Date?
+    /// Line instead of bars (remembered).
+    @AppStorage("statisticsAsLine") private var asLine = false
 
     private func value(_ bucket: CashBucket) -> Decimal {
         switch mode {
@@ -255,7 +257,18 @@ struct FlowBarsPanel: View {
     }
 
     var body: some View {
-        Panel(title: tr("Statistics")) {
+        Panel(title: tr("Statistics"), accessory: {
+            Button { asLine.toggle() } label: {
+                Image(systemName: asLine ? "chart.bar" : "chart.xyaxis.line")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DS.textSecondary)
+                    .frame(width: 28, height: 28)
+                    .background(DS.tile)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help(asLine ? tr("Show as bars") : tr("Show as a line"))
+        }) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     CapsuleSwitch(options: FlowMode.allCases, selection: $mode) { $0.label }
@@ -268,11 +281,31 @@ struct FlowBarsPanel: View {
                 }
                 Chart {
                     ForEach(buckets) { bucket in
-                        BarMark(x: .value("Date", bucket.start, unit: unit),
-                                y: .value("Amount", value(bucket).doubleValue))
-                            .foregroundStyle(color(value(bucket)))
-                            .cornerRadius(3)
-                            .opacity(focus == nil || focus?.start == bucket.start ? 1 : 0.55)
+                        if asLine {
+                            // Days still to come are left off the line.
+                            if bucket.start <= Date() {
+                                AreaMark(x: .value("Date", bucket.start, unit: unit),
+                                         y: .value("Amount", value(bucket).doubleValue))
+                                    .foregroundStyle(color(1).opacity(0.15))
+                                    .interpolationMethod(.monotone)
+                                LineMark(x: .value("Date", bucket.start, unit: unit),
+                                         y: .value("Amount", value(bucket).doubleValue))
+                                    .foregroundStyle(color(1))
+                                    .lineStyle(StrokeStyle(lineWidth: 2))
+                                    .interpolationMethod(.monotone)
+                            }
+                            if focus?.start == bucket.start {
+                                PointMark(x: .value("Date", bucket.start, unit: unit),
+                                          y: .value("Amount", value(bucket).doubleValue))
+                                    .foregroundStyle(color(1))
+                            }
+                        } else {
+                            BarMark(x: .value("Date", bucket.start, unit: unit),
+                                    y: .value("Amount", value(bucket).doubleValue))
+                                .foregroundStyle(color(value(bucket)))
+                                .cornerRadius(3)
+                                .opacity(focus == nil || focus?.start == bucket.start ? 1 : 0.55)
+                        }
                     }
                     if average != 0 {
                         RuleMark(y: .value("Average", average.doubleValue))
@@ -397,12 +430,14 @@ struct CategoryPanel: View {
     let entries: [CashEntry]
     let period: CashPeriod
     let code: String
-    /// Selected category name and the level it belongs to.
-    @Binding var selection: CategorySelection?
 
+    /// Category whose detail sheet is open.
+    @State private var selection: CategorySelection?
     @State private var kind: TransactionKind = .expense
     @State private var level: CategoryLevel = .first
     @State private var expanded = false
+    /// Row under the pointer; highlights its slice.
+    @State private var hovered: String?
 
     private static let collapsedCount = 10
 
@@ -443,8 +478,7 @@ struct CategoryPanel: View {
                 }
             }
         }
-        .onChange(of: kind) { _, _ in selection = nil }
-        .onChange(of: level) { _, _ in selection = nil }
+        .sheet(item: $selection) { CategoryDetailSheet(selection: $0, period: period, code: code) }
     }
 
     private func donut(_ stats: [CategoryStat], total: Decimal) -> some View {
@@ -454,15 +488,15 @@ struct CategoryPanel: View {
                            innerRadius: .ratio(0.68), angularInset: 1.2)
                     .foregroundStyle(FlowPalette.color(kind: kind, rank: rank))
                     .cornerRadius(3)
-                    .opacity(selection == nil || selection?.name == stat.name ? 1 : 0.35)
+                    .opacity(hovered == nil || hovered == stat.name ? 1 : 0.35)
             }
             .chartLegend(.hidden)
             VStack(spacing: 3) {
-                Text(selection?.name ?? kind.displayName)
+                Text(hovered.map(CategoryName.label) ?? kind.displayName)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(DS.textSecondary)
                     .lineLimit(1)
-                Text(Fmt.money(stats.first { $0.name == selection?.name }?.amount ?? total, code))
+                Text(Fmt.money(stats.first { $0.name == hovered }?.amount ?? total, code))
                     .font(DS.money(17, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
@@ -474,14 +508,16 @@ struct CategoryPanel: View {
     }
 
     private func row(_ stat: CategoryStat, rank: Int) -> some View {
-        let selected = selection?.name == stat.name
+        let selected = hovered == stat.name
         let color = FlowPalette.color(kind: kind, rank: rank)
         return Button {
-            selection = selected ? nil : CategorySelection(name: stat.name, level: level, kind: kind)
+            selection = CategorySelection(name: stat.name, level: level, kind: kind)
         } label: {
+            HStack(spacing: 10) {
+            CategoryIcon(name: stat.name, kind: kind, size: 34)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(stat.name)
+                    Text(CategoryName.label(stat.name))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
@@ -513,6 +549,10 @@ struct CategoryPanel: View {
                         .fixedSize()
                 }
             }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(DS.textTertiary)
+            }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background(selected ? DS.tile : Color.clear)
@@ -520,10 +560,12 @@ struct CategoryPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { inside in hovered = inside ? stat.name : (hovered == stat.name ? nil : hovered) }
     }
 }
 
-struct CategorySelection: Equatable {
+struct CategorySelection: Equatable, Identifiable {
+    var id: String { "\(kind.rawValue)|\(level.rawValue)|\(name)" }
     let name: String
     let level: CategoryLevel
     let kind: TransactionKind
@@ -544,11 +586,13 @@ struct RecordRow: View {
     let transaction: Transaction
     var showsDate = false
 
-    private var title: String {
+    private var categoryName: String {
         if !transaction.subcategory.isEmpty { return transaction.subcategory }
         if !transaction.category.isEmpty { return transaction.category }
         return transaction.kind.displayName
     }
+
+    private var title: String { CategoryName.label(categoryName) }
 
     private var subtitle: String {
         let time = showsDate ? Fmt.dateTime.string(from: transaction.date)
@@ -564,7 +608,7 @@ struct RecordRow: View {
     }
 
     private var amountText: String {
-        let net = transaction.kind == .expense ? transaction.amount - transaction.refundAmount : transaction.amount
+        let net = transaction.netAmount
         switch transaction.kind {
         case .expense: return Fmt.money(-net, transaction.currencyCode)
         case .income: return Fmt.money(net, transaction.currencyCode, showSign: true)
@@ -574,11 +618,18 @@ struct RecordRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            CategoryIcon(name: categoryName, kind: transaction.kind, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(DS.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DS.textPrimary)
+                        .lineLimit(1)
+                    if transaction.claimStatus != .none {
+                        TagChip(text: transaction.claimStatus.displayName,
+                                color: transaction.claimStatus == .pending ? DS.warning : DS.textSecondary)
+                    }
+                }
                 Text(subtitle)
                     .font(.system(size: 12))
                     .foregroundStyle(DS.textTertiary)
@@ -638,5 +689,109 @@ struct RecordList: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Category detail
+
+/// One category over time: this period's total, the last twelve periods,
+/// its second-level split, and its records.
+struct CategoryDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
+    @Query private var rates: [CurrencyRate]
+
+    let selection: CategorySelection
+    let period: CashPeriod
+    let code: String
+
+    @State private var editing: Transaction?
+
+    var body: some View {
+        let converter = CurrencyConverter(rates: rates, base: code)
+        let matching = transactions.filter { selection.matches($0) && !$0.excludeFromStats }
+        let inPeriod = matching.filter { period.contains($0.date) }
+        let entries = matching.map { $0.cashEntry(using: converter) }
+        let total = entries.filter { period.contains($0.date) }.reduce(Decimal(0)) { $0 + $1.base }
+        let history = (0..<12).reversed().map { offset -> (Date, Decimal) in
+            let slice = period.shifted(by: -offset)
+            return (slice.start, entries.filter { slice.contains($0.date) }.reduce(Decimal(0)) { $0 + $1.base })
+        }
+        let subcategories: [CategoryStat] = selection.level == .first
+            ? CashflowAnalytics.categories(entries, kind: selection.kind, level: .second, in: period)
+                .filter { $0.name != selection.name }
+            : []
+
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                CategoryIcon(name: selection.name, kind: selection.kind, size: 42)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(CategoryName.label(selection.name))
+                        .font(DS.title(20))
+                        .foregroundStyle(DS.textPrimary)
+                    Text("\(Fmt.money(total, code)) · \(trf("%d records", inPeriod.count))")
+                        .font(.system(size: 13).monospacedDigit())
+                        .foregroundStyle(DS.textSecondary)
+                }
+                Spacer()
+                Button(tr("Done")) { dismiss() }
+                    .buttonStyle(GhostButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+            }
+            Chart(history, id: \.0) { start, amount in
+                BarMark(x: .value("Date", start, unit: period.unit == .month ? .month : .year),
+                        y: .value("Amount", amount.doubleValue))
+                    .foregroundStyle(selection.kind == .income ? FlowPalette.income : FlowPalette.expense)
+                    .cornerRadius(3)
+                    .opacity(start == period.start ? 1 : 0.55)
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine().foregroundStyle(DS.border.opacity(0.6))
+                    AxisValueLabel {
+                        if let amount = value.as(Double.self) {
+                            Text(Fmt.moneyCompact(Decimal(amount), code)).font(.system(size: 10.5))
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                    AxisValueLabel(format: period.unit == .month ? .dateTime.month(.abbreviated) : .dateTime.year())
+                        .font(.system(size: 10.5)).foregroundStyle(DS.textTertiary)
+                }
+            }
+            .frame(height: 140)
+            if !subcategories.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(subcategories) { stat in
+                        HStack(spacing: 10) {
+                            CategoryIcon(name: stat.name, kind: selection.kind, size: 26)
+                            Text(CategoryName.label(stat.name))
+                                .font(.system(size: 13.5, weight: .medium))
+                                .foregroundStyle(DS.textPrimary)
+                                .lineLimit(1)
+                            Text(Fmt.percent(stat.share, decimals: 1, showSign: false))
+                                .font(.system(size: 12).monospacedDigit())
+                                .foregroundStyle(DS.textSecondary)
+                            Spacer()
+                            Text(Fmt.money(stat.amount, code))
+                                .font(DS.money(13.5, weight: .semibold))
+                                .foregroundStyle(DS.textPrimary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(DS.tile)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            ScrollView {
+                RecordList(transactions: inPeriod, showsDate: true, editing: $editing)
+            }
+            .frame(minHeight: 200)
+        }
+        .editorSheet(width: 560)
+        .sheet(item: $editing) { TransactionEditor(transaction: $0) }
     }
 }

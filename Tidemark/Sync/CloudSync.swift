@@ -10,7 +10,7 @@ import AppKit
 
 // MARK: - iCloud sync
 //
-// Ledger records and cash accounts are kept in step between devices through
+// Ledger records, cash accounts and record presets are kept in step between devices through
 // the user's private iCloud database, in one record zone.
 //
 // One sync cycle is: make sure the zone exists, send what changed here, fetch
@@ -297,6 +297,7 @@ final class CloudSync {
     private struct Index {
         var accounts: [UUID: Account] = [:]
         var transactions: [UUID: Transaction] = [:]
+        var presets: [UUID: RecordPreset] = [:]
     }
 
     private func loadIndex() -> Index {
@@ -306,6 +307,9 @@ final class CloudSync {
         }
         for transaction in (try? context.fetch(FetchDescriptor<Transaction>())) ?? [] {
             index.transactions[transaction.id] = transaction
+        }
+        for preset in (try? context.fetch(FetchDescriptor<RecordPreset>())) ?? [] {
+            index.presets[preset.id] = preset
         }
         return index
     }
@@ -322,6 +326,9 @@ final class CloudSync {
         }
         for (id, transaction) in index.transactions {
             local[SyncKey(.transaction, id).name] = SyncCodec.digest(SyncCodec.fields(of: transaction))
+        }
+        for (id, preset) in index.presets {
+            local[SyncKey(.preset, id).name] = SyncCodec.digest(SyncCodec.fields(of: preset))
         }
         let plan = SyncPlanner.plan(local: local, synced: state.records, queued: queued)
         if plan.refusedDeletes {
@@ -347,6 +354,11 @@ final class CloudSync {
             case .transaction:
                 if let transaction = index.transactions[key.id], now.timeIntervalSince(transaction.updatedAt) > 2 {
                     transaction.updatedAt = now
+                    stamped = true
+                }
+            case .preset:
+                if let preset = index.presets[key.id], now.timeIntervalSince(preset.updatedAt) > 2 {
+                    preset.updatedAt = now
                     stamped = true
                 }
             }
@@ -470,6 +482,7 @@ final class CloudSync {
             switch key.kind {
             case .account: fields = index.accounts[key.id].map(SyncCodec.fields(of:))
             case .transaction: fields = index.transactions[key.id].map(SyncCodec.fields(of:))
+            case .preset: fields = index.presets[key.id].map(SyncCodec.fields(of:))
             }
         }
         guard let key = SyncKey(name: name), let fields else {
@@ -581,6 +594,24 @@ final class CloudSync {
             queued[key.name] = nil
         }
 
+        for record in modifications {
+            guard let key = SyncKey(name: record.recordID.recordName), key.kind == .preset else { continue }
+            let fields = Self.fields(from: record)
+            let preset: RecordPreset
+            if let existing = index.presets[key.id] {
+                preset = existing
+            } else {
+                preset = RecordPreset(name: "", kind: .expense, amount: 0)
+                preset.id = key.id
+                context.insert(preset)
+                index.presets[key.id] = preset
+            }
+            SyncCodec.apply(fields, to: preset)
+            state.records[key.name] = SyncEntry(digest: SyncCodec.digest(SyncCodec.fields(of: preset)),
+                                                system: Self.systemFields(of: record))
+            queued[key.name] = nil
+        }
+
         var lags: [String] = []
         for record in modifications {
             guard let key = SyncKey(name: record.recordID.recordName), key.kind == .transaction else { continue }
@@ -600,6 +631,7 @@ final class CloudSync {
             switch key.kind {
             case .account: if let account = index.accounts[key.id] { context.delete(account) }
             case .transaction: if let transaction = index.transactions[key.id] { context.delete(transaction) }
+            case .preset: if let preset = index.presets[key.id] { context.delete(preset) }
             }
             state.records[name] = nil
             state.orphans[name] = nil

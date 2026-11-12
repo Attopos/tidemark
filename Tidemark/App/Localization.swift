@@ -240,6 +240,14 @@ enum L10n {
         "Unlock": "解锁",
         "This Mac cannot check a password.": "这台 Mac 无法验证密码。",
         "unlock the portfolio": "解锁投资组合",
+        "Show amounts": "显示金额",
+        "Hide amounts": "隐藏金额",
+        "Show as bars": "显示为柱状图",
+        "Show as a line": "显示为折线图",
+        "Not reimbursable": "不报销",
+        "Pending": "待报销",
+        "Claimed": "已报销",
+        "%d records": "%d 笔",
     ]
 
     // MARK: Español
@@ -428,5 +436,13 @@ enum L10n {
         "Unlock": "Desbloquear",
         "This Mac cannot check a password.": "Este Mac no puede comprobar una contraseña.",
         "unlock the portfolio": "desbloquear la cartera",
+        "Show amounts": "Mostrar importes",
+        "Hide amounts": "Ocultar importes",
+        "Show as bars": "Ver como barras",
+        "Show as a line": "Ver como línea",
+        "Not reimbursable": "No reembolsable",
+        "Pending": "Pendiente",
+        "Claimed": "Reembolsado",
+        "%d records": "%d movimientos",
     ]
 }
