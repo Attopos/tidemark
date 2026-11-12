@@ -51,7 +51,6 @@ struct Panel<Content: View, Accessory: View>: View {
                         .font(DS.title(18))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
                         .layoutPriority(1)
                     Spacer(minLength: 8)
                     accessory

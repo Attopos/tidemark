@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @State private var showsPresets = false
 
     private var targetSum: Int {
         Int((app.targets.values.reduce(0, +) * 100).rounded())
@@ -59,6 +60,9 @@ struct SettingsView: View {
             Section(tr("iCloud")) {
                 SyncStatusView()
             }
+            Section(tr("Templates & recurring")) {
+                Button(tr("Templates, recurring records and instalments…")) { showsPresets = true }
+            }
             Section {
                 Button(tr("Import bookkeeping export…")) { app.pickLedgerExport(into: context) }
             } header: {
@@ -106,6 +110,7 @@ struct SettingsView: View {
         .frame(maxWidth: 760, maxHeight: .infinity, alignment: .topLeading)
         .frame(maxWidth: .infinity)
         .background(DS.page)
+        .sheet(isPresented: $showsPresets) { PresetsView() }
     }
 
     /// Whole percent in the field, fraction in the store; empty or 0 clears.

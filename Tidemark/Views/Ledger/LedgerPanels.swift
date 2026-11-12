@@ -674,6 +674,20 @@ struct RecordList: View {
                         .onOpenGesture { editing = transaction }
                         .contextMenu {
                             Button(tr("Edit…")) { editing = transaction }
+                            if transaction.claimStatus == .pending {
+                                Button(tr("Mark as claimed")) {
+                                    transaction.claimAmount = transaction.amount - transaction.refundAmount
+                                    transaction.claimStatus = .claimed
+                                    transaction.updatedAt = Date()
+                                    try? context.save()
+                                }
+                            } else if transaction.kind == .expense && transaction.claimStatus == .none {
+                                Button(tr("Mark as reimbursable")) {
+                                    transaction.claimStatus = .pending
+                                    transaction.updatedAt = Date()
+                                    try? context.save()
+                                }
+                            }
                             Button(tr("Delete"), role: .destructive) {
                                 context.delete(transaction)
                                 try? context.save()

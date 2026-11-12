@@ -54,6 +54,7 @@ struct RootView: View {
             if dropTargeted { DropHint() }
         }
         .sheet(isPresented: $app.addingRecord) { TransactionEditor(transaction: nil) }
+        .sheet(item: $app.pendingReceipt) { TransactionEditor(transaction: nil, draft: $0.draft) }
         .sheet(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
                 .tint(DS.accentText)
@@ -68,6 +69,10 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             app.lockPortfolio()
         }
+        // Recurring records and instalments due since last time.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            PresetScheduler.run(in: context)
+        }
         // Every saved change refreshes today's backup (see BackupService).
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
             .debounce(for: .seconds(2), scheduler: RunLoop.main)) { _ in
@@ -75,6 +80,7 @@ struct RootView: View {
         }
         .task {
             CurrencyService.ensureSeeds(in: context)
+            PresetScheduler.run(in: context)
             app.backUp(context)
             // Daily rate: check hourly while the app is open; only fetches
             // when today's rate is missing, so it's one request per day.
@@ -100,6 +106,9 @@ struct RootView: View {
                     Task { @MainActor in
                         if url.pathExtension.lowercased() == "xlsx" {
                             app.importLedgerExport(url: url, into: context)
+                        } else if app.section != .portfolio {
+                            // On the cash pages a screenshot is a receipt.
+                            app.importReceipt(url: url, context: context)
                         } else {
                             app.routeImport(url: url)
                         }
@@ -223,6 +232,8 @@ private struct ImportNotice: View {
 }
 
 private struct DropHint: View {
+    @Environment(AppState.self) private var app
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.35)
@@ -230,7 +241,8 @@ private struct DropHint: View {
                 Image(systemName: "text.viewfinder")
                     .font(.system(size: 32, weight: .light))
                     .foregroundStyle(DS.accentText)
-                Text(tr("Drop screenshots or a bookkeeping export to import"))
+                Text(app.section == .portfolio ? tr("Drop holdings screenshots to import")
+                     : tr("Drop a receipt screenshot or a bookkeeping export"))
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
             }

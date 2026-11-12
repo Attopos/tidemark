@@ -38,6 +38,7 @@ struct TidemarkiOSApp: App {
 struct PhoneRootView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     let storageError: String?
 
     var body: some View {
@@ -55,7 +56,14 @@ struct PhoneRootView: View {
         .tint(DS.accentText)
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
-        .task { CurrencyService.ensureSeeds(in: context) }
+        .task {
+            CurrencyService.ensureSeeds(in: context)
+            PresetScheduler.run(in: context)
+        }
+        // Recurring records and instalments due since last time.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { PresetScheduler.run(in: context) }
+        }
     }
 }
 
@@ -71,6 +79,11 @@ struct PhoneSettingsView: View {
                     SyncStatusView()
                     if let storageError {
                         Text(storageError).font(DS.caption).foregroundStyle(DS.warning)
+                    }
+                }
+                Section(tr("Templates & recurring")) {
+                    NavigationLink(tr("Templates, recurring records and instalments…")) {
+                        PresetsView(showsDone: false)
                     }
                 }
                 Section(tr("Appearance")) {

@@ -95,6 +95,8 @@ struct AnalysisView: View {
                 StatTile(title: tr("Refund"), value: summary.refund, code: code)
                 StatTile(title: tr("Discount"), value: summary.discount, code: code)
                 StatTile(title: tr("Fee"), value: summary.fee, code: code)
+                StatTile(title: tr("Reimbursement pending"), value: summary.claimPending, code: code)
+                StatTile(title: tr("Claimed"), value: summary.claimed, code: code)
                 StatTile(title: tr("Records"), value: Decimal(summary.count), code: "", isCount: true)
             }
         }

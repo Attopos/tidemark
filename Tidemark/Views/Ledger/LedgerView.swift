@@ -131,7 +131,16 @@ struct LedgerView: View {
 
     private var eye: some View {
         @Bindable var app = app
-        return AmountsToggle(hidden: $app.amountsHidden)
+        return HStack(spacing: 8) {
+            #if os(macOS)
+            Button { app.pickReceipt(context: context) } label: {
+                Label(tr("Receipt"), systemImage: "doc.text.viewfinder")
+            }
+            .buttonStyle(GhostButtonStyle())
+            .help(tr("Read a payment screenshot into a new record"))
+            #endif
+            AmountsToggle(hidden: $app.amountsHidden)
+        }
     }
 
     private var emptyState: some View {
@@ -150,13 +159,23 @@ struct LedgerView: View {
         .frame(maxWidth: .infinity, minHeight: 320)
     }
 
+    /// Reimbursable spending not yet paid back, all periods.
+    private var pendingClaims: Decimal {
+        let converter = CurrencyConverter(rates: rates, base: app.baseCurrency)
+        return transactions.filter { $0.claimStatus == .pending }
+            .reduce(Decimal(0)) { $0 + $1.cashEntry(using: converter).claimPending }
+    }
+
     private func heroRow(summary: CashSummary, net: (assets: Decimal, debts: Decimal),
                          code: String, stacked: Bool) -> some View {
         let expense = HeroFigure(title: tr("Expense"), value: summary.expense, code: code,
                                  details: [(tr("Income"), Fmt.money(summary.income, code)), (tr("Balance"), Fmt.money(summary.balance, code, showSign: true))])
-        let daily = HeroFigure(title: app.cashPeriod.unit == .month ? tr("Daily average") : tr("Monthly average"),
-                               value: summary.averageExpense, code: code,
-                               details: [(tr("Records"), "\(summary.count)")])
+        // Reimbursement: what is still owed back (all time), and what came
+        // back this period. The daily average lives on the statistics chart.
+        let pendingAll = pendingClaims
+        let daily = HeroFigure(title: tr("Reimbursement pending"), value: pendingAll, code: code,
+                               details: [(tr("Claimed"), Fmt.money(summary.claimed, code)),
+                                         (tr("Daily average"), Fmt.money(summary.averageExpense, code))])
         let assets = HeroFigure(title: tr("Cash net assets"), value: net.assets - net.debts, code: code,
                                 details: [(tr("Assets"), Fmt.money(net.assets, code)), (tr("Debts"), Fmt.money(net.debts, code))])
         return Group {

@@ -154,6 +154,30 @@ final class AppState {
 
     /// The add-record sheet from the floating button (or ⌘N).
     var addingRecord = false
+    /// A receipt screenshot read into a draft, waiting in the editor.
+    var pendingReceipt: PendingReceipt?
+
+    /// Read a receipt screenshot into a new record (the editor opens).
+    @MainActor
+    func importReceipt(url: URL, context: ModelContext) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let image = NSImage(contentsOf: url),
+              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        Task { @MainActor in
+            let draft = await ReceiptImport.draft(from: cgImage, context: context)
+            pendingReceipt = PendingReceipt(draft: draft)
+        }
+    }
+
+    @MainActor
+    func pickReceipt(context: ModelContext) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importReceipt(url: url, context: context)
+    }
 
     /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())

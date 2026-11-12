@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 // MARK: - Ledger (iPhone)
 //
@@ -19,6 +20,9 @@ struct PhoneLedgerView: View {
     @State private var search = ""
     @State private var editing: Transaction?
     @State private var creating = false
+    @State private var receiptItem: PhotosPickerItem?
+    @State private var pendingReceipt: PendingReceipt?
+    @State private var readingReceipt = false
 
     private struct DayGroup: Identifiable {
         let day: Date
@@ -102,6 +106,17 @@ struct PhoneLedgerView: View {
         }
         .background(DS.page)
         .sheet(item: $editing) { TransactionEditor(transaction: $0) }
+        .sheet(item: $pendingReceipt) { TransactionEditor(transaction: nil, draft: $0.draft) }
+        .onChange(of: receiptItem) { _, item in
+            guard let item else { return }
+            readingReceipt = true
+            Task { @MainActor in
+                defer { readingReceipt = false; receiptItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data)?.cgImage else { return }
+                pendingReceipt = PendingReceipt(draft: await ReceiptImport.draft(from: image, context: context))
+            }
+        }
         .sheet(isPresented: $creating) {
             TransactionEditor(transaction: nil, defaultDate: showsCalendar ? selectedDay : nil)
         }
@@ -118,6 +133,15 @@ struct PhoneLedgerView: View {
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
                 Spacer()
+                PhotosPicker(selection: $receiptItem, matching: .screenshots) {
+                    Image(systemName: readingReceipt ? "hourglass" : "doc.text.viewfinder")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(DS.textPrimary)
+                        .frame(width: 40, height: 40)
+                        .background(DS.tile)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel(tr("Receipt"))
                 roundButton(app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
                 roundButton("magnifyingglass", active: showsSearch) {
                     showsSearch.toggle()
@@ -190,6 +214,9 @@ struct PhoneLedgerView: View {
             HStack(spacing: 18) {
                 figure(tr("Income"), Fmt.money(summary.income, code))
                 figure(tr("Balance"), Fmt.money(summary.balance, code, showSign: true))
+                if summary.claimPending > 0 {
+                    figure(tr("Pending"), Fmt.money(summary.claimPending, code))
+                }
             }
         }
         .padding(20)
@@ -232,6 +259,20 @@ struct PhoneLedgerView: View {
                         .onTapGesture { editing = record }
                         .contextMenu {
                             Button(tr("Edit…")) { editing = record }
+                            if record.claimStatus == .pending {
+                                Button(tr("Mark as claimed")) {
+                                    record.claimAmount = record.amount - record.refundAmount
+                                    record.claimStatus = .claimed
+                                    record.updatedAt = Date()
+                                    try? context.save()
+                                }
+                            } else if record.kind == .expense && record.claimStatus == .none {
+                                Button(tr("Mark as reimbursable")) {
+                                    record.claimStatus = .pending
+                                    record.updatedAt = Date()
+                                    try? context.save()
+                                }
+                            }
                             Button(tr("Delete"), role: .destructive) { delete(record) }
                         }
                     if index < group.records.count - 1 {

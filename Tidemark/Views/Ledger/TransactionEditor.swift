@@ -12,6 +12,7 @@ struct TransactionEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Account.createdAt) private var allAccounts: [Account]
     @Query private var transactions: [Transaction]
+    @Query(sort: \RecordPreset.name) private var presets: [RecordPreset]
 
     let transaction: Transaction?
 
@@ -30,9 +31,13 @@ struct TransactionEditor: View {
     @State private var tags: String
     @State private var refundText: String
     @State private var excluded: Bool
+    @State private var claim: ClaimStatus
+    @State private var claimText: String
+    @State private var savedTemplate = false
     @FocusState private var amountFocused: Bool
 
-    init(transaction: Transaction?, defaultDate: Date? = nil) {
+    /// - Parameter draft: values read from a receipt screenshot, for a new record.
+    init(transaction: Transaction?, defaultDate: Date? = nil, draft: ReceiptDraft? = nil) {
         self.transaction = transaction
         let text: (Decimal) -> String = { $0 == 0 ? "" : NSDecimalNumber(decimal: $0).stringValue }
         _kind = State(initialValue: transaction?.kind ?? .expense)
@@ -55,6 +60,47 @@ struct TransactionEditor: View {
         _tags = State(initialValue: transaction?.tags ?? "")
         _refundText = State(initialValue: transaction.map { text($0.refundAmount) } ?? "")
         _excluded = State(initialValue: transaction?.excludeFromStats ?? false)
+        _claim = State(initialValue: transaction?.claimStatus ?? .none)
+        _claimText = State(initialValue: transaction.map { text($0.claimAmount) } ?? "")
+        if transaction == nil, let draft {
+            _kind = State(initialValue: draft.kind)
+            _amountText = State(initialValue: draft.amount.map(text) ?? "")
+            _currency = State(initialValue: draft.currency ?? "")
+            _category = State(initialValue: draft.category ?? "")
+            _subcategory = State(initialValue: draft.subcategory ?? "")
+            _accountID = State(initialValue: draft.accountID)
+            _note = State(initialValue: draft.note ?? "")
+            if let when = draft.date { _date = State(initialValue: when) }
+        }
+    }
+
+    /// Fill the form from a template (the date stays as it is).
+    private func apply(_ preset: RecordPreset) {
+        let text: (Decimal) -> String = { $0 == 0 ? "" : NSDecimalNumber(decimal: $0).stringValue }
+        kind = preset.kind
+        amountText = text(preset.amount)
+        currency = preset.currencyCode
+        category = preset.category
+        subcategory = preset.subcategory
+        accountID = preset.accountID
+        transferAccountID = preset.transferAccountID
+        note = preset.note
+        tags = preset.tags
+    }
+
+    private func saveAsTemplate() {
+        guard let amount else { return }
+        let name = CategoryName.label(subcategory.isEmpty ? (category.isEmpty ? kind.displayName : category) : subcategory)
+        let preset = RecordPreset(name: name, kind: kind, amount: amount, currencyCode: resolvedCurrency)
+        preset.category = category.trimmingCharacters(in: .whitespaces)
+        preset.subcategory = subcategory.trimmingCharacters(in: .whitespaces)
+        preset.accountID = accountID
+        preset.transferAccountID = isFlow ? nil : transferAccountID
+        preset.note = note
+        preset.tags = tags
+        context.insert(preset)
+        try? context.save()
+        savedTemplate = true
     }
 
     private var accounts: [Account] { allAccounts.filter { $0.isLedgerAccount && !$0.isArchived } }
@@ -93,9 +139,25 @@ struct TransactionEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(transaction == nil ? tr("Add record") : tr("Edit record"))
-                .font(DS.title(20))
-                .foregroundStyle(DS.textPrimary)
+            HStack {
+                Text(transaction == nil ? tr("Add record") : tr("Edit record"))
+                    .font(DS.title(20))
+                    .foregroundStyle(DS.textPrimary)
+                Spacer()
+                let templates = presets.filter { $0.schedule == nil }
+                if transaction == nil && !templates.isEmpty {
+                    Menu {
+                        ForEach(templates) { preset in
+                            Button("\(preset.name) · \(Fmt.money(preset.amount, preset.currencyCode))") { apply(preset) }
+                        }
+                    } label: {
+                        Label(tr("Template"), systemImage: "square.on.square")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+            }
 
             CapsuleSwitch(options: Self.kinds, selection: $kind) { $0.displayName }
 
@@ -152,6 +214,18 @@ struct TransactionEditor: View {
                         label(tr("Refund"))
                         field(tr("0.00"), text: $refundText)
                     }
+                    GridRow {
+                        label(tr("Reimburse"))
+                        CapsuleSwitch(options: ClaimStatus.allCases, selection: $claim) {
+                            $0 == .none ? tr("No") : $0.displayName
+                        }
+                    }
+                    if claim == .claimed {
+                        GridRow {
+                            label(tr("Paid back"))
+                            field(amountText.isEmpty ? tr("0.00") : amountText, text: $claimText)
+                        }
+                    }
                 }
                 if isFlow {
                     GridRow {
@@ -164,6 +238,10 @@ struct TransactionEditor: View {
             }
 
             HStack {
+                Button(savedTemplate ? tr("Saved as template") : tr("Save as template")) { saveAsTemplate() }
+                    .buttonStyle(GhostButtonStyle())
+                    .disabled(amount == nil || savedTemplate)
+                    .opacity(amount == nil ? 0.45 : 1)
                 Spacer()
                 Button(tr("Cancel")) { dismiss() }
                     .buttonStyle(GhostButtonStyle())
@@ -248,6 +326,10 @@ struct TransactionEditor: View {
             target.transferAmount = nil
             target.refundAmount = kind == .expense ? min(Self.decimal(refundText) ?? 0, amount) : 0
             target.excludeFromStats = excluded
+            target.claimStatus = kind == .expense ? claim : .none
+            // Claimed with no amount typed: all of it came back.
+            target.claimAmount = target.claimStatus == .claimed
+                ? min(Self.decimal(claimText) ?? (amount - target.refundAmount), amount - target.refundAmount) : 0
         } else {
             // Keep an imported label ("Lend", "Recharge"…) unless the kind changed.
             if transaction?.kind != kind || target.category.isEmpty {
@@ -258,6 +340,8 @@ struct TransactionEditor: View {
             target.transferAmount = Self.decimal(arrivalText)
             target.refundAmount = 0
             target.excludeFromStats = false
+            target.claimStatus = .none
+            target.claimAmount = 0
         }
         if transaction == nil { context.insert(target) }
         try? context.save()
