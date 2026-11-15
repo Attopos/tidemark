@@ -264,7 +264,8 @@ extension View {
             .background(DS.panel)
         #else
         ScrollView {
-            self.padding(20)
+            self.padding(.horizontal, DS.phoneMargin)
+                .padding(.vertical, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollDismissesKeyboard(.interactively)

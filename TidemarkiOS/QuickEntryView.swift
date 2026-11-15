@@ -161,7 +161,7 @@ struct QuickEntryView: View {
                     .foregroundStyle(DS.accentText)
                     .frame(width: 42, alignment: .trailing)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DS.phoneMargin)
             .padding(.vertical, 10)
             if savedCount > 0 {
                 Text(trf("%d recorded", savedCount))
@@ -236,7 +236,7 @@ struct QuickEntryView: View {
                         .frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, DS.phoneMargin)
             .padding(.vertical, 6)
             .animation(.easeInOut(duration: 0.18), value: category)
         }
@@ -373,7 +373,7 @@ struct QuickEntryView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             keypad
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DS.phoneMargin - 4)
         .padding(.top, 10)
         .padding(.bottom, 6)
         .background(DS.page)

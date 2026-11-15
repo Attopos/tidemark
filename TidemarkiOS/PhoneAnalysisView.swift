@@ -59,7 +59,7 @@ struct PhoneAnalysisView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DS.phoneMargin)
                 .padding(.top, 6)
                 .padding(.bottom, 28)
             }
@@ -1019,6 +1019,7 @@ struct PhoneRangeSheet: View {
                 DatePicker(tr("Start"), selection: $from, displayedComponents: .date)
                 DatePicker(tr("End"), selection: $to, in: from..., displayedComponents: .date)
             }
+            .contentMargins(.horizontal, DS.phoneMargin, for: .scrollContent)
             .navigationTitle(tr("Custom range"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1055,7 +1056,7 @@ struct PhoneRecordsSheet: View {
         NavigationStack {
             ScrollView {
                 RecordList(transactions: shown, showsDate: true, editing: $editing)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, DS.phoneMargin)
             }
             .background(DS.panel)
             .navigationTitle("\(selection.title) · \(selection.period.title)")

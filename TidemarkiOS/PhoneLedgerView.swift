@@ -93,7 +93,7 @@ struct PhoneLedgerView: View {
                         dayBlock(group, code: code)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DS.phoneMargin)
                 .padding(.top, 8)
                 .padding(.bottom, 110) // room for the add button
             }
@@ -303,7 +303,7 @@ struct PhoneLedgerView: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .padding(.trailing, 20)
+        .padding(.trailing, DS.phoneMargin)
         .padding(.bottom, 18)
         .accessibilityLabel(tr("Add record"))
     }

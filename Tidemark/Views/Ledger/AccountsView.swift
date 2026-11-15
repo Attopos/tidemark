@@ -61,7 +61,7 @@ struct AccountsView: View {
                         groups(visible, snapshot: snapshot)
                     }
                 }
-                .padding(.horizontal, wide ? DS.pagePadding : 16)
+                .padding(.horizontal, wide ? DS.pagePadding : DS.phoneMargin)
                 .padding(.top, wide ? 38 : 12)
                 .padding(.bottom, 110)
                 .frame(maxWidth: 1300, alignment: .leading)

@@ -37,7 +37,7 @@ struct ScreenshotImportFlow: View {
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, reviewMargin)
             .padding(.top, 14)
 
             Group {
@@ -234,6 +234,12 @@ struct ScreenshotImportFlow: View {
     }
 }
 
+#if os(macOS)
+private let reviewMargin: CGFloat = 12
+#else
+private let reviewMargin: CGFloat = DS.phoneMargin
+#endif
+
 // MARK: - Review stage
 
 private struct OCRReviewStage: View {
@@ -267,7 +273,8 @@ private struct OCRReviewStage: View {
         #else
         VStack(spacing: 0) {
             screenshotColumn
-                .padding(12)
+                .padding(.horizontal, DS.phoneMargin)
+                .padding(.vertical, 12)
                 .frame(height: 280)
             Divider().overlay(DS.border)
             resultsColumn
@@ -303,7 +310,8 @@ private struct OCRReviewStage: View {
                     Spacer()
                 }
                 .font(DS.caption)
-                .padding(12)
+                .padding(.horizontal, reviewMargin)
+                .padding(.vertical, 12)
 
                 if flaggedCount > 0 {
                     IssueBanner(issue: DataQualityIssue(
@@ -357,7 +365,8 @@ private struct OCRReviewStage: View {
                                 .padding(.top, 30)
                         }
                     }
-                    .padding(12)
+                    .padding(.horizontal, reviewMargin)
+                    .padding(.vertical, 12)
                 }
 
                 Divider().overlay(DS.border)
@@ -370,7 +379,8 @@ private struct OCRReviewStage: View {
                         .disabled(includedWithValues == 0 && closingCount == 0)
                         .keyboardShortcut(.defaultAction)
                 }
-                .padding(12)
+                .padding(.horizontal, reviewMargin)
+                .padding(.vertical, 12)
             }
     }
 }

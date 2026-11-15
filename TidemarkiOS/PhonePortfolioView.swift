@@ -122,7 +122,7 @@ struct PhonePortfolioView: View {
                     holdingsCard(summary)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DS.phoneMargin)
             .padding(.top, 6)
             .padding(.bottom, 28)
         }

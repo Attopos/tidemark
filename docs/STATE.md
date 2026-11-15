@@ -4,17 +4,17 @@
 
 ## 现在
 
-iPhone 与 Mac 功能一致，只是布局不同。iPhone 五个标签：账单、账户、投资组合、分析、设置。投资组合页（总值、风险分布、分组卡片、历史、持仓与改暴露/改名/更新余额/标记卖出/删除）和截图导入（相册多选或文件，逐项核对后保存）都上了 iPhone；投资组合锁用面容 ID。设置页有应用锁、iCloud 同步、导入导出（iCost 格式）、数据备份（本机每日一份，可导出/恢复）、周期记账、外观/货币、语言。标签功能已删除。
+iPhone 与 Mac 功能一致，只是布局不同。iPhone 五个标签：账单、账户、投资组合、分析、设置。投资组合页（总值、风险分布、分组卡片、历史、持仓与改暴露/改名/更新余额/标记卖出/删除）和截图导入（相册多选或文件，逐项核对后保存）都上了 iPhone；投资组合锁用面容 ID。设置页有应用锁、iCloud 同步、导入导出（iCost 格式）、数据备份（本机每日一份，可导出/恢复）、周期记账、外观/货币、语言。标签功能已删除。投资组合已在 Mac 与 iPhone 间同步（Production 结构已部署）。iPhone 页面左右边距统一为 DS.phoneMargin（22pt）。
 
 ## 下一步
 
-- 在 CloudKit Console 把 Development 的结构部署到 Production（新类型 PortfolioAsset / PortfolioHolding / PortfolioValuation），之后投资组合才会在 Mac 和 iPhone 间同步。
 - 真机试投资组合页、截图导入、应用锁和导出。
+- iPhone 切换标签卡顿，排查性能。
 
 ## 注意
 
 - 日常记账仍在 iCost，Tidemark 只记资产快照，不做预测。
 - 构建测试通过后直接更新文档、合并进 main 并 push，不用再问。
-- 结构未部署时服务器拒收投资组合记录，本次启动内暂停投资组合同步，账单同步不受影响；iCloud 同步页会提示。
+- 以后新增同步类型都要先跑 TIDEMARK_SYNC_SCHEMA=1（Development 版）再到 CloudKit Console 部署到 Production。
 - 导出不含投资买卖和余额调整，表头固定英文。标签字段只留在模型和同步里，界面不用。
 - 汇率不同步，各设备每天自己取。

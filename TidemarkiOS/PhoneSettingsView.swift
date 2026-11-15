@@ -34,7 +34,8 @@ struct PhoneSettingsView: View {
                 SetupCard {
                     SetupLink(icon: "repeat", color: .green, title: tr("Periodic Records")) {
                         PresetsView(showsDone: false)
-                            .padding(16)
+                            .padding(.horizontal, DS.phoneMargin)
+                            .padding(.vertical, 16)
                             .frame(maxHeight: .infinity, alignment: .top)
                             .background(DS.page)
                             .navigationBarTitleDisplayMode(.inline)
@@ -65,7 +66,7 @@ struct SetupPage<Content: View>: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) { content }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DS.phoneMargin)
                 .padding(.top, 6)
                 .padding(.bottom, 28)
         }

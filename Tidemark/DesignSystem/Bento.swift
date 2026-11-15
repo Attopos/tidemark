@@ -15,6 +15,8 @@ extension DS {
     static let tile = Color(light: 0xEBEBE6, dark: 0x2A2A2A)
     static let panelRadius: CGFloat = 22
     static let tileRadius: CGFloat = 18
+    /// Gap between iPhone content and the screen edge.
+    static let phoneMargin: CGFloat = 22
 
     static let violet = Color(hex: 0xA98BFA)
     static let violetSoft = Color(hex: 0xCDBDFD)
