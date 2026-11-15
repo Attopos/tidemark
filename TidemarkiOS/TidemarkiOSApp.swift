@@ -48,19 +48,19 @@ struct PhoneRootView: View {
     var body: some View {
         @Bindable var app = app
         TabView(selection: $app.section) {
-            PhoneLedgerView()
+            StableTab { PhoneLedgerView() }.equatable()
                 .tabItem { Label(tr("Ledger"), systemImage: AppSection.ledger.icon) }
                 .tag(AppSection.ledger)
-            AccountsView()
+            StableTab { AccountsView() }.equatable()
                 .tabItem { Label(tr("Accounts"), systemImage: AppSection.accounts.icon) }
                 .tag(AppSection.accounts)
-            PhonePortfolioView()
+            StableTab { PhonePortfolioView() }.equatable()
                 .tabItem { Label(tr("Portfolio"), systemImage: AppSection.portfolio.icon) }
                 .tag(AppSection.portfolio)
-            PhoneAnalysisView()
+            StableTab { PhoneAnalysisView() }.equatable()
                 .tabItem { Label(tr("Analysis"), systemImage: AppSection.analysis.icon) }
                 .tag(AppSection.analysis)
-            PhoneSettingsView(storageError: storageError)
+            StableTab { PhoneSettingsView(storageError: storageError) }.equatable()
                 .tabItem { Label(tr("Settings"), systemImage: AppSection.settings.icon) }
                 .tag(AppSection.settings)
         }
@@ -99,5 +99,19 @@ struct PhoneRootView: View {
             }
         }
         .task { await lock.unlock() }
+        #if DEBUG
+        .task { if PerfProbe.isOn { await PerfProbe().run(app: app) } }
+        #endif
     }
+}
+
+/// A tab whose page is not rebuilt when the tab bar's selection changes: the
+/// pages read their own data, and rebuilding one re-runs its @Query and every
+/// figure computed from it.
+struct StableTab<Content: View>: View, Equatable {
+    @ViewBuilder let content: () -> Content
+
+    static func == (lhs: StableTab, rhs: StableTab) -> Bool { true }
+
+    var body: some View { content() }
 }

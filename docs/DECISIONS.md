@@ -27,3 +27,7 @@
 - 共用一个 AppState、PortfolioSummary（计算）和导入流程，iPhone 只另写布局（PhonePortfolioView）。图片用 PlatformImage 抹平 NSImage/UIImage；拖放和粘贴仅 Mac，iPhone 用相册多选。
 - 同步新增资产、持仓、估值三类记录；持仓所在的投资账户不单独同步，按名称+类型在对方设备找或建。服务器结构没有这些类型时只暂停投资组合同步。
 - iPhone 自动备份写本机 Documents/Backups（iCloud Drive 根目录需要另开 iCloud Documents 能力）；数据本身已经走 CloudKit。
+
+## 2026-11-15 iPhone 切换标签卡顿
+
+- 真机测得每次切换主线程卡 0.4–0.6 秒：根视图刷新时所有带 @Query 的标签页都重建并重算。用 Equatable 的 StableTab 包住各页，切换只剩 25–110 ms；汇率查找改二分并跳过同币种和零金额。没做共享数据缓存，先看实际体感。

@@ -31,11 +31,12 @@ struct CurrencyConverter {
         if c == "CNY" { return 1 }
         guard let series = history[c], !series.isEmpty else { return nil }
         // Latest at-or-before date, else the earliest known.
-        var best: Decimal = series[0].rate
-        for point in series {
-            if point.date <= date { best = point.rate } else { break }
+        var low = 0, high = series.count
+        while low < high {
+            let mid = (low + high) / 2
+            if series[mid].date <= date { low = mid + 1 } else { high = mid }
         }
-        return best
+        return series[max(low - 1, 0)].rate
     }
 
     /// 1 unit of `code` in `base` at `date`; nil when either leg is unknown.
@@ -48,6 +49,7 @@ struct CurrencyConverter {
     /// Convert to base currency. Unknown codes convert 1:1 (callers can check
     /// `knows(_:)` and surface the gap).
     func toBase(_ amount: Decimal, _ code: String, at date: Date = Date()) -> Decimal {
+        if amount == 0 || code == base { return amount }
         guard let r = rate(code, at: date) else { return amount }
         return amount * r
     }
