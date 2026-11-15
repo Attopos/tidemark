@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // MARK: - Cash-flow analytics
 //
@@ -394,6 +395,27 @@ extension Transaction {
             source: account.map { ($0.id, $0.currencyCode) },
             destination: transferAccount.map { ($0.id, $0.currencyCode) },
             arrival: transferAmount, converter: converter)
+    }
+}
+
+extension Transaction {
+    var canBeExcluded: Bool { kind == .expense || kind == .income }
+
+    /// "Exclude from expense" / "Count in income"…, for the record menus.
+    var excludeActionTitle: String {
+        switch (kind, excludeFromStats) {
+        case (.income, false): return tr("Exclude from income")
+        case (.income, true): return tr("Count in income")
+        case (_, false): return tr("Exclude from expense")
+        case (_, true): return tr("Count in expense")
+        }
+    }
+
+    /// Statistics skip the record; account balances still move.
+    func toggleExcluded(in context: ModelContext) {
+        excludeFromStats.toggle()
+        updatedAt = Date()
+        try? context.save()
     }
 }
 

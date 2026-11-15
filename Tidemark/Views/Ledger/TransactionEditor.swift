@@ -222,7 +222,7 @@ struct TransactionEditor: View {
                 if isFlow {
                     GridRow {
                         label("")
-                        Toggle(tr("Leave out of statistics"), isOn: $excluded)
+                        Toggle(tr("Not counted in expense & income"), isOn: $excluded)
                             .toggleStyle(LimeCheckboxStyle())
                             .foregroundStyle(DS.textSecondary)
                     }

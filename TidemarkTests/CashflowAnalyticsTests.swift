@@ -1,4 +1,5 @@
 import XCTest
+import SwiftData
 @testable import Tidemark
 
 // Every figure on the cash-flow pages, on hand-checkable numbers.
@@ -198,5 +199,29 @@ final class CashflowAnalyticsTests: XCTestCase {
                                         converter: converter, now: day(2026, 3, 6), calendar: calendar)
         XCTAssertEqual(trend.count, 6, "only days that have started")
         XCTAssertEqual(trend.map(\.net), [1070, 970, 720, 720, 1120, 1120])
+    }
+
+    func testExcludedRecordStaysOutOfFiguresButMovesTheAccount() throws {
+        let context = ModelContext(try TidemarkSchema.makeContainer(inMemory: true))
+        let wallet = Account(name: "Wallet", kind: .cash)
+        context.insert(wallet)
+        let record = Transaction(date: day(2026, 3, 5), kind: .expense, amount: 999, category: "Gift", account: wallet)
+        context.insert(record)
+        let before = record.updatedAt
+        record.toggleExcluded(in: context)
+        XCTAssertTrue(record.excludeFromStats)
+        XCTAssertGreaterThanOrEqual(record.updatedAt, before, "stamped so the change syncs")
+        XCTAssertEqual(record.excludeActionTitle, tr("Count in expense"))
+
+        let converter = CurrencyConverter(rates: [], base: "CNY")
+        let entries = [record.cashEntry(using: converter)]
+        XCTAssertEqual(CashflowAnalytics.summary(entries, in: march, calendar: calendar).expense, 0)
+        XCTAssertEqual(CashflowAnalytics.buckets(entries, in: march, calendar: calendar).reduce(Decimal(0)) { $0 + $1.expense }, 0)
+        XCTAssertTrue(CashflowAnalytics.categories(entries, kind: .expense, level: .first, in: march, calendar: calendar).isEmpty)
+        let movements = record.movements(using: converter)
+        XCTAssertEqual(movements.map(\.delta), [-999], "the money still left the wallet")
+
+        record.toggleExcluded(in: context)
+        XCTAssertEqual(CashflowAnalytics.summary([record.cashEntry(using: converter)], in: march, calendar: calendar).expense, 999)
     }
 }

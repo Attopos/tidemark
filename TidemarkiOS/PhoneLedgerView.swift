@@ -246,6 +246,9 @@ struct PhoneLedgerView: View {
                                     try? context.save()
                                 }
                             }
+                            if record.canBeExcluded {
+                                Button(record.excludeActionTitle) { record.toggleExcluded(in: context) }
+                            }
                             Button(tr("Delete"), role: .destructive) { delete(record) }
                         }
                     if index < group.records.count - 1 {

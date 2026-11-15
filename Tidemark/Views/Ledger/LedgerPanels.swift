@@ -701,6 +701,9 @@ struct RecordRow: View {
                         TagChip(text: transaction.claimStatus.displayName,
                                 color: transaction.claimStatus == .pending ? DS.warning : DS.textSecondary)
                     }
+                    if transaction.excludeFromStats && transaction.canBeExcluded {
+                        TagChip(text: tr("Not counted"), color: DS.textSecondary)
+                    }
                 }
                 Text(subtitle)
                     .font(.system(size: 12))
@@ -712,6 +715,7 @@ struct RecordRow: View {
                 Text(amountText)
                     .font(DS.money(14, weight: .semibold))
                     .foregroundStyle(FlowPalette.amountColor(transaction.kind))
+                    .opacity(transaction.excludeFromStats && transaction.canBeExcluded ? 0.45 : 1)
                     .lineLimit(1)
                     .fixedSize()
                 Text(accountText)
@@ -759,6 +763,9 @@ struct RecordList: View {
                                     transaction.updatedAt = Date()
                                     try? context.save()
                                 }
+                            }
+                            if transaction.canBeExcluded {
+                                Button(transaction.excludeActionTitle) { transaction.toggleExcluded(in: context) }
                             }
                             Button(tr("Delete"), role: .destructive) {
                                 context.delete(transaction)

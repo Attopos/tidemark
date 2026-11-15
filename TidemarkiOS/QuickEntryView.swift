@@ -29,6 +29,7 @@ struct QuickEntryView: View {
     @State private var showsMore = false
     @State private var showsDate = false
     @State private var claim = false
+    @State private var excluded = false
     /// Records saved in this sitting with "Record" (enter another).
     @State private var savedCount = 0
 
@@ -322,6 +323,12 @@ struct QuickEntryView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    if kind != .transfer {
+                        Button { excluded.toggle() } label: {
+                            chip(icon: excluded ? "eye.slash.fill" : "eye.slash", text: tr("Not counted"), active: excluded)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     Button { showsDate.toggle() } label: {
                         chip(icon: "calendar", text: Calendar.current.isDateInToday(date)
                              ? tr("Today") : Fmt.dateMedium.string(from: date), active: showsDate)
@@ -449,6 +456,7 @@ struct QuickEntryView: View {
                                  account: account,
                                  transferAccount: kind == .transfer ? accounts.first { $0.id == transferAccountID } : nil)
         if kind == .expense && claim { record.claimStatus = .pending }
+        if kind != .transfer && excluded { record.excludeFromStats = true }
         context.insert(record)
         try? context.save()
         #if os(iOS)
@@ -461,6 +469,7 @@ struct QuickEntryView: View {
             expression = ""
             note = ""
             claim = false
+            excluded = false
         }
     }
 }
