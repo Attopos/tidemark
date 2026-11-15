@@ -494,6 +494,7 @@
 				DEVELOPMENT_TEAM = DC9UKDP974;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Tidemark;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Tidemark uses Face ID to unlock the app when App Lock is on.";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -528,6 +529,7 @@
 				DEVELOPMENT_TEAM = DC9UKDP974;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Tidemark;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Tidemark uses Face ID to unlock the app when App Lock is on.";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

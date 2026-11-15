@@ -12,3 +12,8 @@
 
 - 决定：iPhone 用新的 PhoneAnalysisView，Mac 仍用 AnalysisView；CashPeriod 增加 week/all/range，Mac 只开放月/年。
 - 布局对标 iCost，配色保留 Tidemark 青柠/紫。
+
+## 2026-11-15 iPhone 应用锁与 iCost 格式导出
+
+- 应用锁只在 iPhone，用 LocalAuthentication 的 deviceOwnerAuthentication；开关都要先验证。Mac 的「投资组合锁」是另一回事（只锁投资组合页，iPhone 没有该页），保持不动。
+- 导出格式全部取自真实 iCost 导出：表名、21 列与顺序、全文本单元格、支出为负；自写 ZIP+XLSX，不引入依赖。iCost 偶尔写「50.0」这类非规范数字，我们写规范形式，数值相同。

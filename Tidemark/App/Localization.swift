@@ -335,6 +335,23 @@ enum L10n {
         "Start": "开始",
         "End": "结束",
         "Custom range": "自定义范围",
+        // iPhone settings
+        "Protection": "保护", "iCloud Sync": "iCloud 同步", "Import Data": "导入数据", "Export Data": "导出数据",
+        "Periodic Records": "周期记账", "Language Settings": "语言设置", "App lock": "应用锁",
+        "Ask for %@ or the device passcode when Tidemark opens or comes back, and hide its content in the app switcher.": "打开或回到 Tidemark 时需要%@或设备密码，并在多任务界面隐藏内容。",
+        "How long Tidemark may stay in the background before it locks.": "Tidemark 在后台停留多久后上锁。",
+        "Immediately": "立即", "After 1 minute": "1 分钟后", "After 5 minutes": "5 分钟后", "Passcode": "密码",
+        "turn on app lock": "开启应用锁", "turn off app lock": "关闭应用锁", "unlock Tidemark": "解锁 Tidemark",
+        "Set a passcode on this device first.": "请先在本机设置密码。", "Tidemark is locked": "Tidemark 已锁定",
+        "Unlock with %@": "使用%@解锁", "Last synced": "上次同步", "Sent / received": "上传 / 下载",
+        "Records, accounts and presets sync with your other devices through your private iCloud database.": "账单、账户和模板通过你的私有 iCloud 数据库与其他设备同步。",
+        "Choose an iCost export (.xlsx)": "选择 iCost 导出文件（.xlsx）",
+        "In iCost: Settings → Export Data. Records already in Tidemark are skipped, so importing a newer export adds only what is new.": "在 iCost 中：设置 → 导出数据。已有的账单会跳过，导入更新的导出文件只会添加新的部分。",
+        "Added": "新增", "Already there": "已存在", "Unreadable rows": "无法读取的行", "New accounts": "新建账户",
+        "All records": "全部账单",
+        "%d records, in iCost's export format (.xlsx), so iCost or Tidemark can import it again. Investment records and balance adjustments are left out.": "%d 条账单，使用 iCost 的导出格式（.xlsx），iCost 或 Tidemark 都能再导入。投资记录和余额调整不导出。",
+        "Share file": "分享文件", "Create export file": "生成导出文件",
+        "Totals and charts are shown in this currency.": "合计和图表以此货币显示。",
     ]
 
     // MARK: Español
@@ -618,5 +635,24 @@ enum L10n {
         "Start": "Inicio",
         "End": "Fin",
         "Custom range": "Rango personalizado",
+        // iPhone settings
+        "Protection": "Protección", "iCloud Sync": "Sincronización con iCloud", "Import Data": "Importar datos",
+        "Export Data": "Exportar datos", "Periodic Records": "Registros periódicos", "Language Settings": "Idioma",
+        "App lock": "Bloqueo de la app",
+        "Ask for %@ or the device passcode when Tidemark opens or comes back, and hide its content in the app switcher.": "Pedir %@ o el código del dispositivo al abrir o volver a Tidemark, y ocultar su contenido en el selector de apps.",
+        "How long Tidemark may stay in the background before it locks.": "Cuánto tiempo puede estar Tidemark en segundo plano antes de bloquearse.",
+        "Immediately": "Inmediatamente", "After 1 minute": "Tras 1 minuto", "After 5 minutes": "Tras 5 minutos",
+        "Passcode": "Código", "turn on app lock": "activar el bloqueo de la app", "turn off app lock": "desactivar el bloqueo de la app",
+        "unlock Tidemark": "desbloquear Tidemark", "Set a passcode on this device first.": "Primero configura un código en este dispositivo.",
+        "Tidemark is locked": "Tidemark está bloqueado", "Unlock with %@": "Desbloquear con %@",
+        "Last synced": "Última sincronización", "Sent / received": "Enviados / recibidos",
+        "Records, accounts and presets sync with your other devices through your private iCloud database.": "Registros, cuentas y plantillas se sincronizan con tus otros dispositivos a través de tu base de datos privada de iCloud.",
+        "Choose an iCost export (.xlsx)": "Elegir una exportación de iCost (.xlsx)",
+        "In iCost: Settings → Export Data. Records already in Tidemark are skipped, so importing a newer export adds only what is new.": "En iCost: Ajustes → Exportar datos. Los registros que ya están en Tidemark se omiten, así que importar una exportación más reciente solo añade lo nuevo.",
+        "Added": "Añadidos", "Already there": "Ya existentes", "Unreadable rows": "Filas ilegibles", "New accounts": "Cuentas nuevas",
+        "All records": "Todos los registros",
+        "%d records, in iCost's export format (.xlsx), so iCost or Tidemark can import it again. Investment records and balance adjustments are left out.": "%d registros, en el formato de exportación de iCost (.xlsx), para que iCost o Tidemark puedan importarlo de nuevo. Se excluyen inversiones y ajustes de saldo.",
+        "Share file": "Compartir archivo", "Create export file": "Crear archivo de exportación",
+        "Totals and charts are shown in this currency.": "Los totales y gráficos se muestran en esta moneda.",
     ]
 }

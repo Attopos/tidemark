@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct TidemarkiOSApp: App {
     @State private var appState = AppState()
+    @State private var appLock = AppLock()
     @UIApplicationDelegateAdaptor(SyncPushDelegate.self) private var pushDelegate
     private let container: ModelContainer
     private let storageError: String?
@@ -28,6 +29,7 @@ struct TidemarkiOSApp: App {
         WindowGroup {
             PhoneRootView(storageError: storageError)
                 .environment(appState)
+                .environment(appLock)
                 .environment(sync)
                 .task { sync?.start() }
         }
@@ -38,19 +40,25 @@ struct TidemarkiOSApp: App {
 struct PhoneRootView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
+    @Environment(AppLock.self) private var lock
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tab = 0
     let storageError: String?
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             PhoneLedgerView()
                 .tabItem { Label(tr("Ledger"), systemImage: "list.bullet.rectangle.fill") }
+                .tag(0)
             AccountsView()
                 .tabItem { Label(tr("Accounts"), systemImage: "square.stack.3d.up.fill") }
+                .tag(1)
             PhoneAnalysisView()
                 .tabItem { Label(tr("Analysis"), systemImage: "chart.bar.fill") }
+                .tag(2)
             PhoneSettingsView(storageError: storageError)
                 .tabItem { Label(tr("Settings"), systemImage: "gearshape.fill") }
+                .tag(3)
         }
         .preferredColorScheme(app.appearance.colorScheme)
         .tint(DS.accentText)
@@ -62,43 +70,16 @@ struct PhoneRootView: View {
         }
         // Recurring records and instalments due since last time.
         .onChange(of: scenePhase) { _, phase in
+            lock.sceneChanged(to: phase)
             if phase == .active { PresetScheduler.run(in: context) }
         }
-    }
-}
-
-struct PhoneSettingsView: View {
-    @Environment(AppState.self) private var app
-    let storageError: String?
-
-    var body: some View {
-        @Bindable var app = app
-        NavigationStack {
-            Form {
-                Section(tr("iCloud")) {
-                    SyncStatusView()
-                    if let storageError {
-                        Text(storageError).font(DS.caption).foregroundStyle(DS.warning)
-                    }
-                }
-                Section(tr("Templates & recurring")) {
-                    NavigationLink(tr("Templates, recurring records and instalments…")) {
-                        PresetsView(showsDone: false)
-                    }
-                }
-                Section(tr("Appearance")) {
-                    CapsuleSwitch(options: AppAppearance.allCases, selection: $app.appearance) { $0.title }
-                }
-                Section(tr("Language")) {
-                    CapsuleSwitch(options: AppLanguage.allCases, selection: $app.language) { $0.displayName }
-                }
-                Section(tr("Currency")) {
-                    CapsuleSwitch(options: AppState.baseCurrencies, selection: $app.baseCurrency) {
-                        "\(Fmt.symbol(for: $0)) \($0)"
-                    }
-                }
+        .overlay {
+            if lock.locked {
+                LockScreenView()
+            } else if lock.enabled && scenePhase != .active {
+                PrivacyCover()
             }
-            .navigationTitle(tr("Settings"))
         }
+        .task { await lock.unlock() }
     }
 }
