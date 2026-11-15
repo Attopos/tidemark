@@ -3,9 +3,8 @@ import Compression
 
 // MARK: - Minimal .xlsx writer
 //
-// One worksheet of text cells, laid out the way iCost writes its export:
-// every cell a shared string (index 0 is the empty string), header cells
-// style 1, the rest style 2.
+// One worksheet: text cells as shared strings (index 0 is the empty string),
+// chosen columns as numbers.
 
 struct ZipWriter {
     private var body = Data()
@@ -112,7 +111,7 @@ private extension Data {
 }
 
 enum XLSXWriter {
-    static func workbook(sheetName: String, rows: [[String]]) -> Data {
+    static func workbook(sheetName: String, rows: [[String]], numericColumns: Set<Int> = []) -> Data {
         var strings = [""]
         var lookup = ["": 0]
         func index(_ text: String) -> Int {
@@ -137,7 +136,12 @@ enum XLSXWriter {
             for c in 0..<width {
                 let text = c < row.count ? row[c] : ""
                 let style = r == 0 && c == 0 ? 1 : 2
-                sheet += "<c r=\"\(columnName(c))\(r + 1)\" s=\"\(style)\" t=\"s\"><v>\(index(text))</v></c>"
+                let reference = "\(columnName(c))\(r + 1)"
+                if r > 0, numericColumns.contains(c), !text.isEmpty, Decimal(string: text) != nil {
+                    sheet += "<c r=\"\(reference)\" s=\"\(style)\"><v>\(text)</v></c>"
+                } else {
+                    sheet += "<c r=\"\(reference)\" s=\"\(style)\" t=\"s\"><v>\(index(text))</v></c>"
+                }
             }
             sheet += "</row>"
         }

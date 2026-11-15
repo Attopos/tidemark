@@ -33,7 +33,10 @@ struct SettingsView: View {
                 Button(tr("Templates, recurring records and instalments…")) { showsPresets = true }
             }
             Section {
-                Button(tr("Import bookkeeping export…")) { app.pickLedgerExport(into: context) }
+                HStack(spacing: 8) {
+                    Button(tr("Import bookkeeping export…")) { app.pickLedgerExport(into: context) }
+                    Button(tr("Export for iCost…")) { app.exportLedger(from: context) }
+                }
             } header: {
                 Text(tr("Ledger"))
             } footer: {

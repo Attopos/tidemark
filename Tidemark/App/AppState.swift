@@ -233,6 +233,7 @@ final class AppState {
         do {
             let stats = try LedgerExportImporter.importFile(at: url, into: context)
             var message = trf("Imported %d records, %d already there", stats.inserted, stats.skipped)
+            if stats.updated > 0 { message += " · " + trf("%d updated", stats.updated) }
             if stats.accountsCreated > 0 { message += " · " + trf("%d accounts created", stats.accountsCreated) }
             if stats.rejected > 0 { message += " · " + trf("%d rows could not be read", stats.rejected) }
             ledgerImportMessage = message
@@ -253,6 +254,26 @@ final class AppState {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importLedgerExport(url: url, into: context)
+    }
+    #endif
+
+    #if os(macOS)
+    /// Save the ledger as iCost's import template (see LedgerExportWriter).
+    @MainActor
+    func exportLedger(from context: ModelContext) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "xlsx")].compactMap { $0 }
+        panel.nameFieldStringValue = LedgerExportWriter.fileName()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let records = try context.fetch(FetchDescriptor<Transaction>())
+            try LedgerExportWriter.workbook(for: records).write(to: url, options: .atomic)
+            ledgerImportMessage = trf("Exported %d records", records.filter(LedgerExportWriter.isExportable).count)
+            ledgerImportFailed = false
+        } catch {
+            ledgerImportMessage = trf("Export failed: %@", error.localizedDescription)
+            ledgerImportFailed = true
+        }
     }
     #endif
 

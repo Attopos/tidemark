@@ -2,6 +2,7 @@
 import SwiftUI
 import QuartzCore
 import UIKit
+import SwiftData
 
 /// TIDEMARK_PERF=1: switches tabs by itself and logs the longest main-thread
 /// stall after each switch to Application Support/perf.log.
@@ -9,6 +10,28 @@ import UIKit
 final class PerfProbe: NSObject {
     static var isOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF"] != nil }
     static var shotsOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_SHOTS"] != nil }
+    static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
+
+    /// TIDEMARK_IMPORT_TEST=1: reads Documents/import-test.xlsx the way Import
+    /// Data does, imports it into an empty in-memory store, previews it against
+    /// the real store (read-only), and writes the counts to import-test.txt.
+    func importTest(store: ModelContext) async {
+        var lines: [String] = []
+        let url = URL.documentsDirectory.appending(path: "import-test.xlsx")
+        do {
+            let parsed = try LedgerImportReview.read(url)
+            lines.append("rows \(parsed.rows.count) rejected \(parsed.rejected.count)")
+            let scratch = ModelContext(try TidemarkSchema.makeContainer(inMemory: true))
+            let fresh = try LedgerExportImporter.commit(parsed, fileName: url.lastPathComponent, into: scratch)
+            lines.append("in-memory: added \(fresh.inserted) updated \(fresh.updated) skipped \(fresh.skipped) accounts \(fresh.accountsCreated) records \(try scratch.fetchCount(FetchDescriptor<Transaction>()))")
+            let real = try LedgerExportImporter.preview(parsed, in: store)
+            lines.append("real-store preview: add \(real.inserted) update \(real.updated) skip \(real.skipped) not-in-file \(real.notInFile) new accounts \(real.accountsCreated) records now \(try store.fetchCount(FetchDescriptor<Transaction>()))")
+        } catch {
+            lines.append("error \(error)")
+        }
+        try? lines.joined(separator: "\n").write(to: URL.applicationSupportDirectory.appending(path: "import-test.txt"),
+                                                  atomically: true, encoding: .utf8)
+    }
 
     /// TIDEMARK_SHOTS=1: one PNG per tab (amounts hidden) in Application Support.
     func shoot(app: AppState) async {

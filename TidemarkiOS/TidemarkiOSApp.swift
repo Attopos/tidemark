@@ -44,6 +44,7 @@ struct PhoneRootView: View {
     @Environment(AppLock.self) private var lock
     @Environment(\.scenePhase) private var scenePhase
     let storageError: String?
+    @State private var sharedFile: ImportFile?
 
     var body: some View {
         @Bindable var app = app
@@ -69,6 +70,10 @@ struct PhoneRootView: View {
         .scrollIndicators(.hidden)
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
+        .sheet(item: $sharedFile) { LedgerImportReview(url: $0.url) }
+        .onOpenURL { url in
+            if url.pathExtension.lowercased() == "xlsx" { sharedFile = ImportFile(url: url) }
+        }
         .fullScreenCover(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
                 .tint(DS.accentText)
@@ -104,6 +109,7 @@ struct PhoneRootView: View {
         #if DEBUG
         .task { if PerfProbe.isOn { await PerfProbe().run(app: app) } }
         .task { if PerfProbe.shotsOn { await PerfProbe().shoot(app: app) } }
+        .task { if PerfProbe.importTestOn { await PerfProbe().importTest(store: context) } }
         #endif
     }
 }

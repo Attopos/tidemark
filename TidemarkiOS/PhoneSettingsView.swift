@@ -351,13 +351,11 @@ struct CloudSyncSettingsView: View {
 // MARK: - Import
 
 struct ImportDataView: View {
-    @Environment(\.modelContext) private var context
     @State private var picking = false
-    @State private var stats: LedgerExportImporter.Stats?
-    @State private var fileName: String?
+    @State private var reviewing: ImportFile?
     @State private var error: String?
 
-    private static let xlsx = UTType(filenameExtension: "xlsx") ?? .data
+    static let xlsx = UTType("org.openxmlformats.spreadsheetml.sheet") ?? UTType(filenameExtension: "xlsx") ?? .data
 
     var body: some View {
         SetupPage(title: tr("Import Data")) {
@@ -371,49 +369,144 @@ struct ImportDataView: View {
                 }
                 .buttonStyle(.plain)
             }
-            SetupNote(text: tr("In iCost: Settings → Export Data. Records already in Tidemark are skipped, so importing a newer export adds only what is new."))
-            if let stats {
-                SetupCard {
-                    if let fileName {
-                        SetupRowLabel(title: fileName) { EmptyView() }
-                        SetupDivider(inset: 18)
-                    }
-                    resultRow(tr("Added"), stats.inserted)
-                    SetupDivider(inset: 18)
-                    resultRow(tr("Already there"), stats.skipped)
-                    SetupDivider(inset: 18)
-                    resultRow(tr("Unreadable rows"), stats.rejected)
-                    SetupDivider(inset: 18)
-                    resultRow(tr("New accounts"), stats.accountsCreated)
-                }
-            }
+            SetupNote(text: tr("In iCost: Settings → Export Data, then share the file to Tidemark or choose it here. Records already in Tidemark are skipped and records edited in iCost are updated, so importing a newer export adds only what changed."))
             if let error {
                 SetupNote(text: error)
             }
         }
         .fileImporter(isPresented: $picking, allowedContentTypes: [Self.xlsx]) { result in
             switch result {
-            case .success(let url): load(url)
+            case .success(let url): reviewing = ImportFile(url: url)
             case .failure(let failure): error = failure.localizedDescription
             }
         }
+        .sheet(item: $reviewing) { LedgerImportReview(url: $0.url) }
+    }
+}
+
+struct ImportFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// Shows what an import will do (added, updated, already there) and imports
+/// on confirmation. Opened from Import Data and when a file is shared to the app.
+struct LedgerImportReview: View {
+    let url: URL
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @State private var parsed: LedgerExportImporter.Parsed?
+    @State private var preview: LedgerExportImporter.Stats?
+    @State private var result: LedgerExportImporter.Stats?
+    @State private var error: String?
+
+    /// Reads the workbook while the file is accessible (Files, iCloud Drive, AirDrop, share sheet).
+    static func read(_ url: URL) throws -> LedgerExportImporter.Parsed {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        var coordinated: Data?
+        var failure: Error?
+        var coordinatorError: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinatorError) { readable in
+            do { coordinated = try Data(contentsOf: readable) } catch { failure = error }
+        }
+        if let failure { throw failure }
+        if let coordinatorError { throw coordinatorError }
+        return try LedgerExportImporter.parse(rows: try XLSXReader.firstSheetRows(of: coordinated ?? Data()))
     }
 
-    private func resultRow(_ title: String, _ count: Int) -> some View {
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 14) {
+                    SetupCard {
+                        SetupRowLabel(icon: "doc.fill", color: .indigo, title: url.lastPathComponent) { EmptyView() }
+                    }
+                    if let result {
+                        SetupCard {
+                            row(tr("Added"), result.inserted)
+                            SetupDivider(inset: 18)
+                            row(tr("Updated"), result.updated)
+                            SetupDivider(inset: 18)
+                            row(tr("Already there"), result.skipped)
+                            SetupDivider(inset: 18)
+                            row(tr("New accounts"), result.accountsCreated)
+                        }
+                        SetupNote(text: tr("Imported."))
+                    } else if let preview {
+                        SetupCard {
+                            row(tr("To add"), preview.inserted)
+                            SetupDivider(inset: 18)
+                            row(tr("To update"), preview.updated)
+                            SetupDivider(inset: 18)
+                            row(tr("Already there"), preview.skipped)
+                            SetupDivider(inset: 18)
+                            row(tr("New accounts"), preview.accountsCreated)
+                            if preview.rejected > 0 {
+                                SetupDivider(inset: 18)
+                                row(tr("Unreadable rows"), preview.rejected)
+                            }
+                            if preview.notInFile > 0 {
+                                SetupDivider(inset: 18)
+                                row(tr("Not in this file"), preview.notInFile)
+                            }
+                        }
+                        if preview.updated > 0 {
+                            SetupNote(text: tr("“To update” are records edited in iCost since they were imported; they are changed in place."))
+                        }
+                        if preview.notInFile > 0 {
+                            SetupNote(text: tr("“Not in this file” are imported records this export no longer has (deleted in iCost?). Nothing is deleted."))
+                        }
+                    } else if error == nil {
+                        ProgressView().frame(maxWidth: .infinity, minHeight: 120)
+                    }
+                    if let error {
+                        SetupNote(text: error)
+                    }
+                }
+                .padding(.horizontal, DS.phoneMargin)
+                .padding(.bottom, 28)
+            }
+            .background(DS.page)
+            .phoneHeader {
+                PhoneHeader(title: tr("Import Data")) {
+                    if result == nil { Button(tr("Cancel")) { dismiss() } }
+                } trailing: {
+                    if result != nil {
+                        Button(tr("Done")) { dismiss() }.fontWeight(.semibold)
+                    } else {
+                        Button(tr("Import")) { commit() }
+                            .fontWeight(.semibold)
+                            .disabled(preview == nil || (preview?.inserted ?? 0) + (preview?.updated ?? 0) == 0)
+                    }
+                }
+            }
+        }
+        .task { load() }
+    }
+
+    private func row(_ title: String, _ count: Int) -> some View {
         SetupRowLabel(title: title) {
             Text("\(count)").font(.system(size: 17).monospacedDigit()).foregroundStyle(DS.textSecondary)
         }
     }
 
-    private func load(_ url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+    private func load() {
         do {
-            stats = try LedgerExportImporter.importFile(at: url, into: context)
-            fileName = url.lastPathComponent
-            error = nil
+            let parsed = try Self.read(url)
+            self.parsed = parsed
+            preview = try LedgerExportImporter.preview(parsed, in: context)
         } catch {
-            stats = nil
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func commit() {
+        guard let parsed else { return }
+        do {
+            result = try LedgerExportImporter.commit(parsed, fileName: url.lastPathComponent, into: context)
+        } catch {
+            context.rollback()
             self.error = error.localizedDescription
         }
     }
@@ -441,7 +534,7 @@ struct ExportDataView: View {
                 SetupDivider(inset: 18)
                 SetupChoice(title: app.cashPeriod.title, selected: onlyPeriod) { choose(true) }
             }
-            SetupNote(text: trf("%d records, in iCost's export format (.xlsx), so iCost or Tidemark can import it again. Investment records and balance adjustments are left out.", count))
+            SetupNote(text: trf("%d records as iCost's import template (.xlsx): in iCost, Settings › Bill Import › Template Import; Tidemark imports it too. Expenses are net of refunds; investment records and balance adjustments are left out.", count))
             SetupCard {
                 if let file {
                     ShareLink(item: file) {

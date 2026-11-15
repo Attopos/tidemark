@@ -4,18 +4,20 @@
 
 ## 现在
 
-iPhone 与 Mac 功能一致，只是布局不同。iPhone 五个标签：账单、账户、投资组合、分析、设置。投资组合页（总值、风险分布、分组卡片、历史、持仓与改暴露/改名/更新余额/标记卖出/删除）和截图导入（相册多选或文件，逐项核对后保存）都上了 iPhone；投资组合锁用面容 ID。设置页有应用锁、iCloud 同步、导入导出（iCost 格式）、数据备份（本机每日一份，可导出/恢复）、周期记账、外观/货币、语言。标签功能已删除。投资组合已在 Mac 与 iPhone 间同步（Production 结构已部署）。iPhone 所有内容（含标题和顶部按钮）离屏幕边缘 25pt（DS.phoneMargin），标题大写字母顶端离安全区 25pt（DS.phoneTopMargin），标题字形左缘与卡片对齐，滚动条全部隐藏；五个标签页顶部统一用 PageTitle（大标题+圆形按钮），设置子页用 PhoneHeader（返回+标题），系统导航栏隐藏。
+从 2026-11-16 起日常记账改用 Tidemark。iCost 最新导出（2026-11-15 22:21，2658 行）已在 iPhone 上导入并同步到 Mac：两边各 2658 条，最新一条 11-15 11:52，一条在 iCost 里改过的账单（11-09 火车 361→581）被原地更新，没有重复。
+iPhone 与 Mac 功能一致、布局不同；五个标签页共用 PageTitle，边距 25pt。投资组合在两端同步。
+导入：iCost 导出（21 列）和 iCost 导入模板都能读；先显示「将新增/将更新/已存在/文件中没有」再确认；iPhone 可从「文件」选择，或在 iCost 里把文件分享给 Tidemark。
+导出：iCost 的导入模板格式（表 icost_template，10 列中文表头，金额为正数），在 iCost「设置 › 账单导入 › 模板导入」可导入；Mac 设置里也能导出。
 
 ## 下一步
 
-- 真机试投资组合页、截图导入、应用锁和导出。
+- 在 iPhone 的 iCost 里试导入一次 Tidemark 导出的文件，确认分类、账户、转账类型都对。
+- 用几天看是否有卡顿或记账流程缺口。
 
 ## 注意
 
-- 日常记账仍在 iCost，Tidemark 只记资产快照，不做预测。
-- 构建测试通过后直接更新文档、合并进 main 并 push，不用再问。
-- 以后新增同步类型都要先跑 TIDEMARK_SYNC_SCHEMA=1（Development 版）再到 CloudKit Console 部署到 Production。
-- 导出不含投资买卖和余额调整，表头固定英文。标签字段只留在模型和同步里，界面不用。
-- 汇率不同步，各设备每天自己取。
-- 调试截图：用 TIDEMARK_SHOTS=1 启动（devicectl -e），每个标签页存一张 PNG 到 App 的 Application Support，金额自动隐藏。
-- iPhone 各标签页包在 StableTab 里：切换标签不再重算其他页。数据保存后四个页面仍各自重算一次（约 0.3 秒），以后可再做共享缓存。
+- 导入前备份：~/Library/Application Support/Tidemark Backups/before-import-20261115/（Mac 与 iPhone 的数据库、当天 JSON 备份）。
+- 改过的账单按「同一秒 + 同类型」匹配后原地更新；文件里没有的旧账单只计数不删除。
+- 导出给 iCost 时：退款按净额，地址/优惠/手续费/标签不导出（模板没有这些列）；投资记录和余额调整不导出。
+- 构建测试通过后直接更新文档、合并进 main 并 push，不用再问。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。
+- 调试：TIDEMARK_PERF / TIDEMARK_SHOTS / TIDEMARK_IMPORT_TEST（devicectl -e），仅 Debug 构建。

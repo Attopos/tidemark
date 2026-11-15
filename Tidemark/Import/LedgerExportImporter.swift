@@ -18,7 +18,12 @@ import CryptoKit
 //    name is kept as the category ("Transfer", "Repayment", "Lend"…).
 //  * Accounts are matched by name and created when missing.
 //  * Each row gets a fingerprint of its content, so importing the same file
-//    again (or a longer export later) adds only what is new.
+//    again (or a longer export later) adds only what is new. A row that is
+//    new but has the same second and type as an imported record the file no
+//    longer contains is that record edited in the other app: it is updated in
+//    place. Records missing from the file are counted, never deleted.
+//  * Reads both iCost's export (21 columns, English or Chinese) and iCost's
+//    import template (日期/类型/金额/…), which is what Tidemark exports.
 //  * The original row is kept verbatim in `rawPayload`.
 
 struct LedgerExportRow: Equatable {
@@ -51,6 +56,21 @@ enum LedgerExportType: Equatable {
         case .income: return .income
         case .transfer: return .transfer
         case .repayment: return .liabilityPayment
+        }
+    }
+
+    /// "支出" → "Expense", "借出" → "Lend": one spelling per type.
+    static func canonical(_ text: String) -> String {
+        switch text.trimmingCharacters(in: .whitespaces).lowercased() {
+        case "expense", "支出": return "Expense"
+        case "income", "收入": return "Income"
+        case "transfer", "转账": return "Transfer"
+        case "repayment", "还款": return "Repayment"
+        case "lend", "借出": return "Lend"
+        case "borrow", "借入": return "Borrow"
+        case "collect", "收款", "收债": return "Collect"
+        case "recharge", "充值": return "Recharge"
+        default: return text.trimmingCharacters(in: .whitespaces)
         }
     }
 
@@ -92,6 +112,10 @@ enum LedgerExportImporter {
         var skipped = 0
         var rejected = 0
         var accountsCreated = 0
+        /// Imported records edited in the other app since, updated in place.
+        var updated = 0
+        /// Imported records in the file's date range that the file no longer has.
+        var notInFile = 0
     }
 
     private enum Column: CaseIterable {
@@ -120,8 +144,9 @@ enum LedgerExportImporter {
         var isRequired: Bool { self == .date || self == .type || self == .amount }
     }
 
-    private static let dateFormats = ["yyyy/MM/dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy/MM/dd HH:mm",
-                                      "yyyy-MM-dd HH:mm", "yyyy/MM/dd", "yyyy-MM-dd"]
+    private static let dateFormats = ["yyyy/MM/dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy年MM月dd日 HH:mm:ss",
+                                      "yyyy/MM/dd HH:mm", "yyyy-MM-dd HH:mm", "yyyy年MM月dd日 HH:mm",
+                                      "yyyy/MM/dd", "yyyy-MM-dd", "yyyy年MM月dd日"]
 
     private static func makeDateParsers(timeZone: TimeZone) -> [DateFormatter] {
         dateFormats.map { format in
@@ -169,10 +194,20 @@ enum LedgerExportImporter {
                 parsed.rejected.append((line, "unreadable date “\(dateText)”"))
                 continue
             }
-            let typeText = cell(.type).trimmingCharacters(in: .whitespaces)
-            guard let type = LedgerExportType.parse(typeText) else {
+            var typeText = cell(.type).trimmingCharacters(in: .whitespaces)
+            guard var type = LedgerExportType.parse(typeText) else {
                 parsed.rejected.append((line, "unknown type “\(typeText)”"))
                 continue
+            }
+            typeText = LedgerExportType.canonical(typeText)
+            var category = cell(.category).trimmingCharacters(in: .whitespaces)
+            // The import template has only 转账; the kind of transfer travels as its category.
+            let named = LedgerExportType.canonical(category)
+            if typeText == "Transfer", named != "Transfer",
+               let specific = LedgerExportType.parse(category), specific != .expense, specific != .income {
+                type = specific
+                typeText = named
+                category = specific == .repayment ? "Repayment" : "Transfer"
             }
             guard let amount = decimal(cell(.amount)),
                   let refund = decimal(cell(.refund)),
@@ -189,7 +224,7 @@ enum LedgerExportImporter {
             parsed.rows.append(LedgerExportRow(
                 date: date, type: type, typeLabel: typeText,
                 amount: abs(amount),
-                category: cell(.category).trimmingCharacters(in: .whitespaces),
+                category: category,
                 subcategory: cell(.subcategory).trimmingCharacters(in: .whitespaces),
                 account: cell(.account).trimmingCharacters(in: .whitespaces),
                 transferAccount: cell(.transferAccount).trimmingCharacters(in: .whitespaces),
@@ -223,6 +258,70 @@ enum LedgerExportImporter {
 
     // MARK: Records → store
 
+    private enum Step {
+        case skip
+        case insert
+        case update(Transaction)
+    }
+
+    /// What importing would do, row by row, without touching the store.
+    @MainActor
+    private static func plan(_ rows: [LedgerExportRow], fingerprints prints: [String],
+                             existing: [Transaction]) -> (steps: [Step], notInFile: Int) {
+        let known = Set(existing.map(\.fingerprint))
+        let inFile = Set(prints)
+        struct Moment: Hashable { let second: Int; let kind: String }
+        var stale: [Moment: [Transaction]] = [:]
+        for record in existing where record.source == .icost && !inFile.contains(record.fingerprint) {
+            stale[Moment(second: Int(record.date.timeIntervalSince1970), kind: record.kindRaw), default: []].append(record)
+        }
+        var steps: [Step] = []
+        var seen = Set<String>()
+        for (row, print) in zip(rows, prints) {
+            if known.contains(print) || seen.contains(print) {
+                steps.append(.skip)
+                continue
+            }
+            seen.insert(print)
+            let moment = Moment(second: Int(row.date.timeIntervalSince1970), kind: row.type.kind.rawValue)
+            if var candidates = stale[moment], !candidates.isEmpty {
+                steps.append(.update(candidates.removeFirst()))
+                stale[moment] = candidates
+            } else {
+                steps.append(.insert)
+            }
+        }
+        let dates = rows.map(\.date)
+        var missing = 0
+        if let first = dates.min(), let last = dates.max() {
+            missing = stale.values.joined().filter { $0.date >= first && $0.date <= last }.count
+        }
+        return (steps, missing)
+    }
+
+    /// Counts for a confirmation step: what `commit` would add, update and skip.
+    @MainActor
+    static func preview(_ parsed: Parsed, in context: ModelContext) throws -> Stats {
+        let existing = try context.fetch(FetchDescriptor<Transaction>())
+        let (steps, missing) = plan(parsed.rows, fingerprints: fingerprints(for: parsed.rows), existing: existing)
+        var stats = Stats(rejected: parsed.rejected.count, notInFile: missing)
+        let names = Set(try context.fetch(FetchDescriptor<Account>()).map(\.name))
+        var newNames = Set<String>()
+        for (row, step) in zip(parsed.rows, steps) {
+            switch step {
+            case .skip: stats.skipped += 1
+            case .insert: stats.inserted += 1
+            case .update: stats.updated += 1
+            }
+            if case .skip = step { continue }
+            for name in [row.account, row.transferAccount] where !name.isEmpty && !names.contains(name) {
+                newNames.insert(name)
+            }
+        }
+        stats.accountsCreated = newNames.count
+        return stats
+    }
+
     @MainActor
     @discardableResult
     static func commit(_ parsed: Parsed, fileName: String?, into context: ModelContext) throws -> Stats {
@@ -255,46 +354,57 @@ enum LedgerExportImporter {
             return created
         }
 
-        var existing = Set(try context.fetch(FetchDescriptor<Transaction>()).map(\.fingerprint))
+        let prints = fingerprints(for: rows)
+        let (steps, missing) = plan(rows, fingerprints: prints, existing: try context.fetch(FetchDescriptor<Transaction>()))
+        stats.notInFile = missing
         let record = ImportRecord(source: .icost, fileName: fileName)
         context.insert(record)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
 
-        for (row, fingerprint) in zip(rows, fingerprints(for: rows)) {
-            if existing.contains(fingerprint) {
-                stats.skipped += 1
-                continue
-            }
-            existing.insert(fingerprint)
+        func fill(_ transaction: Transaction, from row: LedgerExportRow, fingerprint: String) {
             let isFlow = row.type == .expense || row.type == .income
-            let transaction = Transaction(
-                date: row.date,
-                kind: row.type.kind,
-                amount: row.amount,
-                currencyCode: row.currency,
-                category: isFlow ? row.category : row.typeLabel,
-                subcategory: isFlow ? row.subcategory : "",
-                note: row.remark,
-                account: account(named: row.account, fallbackCurrency: row.currency),
-                transferAccount: isFlow ? nil : account(named: row.transferAccount, fallbackCurrency: row.currency),
-                source: .icost,
-                fingerprint: fingerprint,
-                rawPayload: (try? encoder.encode(row.raw)).map { String(decoding: $0, as: UTF8.self) })
+            transaction.date = row.date
+            transaction.kind = row.type.kind
+            transaction.amount = row.amount
+            transaction.currencyCode = row.currency
+            transaction.category = isFlow ? row.category : row.typeLabel
+            transaction.subcategory = isFlow ? row.subcategory : ""
+            transaction.note = row.remark
+            transaction.account = account(named: row.account, fallbackCurrency: row.currency)
+            transaction.transferAccount = isFlow ? nil : account(named: row.transferAccount, fallbackCurrency: row.currency)
+            transaction.fingerprint = fingerprint
+            transaction.rawPayload = (try? encoder.encode(row.raw)).map { String(decoding: $0, as: UTF8.self) }
             transaction.address = row.address
             transaction.refundAmount = row.refund
             transaction.discountAmount = row.discount
             transaction.feeAmount = row.fee
-            transaction.importRecord = record
-            context.insert(transaction)
-            stats.inserted += 1
+            transaction.updatedAt = Date()
+        }
+
+        for ((row, fingerprint), step) in zip(zip(rows, prints), steps) {
+            switch step {
+            case .skip:
+                stats.skipped += 1
+            case .update(let existing):
+                fill(existing, from: row, fingerprint: fingerprint)
+                stats.updated += 1
+            case .insert:
+                let transaction = Transaction(date: row.date, kind: row.type.kind, amount: row.amount,
+                                              currencyCode: row.currency, account: nil, transferAccount: nil,
+                                              source: .icost, fingerprint: fingerprint)
+                context.insert(transaction)
+                fill(transaction, from: row, fingerprint: fingerprint)
+                transaction.importRecord = record
+                stats.inserted += 1
+            }
         }
 
         record.inserted = stats.inserted
         record.skipped = stats.skipped
         record.flagged = stats.rejected
         record.status = stats.rejected == 0 ? .success : .partial
-        record.summary = "\(stats.inserted) added, \(stats.skipped) already there"
+        record.summary = "\(stats.inserted) added, \(stats.updated) updated, \(stats.skipped) already there"
         record.errorLog = parsed.rejected.prefix(50).map { "row \($0.line): \($0.reason)" }.joined(separator: "\n")
         try context.save()
         return stats
