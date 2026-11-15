@@ -7,3 +7,8 @@
 - 背景：希望换 AI 工具后能从断掉的地方立即续上。
 - 决定：规则写在 `AGENTS.md`（`CLAUDE.md` 只引用它），进度写在 `STATE.md`，取舍写在 `DECISIONS.md`，和代码一起提交；git hook 督促同步，并自动汇总到 atlas-ac 和 ACdian 的只读 Atlas 模块。
 - 放弃的方案：把规则留在某个 AI 工具的设置里（迁移时最容易丢）；在 acdian 里手动维护副本（会和原件不一致）。
+
+## 2026-11-15 iPhone 分析页单独实现
+
+- 决定：iPhone 用新的 PhoneAnalysisView，Mac 仍用 AnalysisView；CashPeriod 增加 week/all/range，Mac 只开放月/年。
+- 布局对标 iCost，配色保留 Tidemark 青柠/紫。
