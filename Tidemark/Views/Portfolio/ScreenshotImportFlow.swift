@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+#if os(iOS)
+import PhotosUI
+#endif
 
 // MARK: - Holdings screenshot OCR flow (Alipay funds, Binance assets)
 //
@@ -17,6 +20,10 @@ struct ScreenshotImportFlow: View {
     @State private var session: ScreenshotImportSession?
     @State private var showFilePicker = false
     @State private var dropTargeted = false
+    #if os(iOS)
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var loadingPhotos = false
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -92,26 +99,32 @@ struct ScreenshotImportFlow: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        #if os(macOS)
         .frame(width: 1020, height: 700)
+        #endif
         .background(DS.bgPrimary)
         .fileImporter(isPresented: $showFilePicker,
                       allowedContentTypes: [.png, .jpeg, .tiff, .heic, .image],
                       allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
-                let images = urls.compactMap { url -> NSImage? in
+                let images = urls.compactMap { url -> PlatformImage? in
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                    return NSImage(contentsOf: url)
+                    return PlatformImage.load(url)
                 }
                 if !images.isEmpty { start(images) }
             }
         }
+        #if os(macOS)
         .onDrop(of: [.fileURL, .image], isTargeted: $dropTargeted) { providers in
             handleDrop(providers)
         }
         .onPasteCommand(of: [.image, .png, .tiff, .fileURL]) { _ in
             pasteFromClipboard()
         }
+        #else
+        .onChange(of: photoItems) { _, items in loadPhotos(items) }
+        #endif
         .onAppear {
             if !app.pendingOCRImages.isEmpty {
                 let images = app.pendingOCRImages
@@ -121,7 +134,7 @@ struct ScreenshotImportFlow: View {
         }
     }
 
-    private func start(_ images: [NSImage]) {
+    private func start(_ images: [PlatformImage]) {
         let newSession = ScreenshotImportSession(images: images)
         session = newSession
         // Sold holdings too: a re-bought fund reopens its old entry.
@@ -129,6 +142,25 @@ struct ScreenshotImportFlow: View {
         Task { await newSession.run(existingHoldings: holdings) }
     }
 
+    #if os(iOS)
+    private func loadPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        loadingPhotos = true
+        Task { @MainActor in
+            var images: [PlatformImage] = []
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                    images.append(image)
+                }
+            }
+            photoItems = []
+            loadingPhotos = false
+            if !images.isEmpty { start(images) }
+        }
+    }
+    #endif
+
+    #if os(macOS)
     private func pasteFromClipboard() {
         guard let images = NSPasteboard.general.readObjects(forClasses: [NSImage.self]) as? [NSImage],
               !images.isEmpty else { return }
@@ -166,6 +198,7 @@ struct ScreenshotImportFlow: View {
         }
         return handled
     }
+    #endif
 
     private var pickStage: some View {
         VStack(spacing: 16) {
@@ -174,10 +207,19 @@ struct ScreenshotImportFlow: View {
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(dropTargeted ? DS.accentText : DS.textTertiary)
             HStack(spacing: 10) {
+                #if os(macOS)
                 Button(tr("Choose images…")) { showFilePicker = true }
                     .buttonStyle(AccentButtonStyle())
                 Button(tr("Paste from clipboard")) { pasteFromClipboard() }
                     .buttonStyle(GhostButtonStyle())
+                #else
+                PhotosPicker(selection: $photoItems, maxSelectionCount: 10, matching: .images) {
+                    Text(tr("Choose screenshots…"))
+                }
+                .buttonStyle(AccentButtonStyle())
+                Button(tr("Files…")) { showFilePicker = true }
+                    .buttonStyle(GhostButtonStyle())
+                #endif
             }
             Spacer()
         }
@@ -213,29 +255,46 @@ private struct OCRReviewStage: View {
     }
 
     var body: some View {
+        #if os(macOS)
         HStack(spacing: 0) {
-            // ── Screenshot with detection overlay ─────────────────────────
-            VStack(spacing: 8) {
-                ScreenshotPane(image: session.images[min(session.currentImageIndex, session.images.count - 1)],
-                               boxes: session.showBoxes ? session.holdings.filter(\.include).map(\.sourceBox) : [])
-                HStack {
-                    if session.images.count > 1 {
-                        CapsuleSwitch(options: Array(0..<session.images.count),
-                                      selection: $session.currentImageIndex) { trf("Image %d", $0 + 1) }
-                    }
-                    Toggle(tr("Show detections"), isOn: $session.showBoxes)
-                        .toggleStyle(LimeCheckboxStyle())
-                        .font(DS.caption)
-                        .foregroundStyle(DS.textSecondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 4)
-            }
-            .padding(14)
-            .frame(width: 420)
-
+            screenshotColumn
+                .padding(14)
+                .frame(width: 420)
             Divider().overlay(DS.border)
+            resultsColumn
+                .frame(maxWidth: .infinity)
+        }
+        #else
+        VStack(spacing: 0) {
+            screenshotColumn
+                .padding(12)
+                .frame(height: 280)
+            Divider().overlay(DS.border)
+            resultsColumn
+        }
+        #endif
+    }
 
+    private var screenshotColumn: some View {
+        VStack(spacing: 8) {
+            ScreenshotPane(image: session.images[min(session.currentImageIndex, session.images.count - 1)],
+                           boxes: session.showBoxes ? session.holdings.filter(\.include).map(\.sourceBox) : [])
+            HStack {
+                if session.images.count > 1 {
+                    CapsuleSwitch(options: Array(0..<session.images.count),
+                                  selection: $session.currentImageIndex) { trf("Image %d", $0 + 1) }
+                }
+                Toggle(tr("Show detections"), isOn: $session.showBoxes)
+                    .toggleStyle(LimeCheckboxStyle())
+                    .font(DS.caption)
+                    .foregroundStyle(DS.textSecondary)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    private var resultsColumn: some View {
             // ── Editable results ─────────────────────────────────────────
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
@@ -313,15 +372,13 @@ private struct OCRReviewStage: View {
                 }
                 .padding(12)
             }
-            .frame(maxWidth: .infinity)
-        }
     }
 }
 
 // MARK: - Screenshot pane with Vision-box overlay
 
 private struct ScreenshotPane: View {
-    let image: NSImage
+    let image: PlatformImage
     let boxes: [CGRect]
 
     var body: some View {
@@ -329,7 +386,7 @@ private struct ScreenshotPane: View {
             let fitted = fittedRect(imageSize: image.size, in: geo.size)
             ZStack(alignment: .topLeading) {
                 Color.black.opacity(0.25)
-                Image(nsImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
@@ -409,6 +466,11 @@ private struct MissingHoldingsCard: View {
 
 private struct DraftCard: View {
     @Binding var holding: ScreenshotImportSession.EditableHolding
+    #if os(macOS)
+    private static let fieldColumns = 3
+    #else
+    private static let fieldColumns = 2
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -464,7 +526,7 @@ private struct DraftCard: View {
                         .clipShape(Capsule())
                 }
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: Self.fieldColumns), spacing: 8) {
                 let sym = holding.currencySymbol
                 if holding.platform == .binance {
                     fieldEditor("value \(sym)", $holding.marketValue, key: "marketValue")

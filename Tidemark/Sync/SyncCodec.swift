@@ -15,14 +15,22 @@ enum SyncKind: String {
     case account = "A"
     case transaction = "T"
     case preset = "P"
+    case asset = "S"
+    case holding = "H"
+    case valuation = "V"
 
     var recordType: String {
         switch self {
         case .account: return "Account"
         case .transaction: return "LedgerRecord"
         case .preset: return "Preset"
+        case .asset: return "PortfolioAsset"
+        case .holding: return "PortfolioHolding"
+        case .valuation: return "PortfolioValuation"
         }
     }
+
+    var isPortfolio: Bool { self == .asset || self == .holding || self == .valuation }
 }
 
 /// "A:<uuid>" or "T:<uuid>" — also the record name on the server.
@@ -217,6 +225,114 @@ enum SyncCodec {
         preset.transferAccountID = fields["transferAccount"].flatMap(UUID.init(uuidString:))
         preset.endDate = date(fields["end"])
         preset.occurrenceLimit = fields["limit"].flatMap { Int($0) }
+    }
+
+    // MARK: Portfolio
+    //
+    // Holdings live in investment accounts (Alipay, Binance), which are not
+    // ledger accounts and do not travel as Account records; a holding carries
+    // its account's name, kind and currency and the other side finds or
+    // creates that account.
+
+    private static func optional(_ value: Decimal?) -> String { value.map(string) ?? "" }
+    private static func optionalDecimal(_ text: String?) -> Decimal? {
+        guard let text, !text.isEmpty else { return nil }
+        return decimal(text)
+    }
+
+    static func fields(of asset: Asset) -> SyncFields {
+        ["name": asset.name,
+         "symbol": asset.symbol,
+         "class": asset.classRaw,
+         "currency": asset.currencyCode,
+         "note": asset.note,
+         "createdAt": string(asset.createdAt),
+         "exposure": asset.exposureRaw ?? "",
+         "customName": asset.customName ?? ""]
+    }
+
+    static func apply(_ fields: SyncFields, to asset: Asset) {
+        asset.name = fields["name"] ?? asset.name
+        asset.symbol = fields["symbol"] ?? ""
+        asset.classRaw = fields["class"] ?? asset.classRaw
+        asset.currencyCode = fields["currency"] ?? asset.currencyCode
+        asset.note = fields["note"] ?? ""
+        asset.createdAt = date(fields["createdAt"]) ?? asset.createdAt
+        asset.exposureRaw = fields["exposure"].flatMap { $0.isEmpty ? nil : $0 }
+        asset.customName = fields["customName"].flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    static func fields(of holding: Holding) -> SyncFields {
+        var fields: SyncFields = [
+            "quantity": optional(holding.quantity),
+            "cost": optional(holding.costBasis),
+            "openedAt": holding.openedAt.map(string) ?? "",
+            "active": string(holding.isActive),
+            "lastUpdated": string(holding.lastUpdated),
+            "source": holding.sourceRaw,
+        ]
+        if let asset = holding.asset { fields["asset"] = asset.id.uuidString }
+        if let account = holding.account {
+            fields["accountName"] = account.name
+            fields["accountKind"] = account.kindRaw
+            fields["accountCurrency"] = account.currencyCode
+        }
+        return fields
+    }
+
+    /// Returns false when the holding's asset is not here yet.
+    @discardableResult
+    static func apply(_ fields: SyncFields, to holding: Holding, assets: [UUID: Asset],
+                      account: (SyncFields) -> Account?) -> Bool {
+        holding.quantity = optionalDecimal(fields["quantity"])
+        holding.costBasis = optionalDecimal(fields["cost"])
+        holding.openedAt = date(fields["openedAt"])
+        holding.isActive = fields["active"] != "0"
+        holding.lastUpdated = date(fields["lastUpdated"]) ?? holding.lastUpdated
+        holding.sourceRaw = fields["source"] ?? holding.sourceRaw
+        holding.account = account(fields)
+        guard let text = fields["asset"], let id = UUID(uuidString: text) else {
+            holding.asset = nil
+            return true
+        }
+        guard let asset = assets[id] else { return false }
+        holding.asset = asset
+        return true
+    }
+
+    static func fields(of snapshot: HoldingSnapshot) -> SyncFields {
+        var fields: SyncFields = [
+            "date": string(snapshot.date),
+            "value": string(snapshot.marketValue),
+            "quantity": optional(snapshot.quantity),
+            "nav": optional(snapshot.unitNAV),
+            "cost": optional(snapshot.costBasis),
+            "profit": optional(snapshot.unrealizedPL),
+            "return": optional(snapshot.returnRate),
+            "source": snapshot.sourceRaw,
+            "createdAt": string(snapshot.createdAt),
+        ]
+        if let holding = snapshot.holding { fields["holding"] = holding.id.uuidString }
+        return fields
+    }
+
+    /// Returns false when the valuation's holding is not here yet.
+    @discardableResult
+    static func apply(_ fields: SyncFields, to snapshot: HoldingSnapshot, holdings: [UUID: Holding]) -> Bool {
+        snapshot.date = date(fields["date"]) ?? snapshot.date
+        snapshot.marketValue = decimal(fields["value"])
+        snapshot.quantity = optionalDecimal(fields["quantity"])
+        snapshot.unitNAV = optionalDecimal(fields["nav"])
+        snapshot.costBasis = optionalDecimal(fields["cost"])
+        snapshot.unrealizedPL = optionalDecimal(fields["profit"])
+        snapshot.returnRate = optionalDecimal(fields["return"])
+        snapshot.sourceRaw = fields["source"] ?? snapshot.sourceRaw
+        snapshot.createdAt = date(fields["createdAt"]) ?? snapshot.createdAt
+        guard let text = fields["holding"], let id = UUID(uuidString: text), let holding = holdings[id] else {
+            return false
+        }
+        snapshot.holding = holding
+        return true
     }
 
     // MARK: Digest

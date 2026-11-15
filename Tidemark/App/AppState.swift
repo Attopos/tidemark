@@ -1,5 +1,7 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 import Observation
 import SwiftData
 import UniformTypeIdentifiers
@@ -76,11 +78,13 @@ final class AppState {
 
     @MainActor
     func applyAppearance() {
+        #if os(macOS)
         switch appearance {
         case .system: NSApp.appearance = nil
         case .light: NSApp.appearance = NSAppearance(named: .aqua)
         case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
         }
+        #endif
     }
 
     // MARK: Portfolio lock
@@ -114,7 +118,11 @@ final class AppState {
         let context = LAContext()
         var error: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            #if os(macOS)
             unlockMessage = error?.localizedDescription ?? tr("This Mac cannot check a password.")
+            #else
+            unlockMessage = error?.localizedDescription ?? tr("Set a passcode on this device first.")
+            #endif
             return
         }
         do {
@@ -160,14 +168,14 @@ final class AppState {
     func importReceipt(url: URL, context: ModelContext) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        guard let image = PlatformImage.load(url), let cgImage = image.cgImageValue else { return }
         Task { @MainActor in
             let draft = await ReceiptImport.draft(from: cgImage, context: context)
             pendingReceipt = PendingReceipt(draft: draft)
         }
     }
 
+    #if os(macOS)
     @MainActor
     func pickReceipt(context: ModelContext) {
         let panel = NSOpenPanel()
@@ -176,6 +184,7 @@ final class AppState {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importReceipt(url: url, context: context)
     }
+    #endif
 
     /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())
@@ -191,7 +200,7 @@ final class AppState {
     var backupFailed = false
 
     // Alipay OCR import flow
-    var pendingOCRImages: [NSImage] = []
+    var pendingOCRImages: [PlatformImage] = []
     var ocrImportPresented = false
 
     init() {
@@ -209,7 +218,7 @@ final class AppState {
     func routeImport(url: URL) {
         let ext = url.pathExtension.lowercased()
         guard ["png", "jpg", "jpeg", "heic", "tiff", "webp"].contains(ext),
-              let image = NSImage(contentsOf: url) else { return }
+              let image = PlatformImage.load(url) else { return }
         pendingOCRImages = [image]
         Task { @MainActor in openScreenshotImport() }
     }
@@ -236,6 +245,7 @@ final class AppState {
         }
     }
 
+    #if os(macOS)
     @MainActor
     func pickLedgerExport(into context: ModelContext) {
         let panel = NSOpenPanel()
@@ -244,6 +254,7 @@ final class AppState {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importLedgerExport(url: url, into: context)
     }
+    #endif
 
     // MARK: Backup & restore
 
@@ -268,6 +279,43 @@ final class AppState {
         }
     }
 
+    /// A backup file in the temporary folder, for the share sheet.
+    @MainActor
+    func backupFile(_ context: ModelContext) -> URL? {
+        do {
+            let backup = try BackupService.makeBackup(from: context, settings: backupSettings)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(BackupService.fileName())
+            try BackupService.encode(backup).write(to: url, options: .atomic)
+            backupMessage = nil
+            backupFailed = false
+            return url
+        } catch {
+            backupMessage = trf("Backup failed: %@", error.localizedDescription)
+            backupFailed = true
+            return nil
+        }
+    }
+
+    /// Merge a backup file into the store (nothing is deleted).
+    @MainActor
+    func restoreBackup(from url: URL, into context: ModelContext) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let backup = try BackupService.decode(try Data(contentsOf: url))
+            let stats = try BackupService.restore(backup, into: context)
+            if let code = backup.settings.baseCurrency, Self.baseCurrencies.contains(code) { baseCurrency = code }
+            if let raw = backup.settings.language, let restored = AppLanguage(rawValue: raw) { language = restored }
+            backupMessage = trf("Restored: %d added, %d updated", stats.added, stats.updated)
+            backupFailed = false
+        } catch {
+            context.rollback()
+            backupMessage = trf("Restore failed: %@", error.localizedDescription)
+            backupFailed = true
+        }
+    }
+
+    #if os(macOS)
     /// Save a backup wherever the user chooses.
     @MainActor
     func exportBackup(_ context: ModelContext) {
@@ -294,17 +342,7 @@ final class AppState {
         panel.allowsMultipleSelection = false
         panel.directoryURL = BackupService.automaticFolder
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let backup = try BackupService.decode(try Data(contentsOf: url))
-            let stats = try BackupService.restore(backup, into: context)
-            if let code = backup.settings.baseCurrency, Self.baseCurrencies.contains(code) { baseCurrency = code }
-            if let raw = backup.settings.language, let restored = AppLanguage(rawValue: raw) { language = restored }
-            backupMessage = trf("Restored: %d added, %d updated", stats.added, stats.updated)
-            backupFailed = false
-        } catch {
-            context.rollback()
-            backupMessage = trf("Restore failed: %@", error.localizedDescription)
-            backupFailed = true
-        }
+        restoreBackup(from: url, into: context)
     }
+    #endif
 }

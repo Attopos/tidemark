@@ -131,4 +131,70 @@ final class SyncCodecTests: XCTestCase {
         let a = UUID(), b = UUID()
         XCTAssertEqual(SyncPlanner.survivor(a, b), SyncPlanner.survivor(b, a))
     }
+
+    func testPortfolioRoundTrip() throws {
+        let context = try makeContext()
+        let fund = Account(name: "支付宝", kind: .investment)
+        let asset = Asset(name: "易方达蓝筹", symbol: "005827", assetClass: .mixedFund, note: "n")
+        asset.exposureRaw = Exposure.allCases.first?.rawValue
+        asset.customName = "Blue chip"
+        let holding = Holding(asset: asset, account: fund, quantity: Decimal(string: "12.5"), costBasis: 1000)
+        holding.openedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let snapshot = HoldingSnapshot(holding: holding, date: Date(timeIntervalSince1970: 1_772_352_000),
+                                       marketValue: Decimal(string: "1234.56")!, quantity: Decimal(string: "12.5"),
+                                       unitNAV: Decimal(string: "98.7648"), costBasis: 1000,
+                                       unrealizedPL: Decimal(string: "234.56"), returnRate: Decimal(string: "0.2346"))
+        [fund].forEach(context.insert)
+        context.insert(asset)
+        context.insert(holding)
+        context.insert(snapshot)
+
+        let assetCopy = Asset(name: "", symbol: "", assetClass: .other)
+        context.insert(assetCopy)
+        SyncCodec.apply(SyncCodec.fields(of: asset), to: assetCopy)
+        XCTAssertEqual(SyncCodec.fields(of: assetCopy), SyncCodec.fields(of: asset))
+        XCTAssertEqual(assetCopy.displayName, "Blue chip")
+
+        var created: Account?
+        let holdingCopy = Holding(asset: nil, account: nil)
+        context.insert(holdingCopy)
+        XCTAssertFalse(SyncCodec.apply(SyncCodec.fields(of: holding), to: holdingCopy, assets: [:]) { _ in nil },
+                       "a holding whose asset has not arrived waits")
+        let complete = SyncCodec.apply(SyncCodec.fields(of: holding), to: holdingCopy,
+                                       assets: [asset.id: assetCopy]) { fields in
+            let account = Account(name: fields["accountName"] ?? "", kind: AccountKind(rawValue: fields["accountKind"] ?? "") ?? .other)
+            created = account
+            return account
+        }
+        XCTAssertTrue(complete)
+        XCTAssertEqual(created?.name, "支付宝")
+        XCTAssertEqual(created?.kind, .investment)
+        XCTAssertEqual(holdingCopy.quantity, Decimal(string: "12.5"))
+        XCTAssertEqual(holdingCopy.costBasis, 1000)
+        XCTAssertEqual(holdingCopy.openedAt, holding.openedAt)
+        XCTAssertTrue(holdingCopy.asset === assetCopy)
+
+        let snapshotCopy = HoldingSnapshot(holding: nil, date: Date(), marketValue: 0)
+        context.insert(snapshotCopy)
+        XCTAssertTrue(SyncCodec.apply(SyncCodec.fields(of: snapshot), to: snapshotCopy, holdings: [holding.id: holding]))
+        XCTAssertEqual(SyncCodec.digest(SyncCodec.fields(of: snapshotCopy)), SyncCodec.digest(SyncCodec.fields(of: snapshot)))
+        XCTAssertNil(HoldingSnapshot(holding: nil, date: Date(), marketValue: 0).unitNAV)
+
+        let empty = HoldingSnapshot(holding: holding, date: Date(), marketValue: 5)
+        context.insert(empty)
+        let emptyCopy = HoldingSnapshot(holding: nil, date: Date(), marketValue: 0)
+        context.insert(emptyCopy)
+        SyncCodec.apply(SyncCodec.fields(of: empty), to: emptyCopy, holdings: [holding.id: holding])
+        XCTAssertNil(emptyCopy.unitNAV, "absent optional values stay absent")
+        XCTAssertNil(emptyCopy.returnRate)
+    }
+
+    func testPortfolioKeyNames() {
+        let id = UUID()
+        for kind in [SyncKind.asset, .holding, .valuation] {
+            XCTAssertEqual(SyncKey(name: SyncKey(kind, id).name)?.kind, kind)
+            XCTAssertTrue(kind.isPortfolio)
+        }
+        XCTAssertFalse(SyncKind.transaction.isPortfolio)
+    }
 }

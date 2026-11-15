@@ -27,6 +27,11 @@ struct PhoneSettingsView: View {
                     }
                 }
                 SetupCard {
+                    SetupLink(icon: "arrow.clockwise.icloud.fill", color: .mint, title: tr("Data Backup")) {
+                        BackupSettingsView()
+                    }
+                }
+                SetupCard {
                     SetupLink(icon: "repeat", color: .green, title: tr("Periodic Records")) {
                         PresetsView(showsDone: false)
                             .padding(16)
@@ -205,6 +210,7 @@ struct SetupChoices<Option: Hashable>: View {
 
 struct ProtectionView: View {
     @Environment(AppLock.self) private var lock
+    @Environment(AppState.self) private var app
 
     var body: some View {
         SetupPage(title: tr("Protection")) {
@@ -224,6 +230,64 @@ struct ProtectionView: View {
                 SetupChoices(options: AppLock.Delay.allCases, selection: lock.delay, title: \.title) { lock.delay = $0 }
                 SetupNote(text: tr("How long Tidemark may stay in the background before it locks."))
             }
+            SetupCard {
+                SetupRowLabel(icon: "chart.pie.fill", color: .purple, title: tr("Portfolio lock")) {
+                    Toggle("", isOn: Binding(get: { app.portfolioLockEnabled }, set: { app.portfolioLockEnabled = $0 }))
+                        .labelsHidden()
+                        .tint(.green)
+                }
+            }
+            SetupNote(text: trf("Ask for %@ or the device passcode each time the Portfolio tab is opened.", lock.biometryName))
+        }
+    }
+}
+
+// MARK: - Backup
+
+struct BackupSettingsView: View {
+    @Environment(AppState.self) private var app
+    @Environment(\.modelContext) private var context
+    @State private var file: URL?
+    @State private var restoring = false
+
+    var body: some View {
+        SetupPage(title: tr("Data Backup")) {
+            SetupCard {
+                Button { app.backUp(context) } label: {
+                    SetupRowLabel(icon: "arrow.clockwise", color: .mint, title: tr("Back up now")) { EmptyView() }
+                }
+                .buttonStyle(.plain)
+                SetupDivider()
+                if let file {
+                    ShareLink(item: file) {
+                        SetupRowLabel(icon: "square.and.arrow.up.fill", color: .orange, title: tr("Share backup file")) {
+                            Text(file.lastPathComponent).font(DS.caption).foregroundStyle(DS.textTertiary).lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button { file = app.backupFile(context) } label: {
+                        SetupRowLabel(icon: "doc.badge.arrow.up", color: .orange, title: tr("Export backup")) { EmptyView() }
+                    }
+                    .buttonStyle(.plain)
+                }
+                SetupDivider()
+                Button { restoring = true } label: {
+                    SetupRowLabel(icon: "clock.arrow.circlepath", color: .indigo, title: tr("Restore from backup…")) {
+                        EmptyView()
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            SetupNote(text: tr("Saved automatically on this iPhone (Files › On My iPhone › Tidemark › Backups), one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted."))
+            if let message = app.backupMessage {
+                SetupNote(text: message)
+            } else if let last = app.lastBackup {
+                SetupNote(text: "\(tr("Last backup")) \(Fmt.relative(last))")
+            }
+        }
+        .fileImporter(isPresented: $restoring, allowedContentTypes: [.json]) { result in
+            if case .success(let url) = result { app.restoreBackup(from: url, into: context) }
         }
     }
 }
@@ -263,6 +327,9 @@ struct CloudSyncSettingsView: View {
             SetupNote(text: tr("Records, accounts and presets sync with your other devices through your private iCloud database."))
             if let storageError {
                 SetupNote(text: storageError)
+            }
+            if sync?.portfolioBlocked == true {
+                SetupNote(text: tr("Portfolio sync is waiting for the iCloud schema."))
             }
         }
     }

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 @main
 struct TidemarkiOSApp: App {
@@ -42,35 +43,52 @@ struct PhoneRootView: View {
     @Environment(\.modelContext) private var context
     @Environment(AppLock.self) private var lock
     @Environment(\.scenePhase) private var scenePhase
-    @State private var tab = 0
     let storageError: String?
 
     var body: some View {
-        TabView(selection: $tab) {
+        @Bindable var app = app
+        TabView(selection: $app.section) {
             PhoneLedgerView()
-                .tabItem { Label(tr("Ledger"), systemImage: "list.bullet.rectangle.fill") }
-                .tag(0)
+                .tabItem { Label(tr("Ledger"), systemImage: AppSection.ledger.icon) }
+                .tag(AppSection.ledger)
             AccountsView()
-                .tabItem { Label(tr("Accounts"), systemImage: "square.stack.3d.up.fill") }
-                .tag(1)
+                .tabItem { Label(tr("Accounts"), systemImage: AppSection.accounts.icon) }
+                .tag(AppSection.accounts)
+            PhonePortfolioView()
+                .tabItem { Label(tr("Portfolio"), systemImage: AppSection.portfolio.icon) }
+                .tag(AppSection.portfolio)
             PhoneAnalysisView()
-                .tabItem { Label(tr("Analysis"), systemImage: "chart.bar.fill") }
-                .tag(2)
+                .tabItem { Label(tr("Analysis"), systemImage: AppSection.analysis.icon) }
+                .tag(AppSection.analysis)
             PhoneSettingsView(storageError: storageError)
-                .tabItem { Label(tr("Settings"), systemImage: "gearshape.fill") }
-                .tag(3)
+                .tabItem { Label(tr("Settings"), systemImage: AppSection.settings.icon) }
+                .tag(AppSection.settings)
         }
         .preferredColorScheme(app.appearance.colorScheme)
         .tint(DS.accentText)
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
+        .fullScreenCover(isPresented: $app.ocrImportPresented) {
+            ScreenshotImportFlow()
+                .tint(DS.accentText)
+        }
         .task {
             CurrencyService.ensureSeeds(in: context)
             PresetScheduler.run(in: context)
+            app.backUp(context)
+            while !Task.isCancelled {
+                await CurrencyService.refreshUSDIfStale(in: context)
+                try? await Task.sleep(for: .seconds(3600))
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
+            .debounce(for: .seconds(2), scheduler: RunLoop.main)) { _ in
+            app.backUp(context)
         }
         // Recurring records and instalments due since last time.
         .onChange(of: scenePhase) { _, phase in
             lock.sceneChanged(to: phase)
+            if phase == .background { app.lockPortfolio() }
             if phase == .active { PresetScheduler.run(in: context) }
         }
         .overlay {

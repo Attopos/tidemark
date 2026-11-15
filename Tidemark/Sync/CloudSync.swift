@@ -10,7 +10,8 @@ import AppKit
 
 // MARK: - iCloud sync
 //
-// Ledger records, cash accounts and record presets are kept in step between devices through
+// Ledger records, cash accounts, record presets and the portfolio (assets,
+// holdings, valuations) are kept in step between devices through
 // the user's private iCloud database, in one record zone.
 //
 // One sync cycle is: make sure the zone exists, send what changed here, fetch
@@ -56,6 +57,9 @@ final class CloudSync {
     private(set) var receivedCount = 0
     /// Whether the push subscription is known to exist on the server.
     private(set) var pushReady = UserDefaults.standard.bool(forKey: "syncPushReady")
+    /// The server refused portfolio records (its schema does not have them
+    /// yet); ledger sync goes on, portfolio sync waits for the next launch.
+    private(set) var portfolioBlocked = false
 
     /// Whether this build may talk to iCloud at all. An unsigned or ad-hoc
     /// build has no iCloud entitlement, and touching CloudKit would crash it.
@@ -135,6 +139,11 @@ final class CloudSync {
             persist()
         }
         let database = CKContainer(identifier: Self.containerID).privateCloudDatabase
+        if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_SCHEMA"] != nil {
+            phase = .off("Seeding the iCloud schema.")
+            Task { await self.seedSchema(database) }
+            return
+        }
         self.database = database
         Self.current = self
         log("start: \(state.records.count) records known to the server")
@@ -164,10 +173,6 @@ final class CloudSync {
                 if self?.isActive == true { self?.fetchNow() }
             }
         }
-        if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_SCHEMA"] != nil {
-            Task { await self.seedSchema(database) }
-            return
-        }
         if ProcessInfo.processInfo.environment["TIDEMARK_SYNC_DIAG"] != nil {
             Task { await self.diagnose(database) }
             return
@@ -195,10 +200,20 @@ final class CloudSync {
         preset.category = "c"; preset.subcategory = "s"; preset.note = "n"; preset.tags = "t"
         preset.accountID = UUID(); preset.transferAccountID = UUID(); preset.schedule = .monthly
         preset.endDate = Date(); preset.occurrenceLimit = 2
+        let asset = Asset(name: "schema", symbol: "S", assetClass: .other, note: "n")
+        asset.exposureRaw = "e"; asset.customName = "c"
+        let fund = Account(name: "schema-fund", kind: .investment)
+        let holding = Holding(asset: asset, account: fund, quantity: 1, costBasis: 1)
+        holding.openedAt = Date()
+        let valuation = HoldingSnapshot(holding: holding, date: Date(), marketValue: 1, quantity: 1, unitNAV: 1,
+                                        costBasis: 1, unrealizedPL: 1, returnRate: 1)
         let seeds: [(String, String, SyncFields)] = [
             ("Account", "schema-seed-A", SyncCodec.fields(of: account)),
             ("LedgerRecord", "schema-seed-T", SyncCodec.fields(of: record)),
             ("Preset", "schema-seed-P", SyncCodec.fields(of: preset)),
+            ("PortfolioAsset", "schema-seed-S", SyncCodec.fields(of: asset)),
+            ("PortfolioHolding", "schema-seed-H", SyncCodec.fields(of: holding)),
+            ("PortfolioValuation", "schema-seed-V", SyncCodec.fields(of: valuation)),
         ]
         do {
             _ = try await database.modifyRecordZones(saving: [CKRecordZone(zoneID: Self.zoneID)], deleting: [])
@@ -351,12 +366,22 @@ final class CloudSync {
         var accounts: [UUID: Account] = [:]
         var transactions: [UUID: Transaction] = [:]
         var presets: [UUID: RecordPreset] = [:]
+        var assets: [UUID: Asset] = [:]
+        var holdings: [UUID: Holding] = [:]
+        var valuations: [UUID: HoldingSnapshot] = [:]
+        var allAccounts: [Account] = []
     }
 
     private func loadIndex() -> Index {
         var index = Index()
-        for account in (try? context.fetch(FetchDescriptor<Account>())) ?? [] where account.isLedgerAccount {
+        index.allAccounts = (try? context.fetch(FetchDescriptor<Account>())) ?? []
+        for account in index.allAccounts where account.isLedgerAccount {
             index.accounts[account.id] = account
+        }
+        for asset in (try? context.fetch(FetchDescriptor<Asset>())) ?? [] { index.assets[asset.id] = asset }
+        for holding in (try? context.fetch(FetchDescriptor<Holding>())) ?? [] { index.holdings[holding.id] = holding }
+        for valuation in (try? context.fetch(FetchDescriptor<HoldingSnapshot>())) ?? [] {
+            index.valuations[valuation.id] = valuation
         }
         for transaction in (try? context.fetch(FetchDescriptor<Transaction>())) ?? [] {
             index.transactions[transaction.id] = transaction
@@ -383,7 +408,19 @@ final class CloudSync {
         for (id, preset) in index.presets {
             local[SyncKey(.preset, id).name] = SyncCodec.digest(SyncCodec.fields(of: preset))
         }
-        let plan = SyncPlanner.plan(local: local, synced: state.records, queued: queued)
+        for (id, asset) in index.assets {
+            local[SyncKey(.asset, id).name] = SyncCodec.digest(SyncCodec.fields(of: asset))
+        }
+        for (id, holding) in index.holdings {
+            local[SyncKey(.holding, id).name] = SyncCodec.digest(SyncCodec.fields(of: holding))
+        }
+        for (id, valuation) in index.valuations {
+            local[SyncKey(.valuation, id).name] = SyncCodec.digest(SyncCodec.fields(of: valuation))
+        }
+        var plan = SyncPlanner.plan(local: local, synced: state.records, queued: queued)
+        if portfolioBlocked {
+            plan.saves.removeAll { SyncKey(name: $0)?.kind.isPortfolio == true }
+        }
         if plan.refusedDeletes {
             log("refused to delete most of the server's records; the local store looks incomplete")
         }
@@ -414,6 +451,8 @@ final class CloudSync {
                     preset.updatedAt = now
                     stamped = true
                 }
+            case .asset, .holding, .valuation:
+                break
             }
         }
         if stamped { try? context.save() }
@@ -432,6 +471,7 @@ final class CloudSync {
         var saved = 0, deleted = 0, failed = 0
 
         while !saves.isEmpty || !deletes.isEmpty {
+            if portfolioBlocked { saves.removeAll { SyncKey(name: $0)?.kind.isPortfolio == true } }
             let saveNames = Array(saves.prefix(Self.batchSize))
             saves.removeFirst(saveNames.count)
             let deleteNames = Array(deletes.prefix(Self.batchSize - saveNames.count))
@@ -462,6 +502,17 @@ final class CloudSync {
                 case .failure(let error):
                     failed += 1
                     guard let cloud = error as? CKError else { continue }
+                    if SyncKey(name: name)?.kind.isPortfolio == true,
+                       [.serverRejectedRequest, .invalidArguments, .permissionFailure].contains(cloud.code) {
+                        if !portfolioBlocked {
+                            log("server refused portfolio records (schema not deployed?): \(cloud.localizedDescription)")
+                        }
+                        portfolioBlocked = true
+                        for queuedName in queued.keys where SyncKey(name: queuedName)?.kind.isPortfolio == true {
+                            queued[queuedName] = nil
+                        }
+                        continue
+                    }
                     switch cloud.code {
                     case .serverRecordChanged:
                         guard let server = cloud.serverRecord else { continue }
@@ -536,6 +587,9 @@ final class CloudSync {
             case .account: fields = index.accounts[key.id].map(SyncCodec.fields(of:))
             case .transaction: fields = index.transactions[key.id].map(SyncCodec.fields(of:))
             case .preset: fields = index.presets[key.id].map(SyncCodec.fields(of:))
+            case .asset: fields = index.assets[key.id].map(SyncCodec.fields(of:))
+            case .holding: fields = index.holdings[key.id].map(SyncCodec.fields(of:))
+            case .valuation: fields = index.valuations[key.id].map(SyncCodec.fields(of:))
             }
         }
         guard let key = SyncKey(name: name), let fields else {
@@ -665,6 +719,79 @@ final class CloudSync {
             queued[key.name] = nil
         }
 
+        func holdingAccount(_ fields: SyncFields) -> Account? {
+            guard let name = fields["accountName"], !name.isEmpty else { return nil }
+            let kind = fields["accountKind"] ?? AccountKind.investment.rawValue
+            if let existing = index.allAccounts.first(where: { $0.name == name && $0.kindRaw == kind }) {
+                return existing
+            }
+            let created = Account(name: name, kind: AccountKind(rawValue: kind) ?? .investment,
+                                  currencyCode: fields["accountCurrency"] ?? "CNY")
+            context.insert(created)
+            index.allAccounts.append(created)
+            return created
+        }
+
+        func applyHolding(_ key: SyncKey, _ fields: SyncFields, system: Data?) {
+            let holding: Holding
+            if let existing = index.holdings[key.id] {
+                holding = existing
+            } else {
+                holding = Holding(asset: nil, account: nil)
+                holding.id = key.id
+                context.insert(holding)
+                index.holdings[key.id] = holding
+            }
+            let complete = SyncCodec.apply(fields, to: holding, assets: index.assets, account: holdingAccount)
+            state.orphans[key.name] = complete ? nil : fields
+            state.records[key.name] = SyncEntry(digest: SyncCodec.digest(SyncCodec.fields(of: holding)),
+                                                system: system ?? state.records[key.name]?.system)
+            queued[key.name] = nil
+        }
+
+        func applyValuation(_ key: SyncKey, _ fields: SyncFields, system: Data?) {
+            let valuation: HoldingSnapshot
+            if let existing = index.valuations[key.id] {
+                valuation = existing
+            } else {
+                valuation = HoldingSnapshot(holding: nil, date: now, marketValue: 0)
+                valuation.id = key.id
+                context.insert(valuation)
+                index.valuations[key.id] = valuation
+            }
+            let complete = SyncCodec.apply(fields, to: valuation, holdings: index.holdings)
+            state.orphans[key.name] = complete ? nil : fields
+            state.records[key.name] = SyncEntry(digest: SyncCodec.digest(SyncCodec.fields(of: valuation)),
+                                                system: system ?? state.records[key.name]?.system)
+            queued[key.name] = nil
+        }
+
+        for record in modifications {
+            guard let key = SyncKey(name: record.recordID.recordName), key.kind == .asset else { continue }
+            let fields = Self.fields(from: record)
+            let asset: Asset
+            if let existing = index.assets[key.id] {
+                asset = existing
+            } else {
+                asset = Asset(name: fields["name"] ?? "", symbol: "", assetClass: .other)
+                asset.id = key.id
+                context.insert(asset)
+                index.assets[key.id] = asset
+            }
+            SyncCodec.apply(fields, to: asset)
+            state.records[key.name] = SyncEntry(digest: SyncCodec.digest(SyncCodec.fields(of: asset)),
+                                                system: Self.systemFields(of: record))
+            queued[key.name] = nil
+        }
+        for record in modifications {
+            guard let key = SyncKey(name: record.recordID.recordName), key.kind == .holding else { continue }
+            applyHolding(key, Self.fields(from: record), system: Self.systemFields(of: record))
+        }
+        for record in modifications {
+            guard let key = SyncKey(name: record.recordID.recordName), key.kind == .valuation else { continue }
+            applyValuation(key, Self.fields(from: record), system: Self.systemFields(of: record))
+        }
+
         var lags: [String] = []
         for record in modifications {
             guard let key = SyncKey(name: record.recordID.recordName), key.kind == .transaction else { continue }
@@ -675,8 +802,15 @@ final class CloudSync {
             }
         }
         // Records that were waiting for an account that has now arrived.
-        for (name, fields) in state.orphans {
-            if let key = SyncKey(name: name) { applyRecord(key, fields, system: nil) }
+        for kind in [SyncKind.transaction, .holding, .valuation] {
+            for (name, fields) in state.orphans {
+                guard let key = SyncKey(name: name), key.kind == kind else { continue }
+                switch kind {
+                case .holding: applyHolding(key, fields, system: nil)
+                case .valuation: applyValuation(key, fields, system: nil)
+                default: applyRecord(key, fields, system: nil)
+                }
+            }
         }
 
         for name in deletions {
@@ -685,6 +819,9 @@ final class CloudSync {
             case .account: if let account = index.accounts[key.id] { context.delete(account) }
             case .transaction: if let transaction = index.transactions[key.id] { context.delete(transaction) }
             case .preset: if let preset = index.presets[key.id] { context.delete(preset) }
+            case .asset: if let asset = index.assets[key.id] { context.delete(asset) }
+            case .holding: if let holding = index.holdings[key.id] { context.delete(holding) }
+            case .valuation: if let valuation = index.valuations[key.id] { context.delete(valuation) }
             }
             state.records[name] = nil
             state.orphans[name] = nil

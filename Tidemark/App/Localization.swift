@@ -351,6 +351,12 @@ enum L10n {
         "%d records, in iCost's export format (.xlsx), so iCost or Tidemark can import it again. Investment records and balance adjustments are left out.": "%d 条账单，使用 iCost 的导出格式（.xlsx），iCost 或 Tidemark 都能再导入。投资记录和余额调整不导出。",
         "Share file": "分享文件", "Create export file": "生成导出文件",
         "Totals and charts are shown in this currency.": "合计和图表以此货币显示。",
+        "Data Backup": "数据备份", "Portfolio lock": "投资组合锁",
+        "Ask for %@ or the device passcode each time the Portfolio tab is opened.": "每次打开投资组合页都需要%@或设备密码。",
+        "Share backup file": "分享备份文件", "Export backup": "导出备份",
+        "Saved automatically on this iPhone (Files › On My iPhone › Tidemark › Backups), one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted.": "自动保存在本机（文件 › 我的 iPhone › Tidemark › Backups），每天一个文件：持仓、每次估值、账单、账户、汇率和设置。恢复会合并进来，不会删除任何数据。",
+        "Choose screenshots…": "选择截图…", "Files…": "文件…",
+        "Portfolio sync is waiting for the iCloud schema.": "投资组合同步在等 iCloud 结构部署完成。",
     ]
 
     // MARK: Español
@@ -652,5 +658,11 @@ enum L10n {
         "%d records, in iCost's export format (.xlsx), so iCost or Tidemark can import it again. Investment records and balance adjustments are left out.": "%d registros, en el formato de exportación de iCost (.xlsx), para que iCost o Tidemark puedan importarlo de nuevo. Se excluyen inversiones y ajustes de saldo.",
         "Share file": "Compartir archivo", "Create export file": "Crear archivo de exportación",
         "Totals and charts are shown in this currency.": "Los totales y gráficos se muestran en esta moneda.",
+        "Data Backup": "Copia de seguridad", "Portfolio lock": "Bloqueo de la cartera",
+        "Ask for %@ or the device passcode each time the Portfolio tab is opened.": "Pedir %@ o el código del dispositivo cada vez que se abre la pestaña Cartera.",
+        "Share backup file": "Compartir copia", "Export backup": "Exportar copia",
+        "Saved automatically on this iPhone (Files › On My iPhone › Tidemark › Backups), one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted.": "Se guarda automáticamente en este iPhone (Archivos › En mi iPhone › Tidemark › Backups), un archivo por día: posiciones, cada valoración, registros, cuentas, tipos de cambio y ajustes. Restaurar combina el archivo; no se borra nada.",
+        "Choose screenshots…": "Elegir capturas…", "Files…": "Archivos…",
+        "Portfolio sync is waiting for the iCloud schema.": "La sincronización de la cartera espera al esquema de iCloud.",
     ]
 }

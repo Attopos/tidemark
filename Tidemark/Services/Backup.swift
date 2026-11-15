@@ -511,6 +511,7 @@ enum BackupService {
 
     // MARK: Files
 
+    #if os(macOS)
     /// The user's real home; inside the sandbox NSHomeDirectory() is the container.
     private static var realHome: URL {
         if let entry = getpwuid(getuid()), let dir = entry.pointee.pw_dir {
@@ -524,6 +525,12 @@ enum BackupService {
     static var automaticFolder: URL {
         realHome.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Tidemark", isDirectory: true)
     }
+    #else
+    /// On My iPhone › Tidemark › Backups (shown in the Files app).
+    static var automaticFolder: URL {
+        URL.documentsDirectory.appendingPathComponent("Backups", isDirectory: true)
+    }
+    #endif
 
     static let filePrefix = "Tidemark-backup-"
     static let keepFiles = 60

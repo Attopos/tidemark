@@ -30,80 +30,20 @@ struct PortfolioView: View {
 
     private static let maxDonutSegments = 6
 
-    private struct Row: Identifiable {
-        let id: UUID
-        let holding: Holding
-        let name: String
-        let meta: String
-        let currency: String
-        let nativeValue: Decimal?
-        let baseValue: Decimal
-        let updated: Date?
-        let exposure: Exposure
-    }
+    typealias Row = PortfolioRow
+    typealias ExposureGroup = PortfolioExposureGroup
 
-    private struct ExposureGroup: Identifiable {
-        let exposure: Exposure
-        let rows: [Row]
-        var id: String { exposure.rawValue }
-        var baseValue: Decimal { rows.filter { $0.nativeValue != nil }.reduce(0) { $0 + $1.baseValue } }
+    private var summary: PortfolioSummary {
+        PortfolioSummary(allHoldings: allHoldings, rates: rates, baseCurrency: app.baseCurrency)
     }
-
-    /// Latest valuation of every active holding, at today's rate.
-    private var valuation: PortfolioValuation {
-        PortfolioValuation(inputs: holdings.map(\.valuationInput),
-                           converter: CurrencyConverter(rates: rates, base: app.baseCurrency))
-    }
-
-    /// One total per valuation day; sold holdings count until they were sold.
-    private var history: [PortfolioValuation.HistoryPoint] {
-        PortfolioValuation.history(inputs: allHoldings.map(\.valuationInput),
-                                   converter: CurrencyConverter(rates: rates, base: app.baseCurrency))
-    }
-
-    private var rows: [Row] {
-        let valuation = self.valuation
-        var built: [Row] = holdings.map { holding in
-            let position = valuation.position(holding.id)
-            let currency = holding.asset?.currencyCode ?? "CNY"
-            let meta = [holding.asset?.symbol, holding.account?.name]
-                .compactMap { $0?.isEmpty == false ? $0 : nil }
-                .joined(separator: " · ")
-            return Row(id: holding.id,
-                       holding: holding,
-                       name: holding.asset?.displayName ?? "—",
-                       meta: meta,
-                       currency: currency,
-                       nativeValue: position?.nativeValue,
-                       baseValue: position?.baseValue ?? 0,
-                       updated: position?.date,
-                       exposure: holding.asset?.exposure ?? .other)
-        }
-        built.sort { lhs, rhs in
-            if (lhs.nativeValue == nil) != (rhs.nativeValue == nil) { return rhs.nativeValue == nil }
-            return lhs.baseValue > rhs.baseValue
-        }
-        return built
-    }
-
-    /// Level 1: exposures by value; level 2: holdings by value.
-    private var groups: [ExposureGroup] {
-        Dictionary(grouping: rows, by: \.exposure)
-            .map { ExposureGroup(exposure: $0.key, rows: $0.value) }
-            .sorted { $0.baseValue > $1.baseValue }
-    }
-
-    private var valuedRows: [Row] { rows.filter { $0.nativeValue != nil } }
-    private var total: Decimal { valuedRows.reduce(0) { $0 + $1.baseValue } }
-    private var asOf: Date? { valuedRows.compactMap(\.updated).max() }
-
-    /// "1 USD = ¥7.12" for the hero, from the latest stored rate.
-    private var rateCaption: String? {
-        let converter = CurrencyConverter(rates: rates, base: "CNY")
-        guard rows.contains(where: { $0.currency.uppercased() != "CNY" }) || app.baseCurrency != "CNY",
-              let usd = converter.rateToCNY("USD") else { return nil }
-        return "1 USD = ¥" + NSDecimalNumber(decimal: usd.rounded(4)).stringValue
-    }
+    private var valuation: PortfolioValuation { summary.valuation }
+    private var history: [PortfolioValuation.HistoryPoint] { summary.history }
+    private var rows: [Row] { summary.rows }
+    private var groups: [ExposureGroup] { summary.groups }
+    private var valuedRows: [Row] { summary.valuedRows }
+    private var total: Decimal { summary.total }
+    private var asOf: Date? { summary.asOf }
+    private var rateCaption: String? { summary.rateCaption }
 
     var body: some View {
         GeometryReader { geometry in
@@ -218,8 +158,10 @@ struct PortfolioView: View {
             importButton
                 .padding(.top, 4)
             // A new device starts empty: the backup is in iCloud Drive › Tidemark.
+            #if os(macOS)
             Button(tr("Restore from backup…")) { app.restoreBackup(context) }
                 .buttonStyle(GhostButtonStyle())
+            #endif
         }
         .frame(maxWidth: .infinity, minHeight: 320)
         .padding(32)
@@ -247,13 +189,7 @@ struct PortfolioView: View {
         }
     }
 
-    /// "18% of value is older than 7 days": the total mixes valuation dates,
-    /// so say how much of it is not fresh.
-    private var staleNote: String? {
-        let share = valuation.freshness().staleShare
-        guard share >= 0.005 else { return nil }
-        return trf("%@ of value is older than 7 days", Fmt.percent(share, decimals: 0, showSign: false))
-    }
+    private var staleNote: String? { summary.staleNote }
 
     @ViewBuilder
     private var historyPanel: some View {
@@ -287,14 +223,7 @@ struct PortfolioView: View {
         }
     }
 
-    private var familyShares: [(family: RiskFamily, share: Double)] {
-        guard total > 0 else { return [] }
-        return RiskFamily.allCases.compactMap { family in
-            let value = groups.filter { $0.exposure.family == family }.reduce(Decimal(0)) { $0 + $1.baseValue }
-            return value > 0 ? (family, (value / total).doubleValue) : nil
-        }
-        .sorted { $0.share > $1.share }
-    }
+    private var familyShares: [(family: RiskFamily, share: Double)] { summary.familyShares }
 
     private var totalPanel: some View {
         Panel(title: tr("Total value"), icon: "chart.pie.fill") {
@@ -350,7 +279,7 @@ struct PortfolioView: View {
         }
     }
 
-    private struct ExposureCard: View {
+    struct ExposureCard: View {
         let group: ExposureGroup
         let share: Double
         let baseCurrency: String
@@ -602,7 +531,9 @@ struct PortfolioView: View {
                             .focused($focused)
                             .onAppear { draft = row.name; focused = true }
                             .onSubmit { finishRename(draft) }
+                            #if os(macOS)
                             .onExitCommand { finishRename(nil) }
+                            #endif
                             .onChange(of: focused) { _, isFocused in
                                 if !isFocused && renaming { finishRename(draft) }
                             }
@@ -669,7 +600,7 @@ struct PortfolioView: View {
 
 // MARK: - Manual balance correction
 
-private struct BalanceSheet: View {
+struct BalanceSheet: View {
     let holding: Holding
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -718,7 +649,9 @@ private struct BalanceSheet: View {
             }
         }
         .padding(22)
+        #if os(macOS)
         .frame(width: 400)
+        #endif
         .background(DS.bgSecondary)
     }
 
@@ -746,6 +679,21 @@ private struct HistoryPanel: View {
     let points: [PortfolioValuation.HistoryPoint]
     let currency: String
 
+    var body: some View {
+        Panel(title: tr("History"), icon: "chart.xyaxis.line") {
+            Text(trf("%d valuation days", points.count))
+                .font(DS.caption)
+                .foregroundStyle(DS.textSecondary)
+        } content: {
+            PortfolioHistoryChart(points: points, currency: currency)
+        }
+    }
+}
+
+struct PortfolioHistoryChart: View {
+    let points: [PortfolioValuation.HistoryPoint]
+    let currency: String
+
     private var domain: ClosedRange<Double> {
         let values = points.map { $0.total.doubleValue }
         let low = values.min() ?? 0
@@ -756,11 +704,6 @@ private struct HistoryPanel: View {
 
     var body: some View {
         let domain = self.domain
-        Panel(title: tr("History"), icon: "chart.xyaxis.line") {
-            Text(trf("%d valuation days", points.count))
-                .font(DS.caption)
-                .foregroundStyle(DS.textSecondary)
-        } content: {
             Chart(points) { point in
                 AreaMark(x: .value("Date", point.date),
                          yStart: .value("Base", domain.lowerBound),
@@ -797,6 +740,103 @@ private struct HistoryPanel: View {
                 }
             }
             .frame(height: 170)
+    }
+}
+
+// MARK: - Shared figures (Mac and iPhone)
+
+struct PortfolioRow: Identifiable {
+    let id: UUID
+    let holding: Holding
+    let name: String
+    let meta: String
+    let currency: String
+    let nativeValue: Decimal?
+    let baseValue: Decimal
+    let updated: Date?
+    let exposure: Exposure
+
+    var isStale: Bool {
+        guard let updated else { return true }
+        return Date().timeIntervalSince(updated) > 7 * 86_400
+    }
+}
+
+struct PortfolioExposureGroup: Identifiable {
+    let exposure: Exposure
+    let rows: [PortfolioRow]
+    var id: String { exposure.rawValue }
+    var baseValue: Decimal { rows.filter { $0.nativeValue != nil }.reduce(0) { $0 + $1.baseValue } }
+}
+
+/// Everything the portfolio pages show, computed once from the store. Values
+/// come from the latest valuation snapshot at today's rate; sold holdings
+/// count in the history until they were sold.
+struct PortfolioSummary {
+    let valuation: PortfolioValuation
+    let history: [PortfolioValuation.HistoryPoint]
+    let rows: [PortfolioRow]
+    let groups: [PortfolioExposureGroup]
+    let rateCaption: String?
+
+    init(allHoldings: [Holding], rates: [CurrencyRate], baseCurrency: String) {
+        let holdings = allHoldings.filter(\.isActive)
+        let converter = CurrencyConverter(rates: rates, base: baseCurrency)
+        let valuation = PortfolioValuation(inputs: holdings.map(\.valuationInput), converter: converter)
+        self.valuation = valuation
+        history = PortfolioValuation.history(inputs: allHoldings.map(\.valuationInput), converter: converter)
+        var built: [PortfolioRow] = holdings.map { holding in
+            let position = valuation.position(holding.id)
+            let meta = [holding.asset?.symbol, holding.account?.name]
+                .compactMap { $0?.isEmpty == false ? $0 : nil }
+                .joined(separator: " · ")
+            return PortfolioRow(id: holding.id,
+                                holding: holding,
+                                name: holding.asset?.displayName ?? "—",
+                                meta: meta,
+                                currency: holding.asset?.currencyCode ?? "CNY",
+                                nativeValue: position?.nativeValue,
+                                baseValue: position?.baseValue ?? 0,
+                                updated: position?.date,
+                                exposure: holding.asset?.exposure ?? .other)
         }
+        built.sort { lhs, rhs in
+            if (lhs.nativeValue == nil) != (rhs.nativeValue == nil) { return rhs.nativeValue == nil }
+            return lhs.baseValue > rhs.baseValue
+        }
+        rows = built
+        groups = Dictionary(grouping: built, by: \.exposure)
+            .map { PortfolioExposureGroup(exposure: $0.key, rows: $0.value) }
+            .sorted { $0.baseValue > $1.baseValue }
+        let cny = CurrencyConverter(rates: rates, base: "CNY")
+        if built.contains(where: { $0.currency.uppercased() != "CNY" }) || baseCurrency != "CNY",
+           let usd = cny.rateToCNY("USD") {
+            rateCaption = "1 USD = ¥" + NSDecimalNumber(decimal: usd.rounded(4)).stringValue
+        } else {
+            rateCaption = nil
+        }
+    }
+
+    var valuedRows: [PortfolioRow] { rows.filter { $0.nativeValue != nil } }
+    var total: Decimal { valuedRows.reduce(0) { $0 + $1.baseValue } }
+    var asOf: Date? { valuedRows.compactMap(\.updated).max() }
+
+    func share(_ value: Decimal) -> Double { total > 0 ? (value / total).doubleValue : 0 }
+
+    /// "18% of value is older than 7 days": the total mixes valuation dates.
+    var staleNote: String? {
+        let share = valuation.freshness().staleShare
+        guard share >= 0.005 else { return nil }
+        return trf("%@ of value is older than 7 days", Fmt.percent(share, decimals: 0, showSign: false))
+    }
+
+    var familyShares: [(family: RiskFamily, share: Double)] {
+        let total = self.total
+        guard total > 0 else { return [] }
+        return RiskFamily.allCases.compactMap { family in
+            let value = groups.filter { $0.exposure.family == family }.reduce(Decimal(0)) { $0 + $1.baseValue }
+            return value > 0 ? (family, (value / total).doubleValue) : nil
+        }
+        .sorted { $0.share > $1.share }
     }
 }

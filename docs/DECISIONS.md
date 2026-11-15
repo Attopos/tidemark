@@ -21,3 +21,9 @@
 ## 2026-11-15 删除标签
 
 - 只删界面、导入和导出里的标签；SwiftData/CloudKit 的 tags 字段保留，避免改模型破坏同步和迁移。导出保留 Tag 列（留空），格式仍与 iCost 一致。
+
+## 2026-11-15 投资组合上 iPhone，功能一致
+
+- 共用一个 AppState、PortfolioSummary（计算）和导入流程，iPhone 只另写布局（PhonePortfolioView）。图片用 PlatformImage 抹平 NSImage/UIImage；拖放和粘贴仅 Mac，iPhone 用相册多选。
+- 同步新增资产、持仓、估值三类记录；持仓所在的投资账户不单独同步，按名称+类型在对方设备找或建。服务器结构没有这些类型时只暂停投资组合同步。
+- iPhone 自动备份写本机 Documents/Backups（iCloud Drive 根目录需要另开 iCloud Documents 能力）；数据本身已经走 CloudKit。

@@ -1,12 +1,11 @@
 import Foundation
-import AppKit
 import Vision
 import SwiftData
 import Observation
 
 // MARK: - Holdings screenshot OCR (Alipay funds, Binance assets)
 //
-// Pipeline: NSImage → Vision text recognition (zh-Hans + en) → platform layout
+// Pipeline: image → Vision text recognition (zh-Hans + en) → platform layout
 // parser (Alipay fund cards or Binance asset rows, chosen per screenshot; see
 // BinanceScreenshotParser.swift) → editable review drafts → explicit
 // user confirmation → holdings + dated valuation snapshots. Uncertain fields
@@ -38,9 +37,8 @@ enum OCRError: LocalizedError {
 // MARK: Vision wrapper
 
 enum ScreenshotOCRService {
-    static func recognize(image: NSImage) async throws -> [RecognizedLine] {
-        var rect = CGRect(origin: .zero, size: image.size)
-        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
+    static func recognize(image: PlatformImage) async throws -> [RecognizedLine] {
+        guard let cgImage = image.cgImageValue else {
             throw OCRError.notAnImage
         }
         return try await withCheckedThrowingContinuation { continuation in
@@ -460,7 +458,7 @@ final class ScreenshotImportSession {
         let matches: Bool
     }
 
-    let images: [NSImage]
+    let images: [PlatformImage]
     var phase: Phase = .recognizing
     private(set) var lines: [RecognizedLine] = []
     var holdings: [EditableHolding] = []
@@ -475,7 +473,7 @@ final class ScreenshotImportSession {
     var showBoxes = true
     var currentImageIndex = 0
 
-    init(images: [NSImage]) {
+    init(images: [PlatformImage]) {
         self.images = images
     }
 

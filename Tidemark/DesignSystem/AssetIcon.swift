@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 import CoreImage
 
 // MARK: - Round asset icons
@@ -17,16 +16,16 @@ import CoreImage
 // Chinese funds ("南方…" → 南), the ticker's first letter otherwise.
 
 enum AssetIconStore {
-    private static var cache: [String: NSImage] = [:]
+    private static var cache: [String: PlatformImage] = [:]
     private static var misses: Set<String> = []
 
-    static func cryptoImage(ticker: String) -> NSImage? {
+    static func cryptoImage(ticker: String) -> PlatformImage? {
         let key = ticker.lowercased()
         guard !key.isEmpty, key.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return nil }
         if let hit = cache[key] { return hit }
         if misses.contains(key) { return nil }
         guard let url = Bundle.main.url(forResource: "crypto-\(key)", withExtension: "png"),
-              let image = NSImage(contentsOf: url) else {
+              let image = PlatformImage.load(url) else {
             misses.insert(key)
             return nil
         }
@@ -46,7 +45,7 @@ enum AssetIconStore {
     }
 
     struct IndexMark {
-        let image: NSImage
+        let image: PlatformImage
         let style: MarkStyle
     }
 
@@ -70,11 +69,11 @@ enum AssetIconStore {
 
     static func indexMark(name: String, symbol: String) -> IndexMark? {
         guard let (key, style) = indexKey(name: name, symbol: symbol) else { return nil }
-        if case .text = style { return IndexMark(image: NSImage(), style: style) }
+        if case .text = style { return IndexMark(image: PlatformImage(), style: style) }
         let cacheKey = "index-" + key
         if let hit = cache[cacheKey] { return IndexMark(image: hit, style: style) }
         guard let url = Bundle.main.url(forResource: cacheKey, withExtension: "png"),
-              let image = NSImage(contentsOf: url) else { return nil }
+              let image = PlatformImage.load(url) else { return nil }
         cache[cacheKey] = image
         return IndexMark(image: image, style: style)
     }
@@ -96,11 +95,16 @@ enum AssetIconStore {
     /// luminance and stretch so the logo's own background lands on full
     /// tint and its mark goes dark: a light disc with a dark mark, never a
     /// black disc. Baked into a bitmap (exact everywhere), cached per tint.
-    static func duotone(_ image: NSImage, key: String, tint: NSColor, inverted: Bool = false) -> NSImage {
-        let rgb = tint.usingColorSpace(.sRGB) ?? tint
-        let cacheKey = "\(key)|\(inverted)|\(Int(rgb.redComponent * 255)),\(Int(rgb.greenComponent * 255)),\(Int(rgb.blueComponent * 255))"
+    static func duotone(_ image: PlatformImage, key: String, tint: Color, inverted: Bool = false) -> PlatformImage {
+        let rgb = sRGBComponents(tint)
+        let cacheKey = "\(key)|\(inverted)|\(Int(rgb.red * 255)),\(Int(rgb.green * 255)),\(Int(rgb.blue * 255))"
         if let hit = cache[cacheKey] { return hit }
+        #if os(macOS)
         guard let tiff = image.tiffRepresentation, let input = CIImage(data: tiff) else { return image }
+        #else
+        guard let source = image.cgImageValue else { return image }
+        let input = CIImage(cgImage: source)
+        #endif
         let context = CIContext()
         var gray = input.applyingFilter("CIColorControls", parameters: [
             kCIInputSaturationKey: 0, kCIInputContrastKey: 1.15,
@@ -121,13 +125,13 @@ enum AssetIconStore {
             scale = min(6, 1 / max(level, 0.15))
         }
         let tinted = gray.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: rgb.redComponent * scale, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: rgb.greenComponent * scale, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: rgb.blueComponent * scale, w: 0),
+            "inputRVector": CIVector(x: rgb.red * scale, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: rgb.green * scale, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: rgb.blue * scale, w: 0),
             "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
         ]).applyingFilter("CIColorClamp")
         guard let cg = context.createCGImage(tinted, from: input.extent) else { return image }
-        let result = NSImage(cgImage: cg, size: image.size)
+        let result = PlatformImage.make(cgImage: cg, like: image)
         cache[cacheKey] = result
         return result
     }
@@ -156,8 +160,8 @@ struct AssetIcon: View {
 
     /// Any logo → luminance only → multiplied by the tint: brand colors are
     /// dropped, the mark's shape and light/dark structure stay.
-    private func duotone(_ image: NSImage, key: String, fill: Bool) -> some View {
-        Image(nsImage: AssetIconStore.duotone(image, key: key, tint: NSColor(tint), inverted: fill))
+    private func duotone(_ image: PlatformImage, key: String, fill: Bool) -> some View {
+        Image(platformImage: AssetIconStore.duotone(image, key: key, tint: tint, inverted: fill))
             .resizable()
             .interpolation(.high)
             .aspectRatio(contentMode: fill ? .fill : .fit)
@@ -200,7 +204,7 @@ struct AssetIcon: View {
                     .background(tint)
                     .clipShape(Circle())
             case .wordmark:
-                Image(nsImage: AssetIconStore.duotone(mark.image, key: "index|" + name + symbol, tint: NSColor(tint)))
+                Image(platformImage: AssetIconStore.duotone(mark.image, key: "index|" + name + symbol, tint: tint))
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
@@ -212,7 +216,7 @@ struct AssetIcon: View {
         } else if let image = AssetIconStore.cryptoImage(ticker: symbol) {
             // The white variant is a disc with the glyph knocked out; tinted,
             // the glyph shows the dark panel through it.
-            Image(nsImage: image)
+            Image(platformImage: image)
                 .renderingMode(.template)
                 .resizable()
                 .interpolation(.high)
