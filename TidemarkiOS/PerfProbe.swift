@@ -1,12 +1,33 @@
 #if DEBUG
 import SwiftUI
 import QuartzCore
+import UIKit
 
 /// TIDEMARK_PERF=1: switches tabs by itself and logs the longest main-thread
 /// stall after each switch to Application Support/perf.log.
 @MainActor
 final class PerfProbe: NSObject {
     static var isOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF"] != nil }
+    static var shotsOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_SHOTS"] != nil }
+
+    /// TIDEMARK_SHOTS=1: one PNG per tab (amounts hidden) in Application Support.
+    func shoot(app: AppState) async {
+        try? await Task.sleep(for: .seconds(5))
+        let hidden = app.amountsHidden
+        app.amountsHidden = true
+        for section in AppSection.allCases {
+            app.section = section
+            try? await Task.sleep(for: .milliseconds(1500))
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = scene.windows.first(where: \.isKeyWindow) ?? scene.windows.first else { continue }
+            let data = UIGraphicsImageRenderer(bounds: window.bounds).pngData { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            try? data.write(to: URL.applicationSupportDirectory.appending(path: "shot-\(section.rawValue).png"))
+        }
+        app.amountsHidden = hidden
+        app.section = .ledger
+    }
 
     private var link: CADisplayLink?
     private var last: CFTimeInterval = 0

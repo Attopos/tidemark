@@ -66,11 +66,13 @@ struct PhoneRootView: View {
         }
         .preferredColorScheme(app.appearance.colorScheme)
         .tint(DS.accentText)
+        .scrollIndicators(.hidden)
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
         .fullScreenCover(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()
                 .tint(DS.accentText)
+                .scrollIndicators(.hidden)
         }
         .task {
             CurrencyService.ensureSeeds(in: context)
@@ -101,6 +103,7 @@ struct PhoneRootView: View {
         .task { await lock.unlock() }
         #if DEBUG
         .task { if PerfProbe.isOn { await PerfProbe().run(app: app) } }
+        .task { if PerfProbe.shotsOn { await PerfProbe().shoot(app: app) } }
         #endif
     }
 }

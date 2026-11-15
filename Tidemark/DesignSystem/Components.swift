@@ -265,10 +265,12 @@ extension View {
         #else
         ScrollView {
             self.padding(.horizontal, DS.phoneMargin)
-                .padding(.vertical, 20)
+                .padding(.top, DS.phoneTopMargin)
+                .padding(.bottom, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
         .background(DS.panel)
         #endif
     }

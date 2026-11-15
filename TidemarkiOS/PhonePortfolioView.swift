@@ -71,7 +71,7 @@ struct PhonePortfolioView: View {
         VStack(spacing: 16) {
             title
                 .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, 8)
+                .padding(.top, PageTitle<EmptyView>.pageTop)
             Spacer()
             Image(systemName: "lock.fill")
                 .font(.system(size: 26, weight: .semibold))
@@ -123,7 +123,7 @@ struct PhonePortfolioView: View {
                 }
             }
             .padding(.horizontal, DS.phoneMargin)
-            .padding(.top, 8)
+            .padding(.top, PageTitle<EmptyView>.pageTop)
             .padding(.bottom, 28)
         }
     }

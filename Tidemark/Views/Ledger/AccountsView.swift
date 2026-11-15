@@ -62,7 +62,7 @@ struct AccountsView: View {
                     }
                 }
                 .padding(.horizontal, wide ? DS.pagePadding : DS.phoneMargin)
-                .padding(.top, wide ? 38 : 8)
+                .padding(.top, wide ? 38 : PageTitle<EmptyView>.pageTop)
                 .padding(.bottom, 110)
                 .frame(maxWidth: 1300, alignment: .leading)
                 .frame(maxWidth: .infinity)

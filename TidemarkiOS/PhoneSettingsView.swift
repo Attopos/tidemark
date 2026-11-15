@@ -85,7 +85,7 @@ struct SetupPage<Content: View>: View {
                 content
             }
             .padding(.horizontal, DS.phoneMargin)
-            .padding(.top, showsBack ? 6 : 8)
+            .padding(.top, showsBack ? 6 : PageTitle<EmptyView>.pageTop)
             .padding(.bottom, 28)
         }
         .background(DS.page)

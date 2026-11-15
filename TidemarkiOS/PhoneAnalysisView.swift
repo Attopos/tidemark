@@ -37,8 +37,7 @@ struct PhoneAnalysisView: View {
                                         period: period, converter: snapshot.converter)
         let transfers = CashflowAnalytics.transfers(snapshot.entries, in: period)
 
-        NavigationStack {
-            ScrollView {
+        ScrollView {
                 VStack(spacing: 14) {
                     PageTitle(title: tr("Analysis")) {
                         RoundIconButton(symbol: app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
@@ -63,12 +62,10 @@ struct PhoneAnalysisView: View {
                     }
                 }
                 .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, 8)
+                .padding(.top, PageTitle<EmptyView>.pageTop)
                 .padding(.bottom, 28)
             }
             .background(DS.page)
-            .toolbar(.hidden, for: .navigationBar)
-        }
         .sheet(isPresented: $editingRange) {
             PhoneRangeSheet(period: period) { app.cashPeriod = $0 }
         }
@@ -1023,6 +1020,7 @@ struct PhoneRangeSheet: View {
             }
         }
         .presentationDetents([.medium])
+        .scrollIndicators(.hidden)
     }
 }
 
@@ -1055,6 +1053,7 @@ struct PhoneRecordsSheet: View {
                 }
             }
         }
+        .scrollIndicators(.hidden)
         .sheet(item: $editing) { TransactionEditor(transaction: $0) }
     }
 }

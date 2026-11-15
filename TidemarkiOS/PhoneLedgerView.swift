@@ -94,7 +94,7 @@ struct PhoneLedgerView: View {
                     }
                 }
                 .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, 8)
+                .padding(.top, PageTitle<EmptyView>.pageTop)
                 .padding(.bottom, 110) // room for the add button
             }
             addButton

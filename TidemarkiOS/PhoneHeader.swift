@@ -23,9 +23,14 @@ struct PhoneHeader<Leading: View, Trailing: View>: View {
         }
         .font(.system(size: 17))
         .tint(DS.textPrimary)
-        .frame(height: 44)
+        .frame(height: Self.rowHeight)
         .padding(.horizontal, DS.phoneMargin)
+        .padding(.top, DS.phoneTopMargin - (Self.rowHeight - TextMetrics.lineHeight(size: 17, weight: .semibold)) / 2
+                 - TextMetrics.capInset(size: 17, weight: .semibold))
+        .padding(.bottom, 10)
     }
+
+    static var rowHeight: CGFloat { 32 }
 }
 
 extension PhoneHeader where Leading == EmptyView {
@@ -51,7 +56,7 @@ struct PhoneBackButton: View {
         Button { dismiss() } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 17, weight: .semibold))
-                .frame(width: 32, height: 44, alignment: .leading)
+                .frame(width: 32, height: 32, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .accessibilityLabel(tr("Back"))
