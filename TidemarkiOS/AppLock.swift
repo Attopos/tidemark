@@ -135,7 +135,7 @@ struct LockScreenView: View {
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, DS.phoneMargin)
             .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

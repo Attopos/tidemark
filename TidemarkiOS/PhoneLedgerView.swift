@@ -124,22 +124,13 @@ struct PhoneLedgerView: View {
     private var header: some View {
         @Bindable var app = app
         return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(tr("Ledger"))
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(DS.textPrimary)
-                Spacer()
+            PageTitle(title: tr("Ledger")) {
                 PhotosPicker(selection: $receiptItem, matching: .screenshots) {
-                    Image(systemName: readingReceipt ? "hourglass" : "doc.text.viewfinder")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(DS.textPrimary)
-                        .frame(width: 40, height: 40)
-                        .background(DS.tile)
-                        .clipShape(Circle())
+                    RoundIcon(symbol: readingReceipt ? "hourglass" : "doc.text.viewfinder")
                 }
                 .accessibilityLabel(tr("Receipt"))
-                roundButton(app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
-                roundButton("magnifyingglass", active: showsSearch) {
+                RoundIconButton(symbol: app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
+                RoundIconButton(symbol: "magnifyingglass", active: showsSearch) {
                     showsSearch.toggle()
                     if !showsSearch { search = "" }
                 }
@@ -148,8 +139,8 @@ struct PhoneLedgerView: View {
                 Text(monthTitle)
                     .font(.system(size: 19, weight: .bold).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
-                roundButton("chevron.left", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: -1) }
-                roundButton("chevron.right", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: 1) }
+                RoundIconButton(symbol: "chevron.left", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: -1) }
+                RoundIconButton(symbol: "chevron.right", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: 1) }
                 Spacer()
                 Button {
                     showsCalendar.toggle()
@@ -166,20 +157,6 @@ struct PhoneLedgerView: View {
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private func roundButton(_ symbol: String, size: CGFloat = 40, active: Bool = false,
-                             action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: size * 0.4, weight: .bold))
-                .foregroundStyle(active ? DS.ink : DS.textPrimary)
-                .frame(width: size, height: size)
-                .background(active ? DS.accent : DS.tile)
-                .clipShape(Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
     }
 
     private var searchField: some View {

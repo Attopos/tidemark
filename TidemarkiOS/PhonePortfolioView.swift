@@ -23,20 +23,7 @@ struct PhonePortfolioView: View {
                 }
             }
             .background(DS.page)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(tr("Portfolio")).font(.system(size: 17, weight: .semibold))
-                }
-                if !app.portfolioLockEnabled || app.portfolioUnlocked {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { app.ocrImportPresented = true } label: {
-                            Image(systemName: "text.viewfinder")
-                        }
-                        .accessibilityLabel(tr("Import screenshot"))
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .sheet(item: $editingHolding) { holding in
             BalanceSheet(holding: holding)
@@ -71,8 +58,20 @@ struct PhonePortfolioView: View {
 
     // MARK: Locked
 
+    private var title: some View {
+        PageTitle(title: tr("Portfolio")) {
+            if !app.portfolioLockEnabled || app.portfolioUnlocked {
+                RoundIconButton(symbol: "text.viewfinder") { app.ocrImportPresented = true }
+                    .accessibilityLabel(tr("Import screenshot"))
+            }
+        }
+    }
+
     private var locked: some View {
         VStack(spacing: 16) {
+            title
+                .padding(.horizontal, DS.phoneMargin)
+                .padding(.top, 8)
             Spacer()
             Image(systemName: "lock.fill")
                 .font(.system(size: 26, weight: .semibold))
@@ -104,6 +103,7 @@ struct PhonePortfolioView: View {
         let summary = PortfolioSummary(allHoldings: allHoldings, rates: rates, baseCurrency: app.baseCurrency)
         return ScrollView {
             VStack(spacing: 14) {
+                title
                 if summary.rows.isEmpty {
                     empty
                 } else {
@@ -123,7 +123,7 @@ struct PhonePortfolioView: View {
                 }
             }
             .padding(.horizontal, DS.phoneMargin)
-            .padding(.top, 6)
+            .padding(.top, 8)
             .padding(.bottom, 28)
         }
     }

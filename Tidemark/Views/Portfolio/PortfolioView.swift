@@ -648,9 +648,12 @@ struct BalanceSheet: View {
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(22)
         #if os(macOS)
+        .padding(22)
         .frame(width: 400)
+        #else
+        .padding(.horizontal, DS.phoneMargin)
+        .padding(.vertical, 22)
         #endif
         .background(DS.bgSecondary)
     }

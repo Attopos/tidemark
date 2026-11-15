@@ -8,7 +8,7 @@ struct PhoneSettingsView: View {
 
     var body: some View {
         NavigationStack {
-            SetupPage(title: tr("Settings")) {
+            SetupPage(title: tr("Settings"), showsBack: false) {
                 SetupCard {
                     SetupLink(icon: "lock.fill", color: .blue, title: tr("Protection")) { ProtectionView() }
                 }
@@ -38,7 +38,9 @@ struct PhoneSettingsView: View {
                             .padding(.vertical, 16)
                             .frame(maxHeight: .infinity, alignment: .top)
                             .background(DS.page)
-                            .navigationBarTitleDisplayMode(.inline)
+                            .phoneHeader {
+                                PhoneHeader(title: tr("Periodic Records")) { PhoneBackButton() } trailing: { EmptyView() }
+                            }
                     }
                 }
                 SetupCard {
@@ -61,22 +63,32 @@ struct PhoneSettingsView: View {
 
 struct SetupPage<Content: View>: View {
     let title: String
+    var showsBack = true
     @ViewBuilder let content: Content
 
     var body: some View {
+        if showsBack {
+            scroll
+                .phoneHeader {
+                    PhoneHeader(title: title) { PhoneBackButton() } trailing: { EmptyView() }
+                }
+        } else {
+            scroll
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var scroll: some View {
         ScrollView {
-            VStack(spacing: 14) { content }
-                .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, 6)
-                .padding(.bottom, 28)
+            VStack(spacing: 14) {
+                if !showsBack { PageTitle(title: title) }
+                content
+            }
+            .padding(.horizontal, DS.phoneMargin)
+            .padding(.top, showsBack ? 6 : 8)
+            .padding(.bottom, 28)
         }
         .background(DS.page)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(title).font(.system(size: 17, weight: .semibold))
-            }
-        }
     }
 }
 

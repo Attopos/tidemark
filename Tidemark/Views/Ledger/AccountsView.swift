@@ -62,7 +62,7 @@ struct AccountsView: View {
                     }
                 }
                 .padding(.horizontal, wide ? DS.pagePadding : DS.phoneMargin)
-                .padding(.top, wide ? 38 : 12)
+                .padding(.top, wide ? 38 : 8)
                 .padding(.bottom, 110)
                 .frame(maxWidth: 1300, alignment: .leading)
                 .frame(maxWidth: .infinity)
@@ -92,13 +92,7 @@ struct AccountsView: View {
 
     private var header: some View {
         @Bindable var app = app
-        return HStack(spacing: 10) {
-            Text(tr("Accounts"))
-                .font(DS.title(30))
-                .foregroundStyle(DS.textPrimary)
-                .lineLimit(1)
-                .fixedSize()
-            Spacer(minLength: 8)
+        return PageTitle(title: tr("Accounts")) {
             Menu {
                 Button(tr("Reconcile…")) { reconciling = true }
                 Toggle(tr("Show archived"), isOn: $showArchived)

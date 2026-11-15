@@ -40,6 +40,9 @@ struct PhoneAnalysisView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    PageTitle(title: tr("Analysis")) {
+                        RoundIconButton(symbol: app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
+                    }
                     PhonePeriodSwitcher(selected: period.unit) { select($0, from: period) }
                     navigator(period)
                     PhoneOverviewCard(summary: summary, period: period, code: code) { title, kinds in
@@ -60,24 +63,11 @@ struct PhoneAnalysisView: View {
                     }
                 }
                 .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, 6)
+                .padding(.top, 8)
                 .padding(.bottom, 28)
             }
             .background(DS.page)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(tr("Analysis"))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(DS.textPrimary)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { app.amountsHidden.toggle() } label: {
-                        Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
-                    }
-                    .tint(DS.textPrimary)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .sheet(isPresented: $editingRange) {
             PhoneRangeSheet(period: period) { app.cashPeriod = $0 }
@@ -1020,15 +1010,15 @@ struct PhoneRangeSheet: View {
                 DatePicker(tr("End"), selection: $to, in: from..., displayedComponents: .date)
             }
             .contentMargins(.horizontal, DS.phoneMargin, for: .scrollContent)
-            .navigationTitle(tr("Custom range"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancel")) { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
+            .phoneHeader(background: Color(.systemGroupedBackground)) {
+                PhoneHeader(title: tr("Custom range")) {
+                    Button(tr("Cancel")) { dismiss() }
+                } trailing: {
                     Button(tr("Done")) {
                         apply(CashPeriod(from: from, through: to))
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
             }
         }
@@ -1059,10 +1049,10 @@ struct PhoneRecordsSheet: View {
                     .padding(.horizontal, DS.phoneMargin)
             }
             .background(DS.panel)
-            .navigationTitle("\(selection.title) · \(selection.period.title)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button(tr("Done")) { dismiss() } }
+            .phoneHeader(background: DS.panel) {
+                PhoneHeader(title: "\(selection.title) · \(selection.period.title)") {
+                    Button(tr("Done")) { dismiss() }.fontWeight(.semibold)
+                }
             }
         }
         .sheet(item: $editing) { TransactionEditor(transaction: $0) }

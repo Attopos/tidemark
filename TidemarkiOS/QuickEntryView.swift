@@ -373,7 +373,7 @@ struct QuickEntryView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             keypad
         }
-        .padding(.horizontal, DS.phoneMargin - 4)
+        .padding(.horizontal, DS.phoneMargin)
         .padding(.top, 10)
         .padding(.bottom, 6)
         .background(DS.page)
