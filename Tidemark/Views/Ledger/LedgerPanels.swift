@@ -81,12 +81,7 @@ enum FlowMode: String, CaseIterable {
 struct PeriodBar: View {
     @Binding var period: CashPeriod
 
-    private var title: String {
-        let formatter = DateFormatter()
-        formatter.locale = L10n.current.locale
-        formatter.setLocalizedDateFormatFromTemplate(period.unit == .month ? "yMMM" : "y")
-        return formatter.string(from: period.start)
-    }
+    private var title: String { period.title }
 
     var body: some View {
         // The "Today" shortcut is the first thing to go when space is short.
@@ -98,10 +93,10 @@ struct PeriodBar: View {
 
     private func bar(withToday: Bool) -> some View {
         HStack(spacing: 10) {
-            CapsuleSwitch(options: CashPeriod.Unit.allCases, selection: Binding(
+            CapsuleSwitch(options: [CashPeriod.Unit.month, .year], selection: Binding(
                 get: { period.unit },
                 set: { period = CashPeriod(unit: $0, containing: period.start) })) {
-                $0 == .month ? tr("Month") : tr("Year")
+                $0.title
             }
             arrow("chevron.left") { period = period.shifted(by: -1) }
             Text(title)
@@ -129,6 +124,52 @@ struct PeriodBar: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+extension CashPeriod.Unit {
+    var title: String {
+        switch self {
+        case .week: return tr("Week")
+        case .month: return tr("Month")
+        case .year: return tr("Year")
+        case .all: return tr("All")
+        case .range: return tr("Range")
+        }
+    }
+}
+
+extension CashPeriod {
+    /// "Nov 2026", "2026", "Nov 10 – Nov 16".
+    var title: String {
+        let calendar = Calendar.current
+        func format(_ date: Date, _ template: String) -> String {
+            let formatter = DateFormatter()
+            formatter.locale = L10n.current.locale
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            return formatter.string(from: date)
+        }
+        let last = calendar.date(byAdding: .second, value: -1, to: end()) ?? start
+        let sameYear = calendar.isDate(start, equalTo: last, toGranularity: .year)
+        switch unit {
+        case .month: return format(start, "yMMM")
+        case .year: return format(start, "y")
+        case .all: return "\(format(start, "yMMM")) – \(format(last, "yMMM"))"
+        case .week, .range:
+            let template = sameYear && calendar.isDate(start, equalTo: Date(), toGranularity: .year) ? "MMMd" : "yMMMd"
+            if calendar.isDate(start, inSameDayAs: last) { return format(start, template) }
+            return "\(format(start, template)) – \(format(last, template))"
+        }
+    }
+
+    /// The month, week or year a category's history steps by.
+    var historyStep: CashPeriod {
+        switch unit {
+        case .week, .month, .year: return self
+        case .all, .range:
+            let last = Calendar.current.date(byAdding: .second, value: -1, to: end()) ?? start
+            return CashPeriod(unit: .month, containing: min(last, Date()))
+        }
     }
 }
 
@@ -236,7 +277,7 @@ struct FlowBarsPanel: View {
         }
     }
 
-    private var unit: Calendar.Component { period.unit == .month ? .day : .month }
+    private var unit: Calendar.Component { period.bucketComponent }
 
     private var focus: CashBucket? {
         let target = hovered ?? selectedDay
@@ -252,7 +293,7 @@ struct FlowBarsPanel: View {
         }
         let formatter = DateFormatter()
         formatter.locale = L10n.current.locale
-        formatter.setLocalizedDateFormatFromTemplate(period.unit == .month ? "MMMd" : "yMMM")
+        formatter.setLocalizedDateFormatFromTemplate(period.bucketComponent == .day ? "MMMd" : "yMMM")
         return "\(formatter.string(from: focus.start))  \(Fmt.money(value(focus), code))"
     }
 
@@ -334,7 +375,7 @@ struct FlowBarsPanel: View {
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                        AxisValueLabel(format: period.unit == .month
+                        AxisValueLabel(format: period.bucketComponent == .day
                                        ? .dateTime.day() : .dateTime.month(.abbreviated))
                             .font(.system(size: 10.5))
                             .foregroundStyle(DS.textTertiary)
@@ -436,7 +477,7 @@ struct NetTrendPanel: View {
                 }
                 .chartXAxis {
                     AxisMarks(values: .automatic(desiredCount: 5)) { _ in
-                        AxisValueLabel(format: period.unit == .month
+                        AxisValueLabel(format: period.bucketComponent == .day
                                        ? .dateTime.month(.defaultDigits).day() : .dateTime.month(.abbreviated))
                             .font(.system(size: 10.5))
                             .foregroundStyle(DS.textTertiary)
@@ -758,8 +799,9 @@ struct CategoryDetailSheet: View {
         let inPeriod = matching.filter { period.contains($0.date) }
         let entries = matching.map { $0.cashEntry(using: converter) }
         let total = entries.filter { period.contains($0.date) }.reduce(Decimal(0)) { $0 + $1.base }
+        let step = period.historyStep
         let history = (0..<12).reversed().map { offset -> (Date, Decimal) in
-            let slice = period.shifted(by: -offset)
+            let slice = step.shifted(by: -offset)
             return (slice.start, entries.filter { slice.contains($0.date) }.reduce(Decimal(0)) { $0 + $1.base })
         }
         let subcategories: [CategoryStat] = selection.level == .first
@@ -784,11 +826,12 @@ struct CategoryDetailSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
             Chart(history, id: \.0) { start, amount in
-                BarMark(x: .value("Date", start, unit: period.unit == .month ? .month : .year),
+                BarMark(x: .value("Date", start, unit: step.unit == .week ? .weekOfYear
+                                                      : (step.unit == .month ? .month : .year)),
                         y: .value("Amount", amount.doubleValue))
                     .foregroundStyle(selection.kind == .income ? FlowPalette.income : FlowPalette.expense)
                     .cornerRadius(3)
-                    .opacity(start == period.start ? 1 : 0.55)
+                    .opacity(start == step.start ? 1 : 0.55)
             }
             .chartYAxis {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
@@ -803,7 +846,9 @@ struct CategoryDetailSheet: View {
             }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                    AxisValueLabel(format: period.unit == .month ? .dateTime.month(.abbreviated) : .dateTime.year())
+                    AxisValueLabel(format: step.unit == .year ? .dateTime.year()
+                                   : (step.unit == .week ? .dateTime.month(.defaultDigits).day()
+                                      : .dateTime.month(.abbreviated)))
                         .font(.system(size: 10.5)).foregroundStyle(DS.textTertiary)
                 }
             }

@@ -84,7 +84,7 @@ struct AnalysisView: View {
     }
 
     private func figuresPanel(_ summary: CashSummary, code: String) -> some View {
-        let average = app.cashPeriod.unit == .month ? tr("Daily expense") : tr("Monthly expense")
+        let average = app.cashPeriod.bucketComponent == .day ? tr("Daily expense") : tr("Monthly expense")
         return Panel(title: tr("Expense & income")) {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 StatTile(title: tr("Expense"), value: summary.expense, code: code)
@@ -136,12 +136,12 @@ struct SummaryTable: View {
     private func label(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = L10n.current.locale
-        formatter.setLocalizedDateFormatFromTemplate(period.unit == .month ? "Md" : "yMMM")
+        formatter.setLocalizedDateFormatFromTemplate(period.bucketComponent == .day ? "Md" : "yMMM")
         return formatter.string(from: date)
     }
 
     var body: some View {
-        Panel(title: period.unit == .month ? tr("Daily summary") : tr("Monthly summary")) {
+        Panel(title: period.bucketComponent == .day ? tr("Daily summary") : tr("Monthly summary")) {
             Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 9) {
                 GridRow {
                     Text(tr("Date")).gridColumnAlignment(.leading)

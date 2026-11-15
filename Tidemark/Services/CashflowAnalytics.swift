@@ -34,44 +34,101 @@ struct CashEntry: Identifiable, Equatable {
 }
 
 struct CashPeriod: Equatable, Hashable {
-    enum Unit: String, CaseIterable { case month, year }
+    enum Unit: String, CaseIterable { case week, month, year, all, range }
 
     let unit: Unit
     /// First instant of the period.
     let start: Date
+    private let limit: Date
 
+    /// The week, month or year containing `date` (`.all` and `.range` fall back to its month).
     init(unit: Unit, containing date: Date, calendar: Calendar = .current) {
         self.unit = unit
+        let component: Calendar.Component
         switch unit {
-        case .month:
-            start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
-        case .year:
-            start = calendar.date(from: calendar.dateComponents([.year], from: date)) ?? date
+        case .week: component = .weekOfYear
+        case .year: component = .year
+        default: component = .month
+        }
+        let interval = calendar.dateInterval(of: component, for: date)
+        start = interval?.start ?? date
+        limit = interval?.end ?? date
+    }
+
+    /// Whole days from `from` through `to`.
+    init(from: Date, through to: Date, calendar: Calendar = .current) {
+        unit = .range
+        let first = calendar.startOfDay(for: min(from, to))
+        let last = calendar.startOfDay(for: max(from, to))
+        start = first
+        limit = calendar.date(byAdding: .day, value: 1, to: last) ?? last
+    }
+
+    private init(unit: Unit, start: Date, limit: Date) {
+        self.unit = unit
+        self.start = start
+        self.limit = limit
+    }
+
+    /// Every month from the earliest date through the current month (or the latest date, if later).
+    static func all(spanning dates: [Date], now: Date = Date(), calendar: Calendar = .current) -> CashPeriod {
+        let first = min(dates.min() ?? now, now)
+        let last = max(dates.max() ?? now, now)
+        let start = calendar.dateInterval(of: .month, for: first)?.start ?? first
+        let limit = calendar.dateInterval(of: .month, for: last)?.end ?? last
+        return CashPeriod(unit: .all, start: start, limit: limit)
+    }
+
+    /// First instant after the period.
+    func end(_ calendar: Calendar = .current) -> Date { limit }
+
+    /// Days in the period.
+    func dayCount(_ calendar: Calendar = .current) -> Int {
+        max(1, calendar.dateComponents([.day], from: start, to: limit).day ?? 1)
+    }
+
+    /// What one bucket of the charts and summary table covers.
+    var bucketComponent: Calendar.Component {
+        switch unit {
+        case .week, .month: return .day
+        case .year, .all: return .month
+        case .range: return dayCount() > 62 ? .month : .day
         }
     }
 
-    private var component: Calendar.Component { unit == .month ? .month : .year }
-
-    /// First instant after the period.
-    func end(_ calendar: Calendar = .current) -> Date {
-        calendar.date(byAdding: component, value: 1, to: start) ?? start
-    }
+    var isShiftable: Bool { unit != .all }
 
     func shifted(by value: Int, calendar: Calendar = .current) -> CashPeriod {
-        CashPeriod(unit: unit, containing: calendar.date(byAdding: component, value: value, to: start) ?? start,
-                   calendar: calendar)
+        switch unit {
+        case .all:
+            return self
+        case .range:
+            let days = dayCount(calendar) * value
+            let from = calendar.date(byAdding: .day, value: days, to: start) ?? start
+            let to = calendar.date(byAdding: .day, value: days - 1, to: limit) ?? limit
+            return CashPeriod(from: from, through: to, calendar: calendar)
+        case .week, .month, .year:
+            let component: Calendar.Component = unit == .week ? .weekOfYear : (unit == .month ? .month : .year)
+            return CashPeriod(unit: unit,
+                              containing: calendar.date(byAdding: component, value: value, to: start) ?? start,
+                              calendar: calendar)
+        }
+    }
+
+    /// The period just before, for comparisons; nil when there is none.
+    func previous(_ calendar: Calendar = .current) -> CashPeriod? {
+        isShiftable ? shifted(by: -1, calendar: calendar) : nil
     }
 
     func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
-        date >= start && date < end(calendar)
+        date >= start && date < limit
     }
 
-    /// Starts of the buckets a chart shows: days of a month, months of a year.
+    /// Starts of the buckets a chart shows: days, or months (the first may begin before `start`).
     func bucketStarts(_ calendar: Calendar = .current) -> [Date] {
-        let step: Calendar.Component = unit == .month ? .day : .month
+        let step = bucketComponent
         var starts: [Date] = []
-        var cursor = start
-        let limit = end(calendar)
+        var cursor = step == .month ? (calendar.dateInterval(of: .month, for: start)?.start ?? start) : start
         while cursor < limit {
             starts.append(cursor)
             guard let next = calendar.date(byAdding: step, value: 1, to: cursor), next > cursor else { break }
@@ -151,7 +208,8 @@ enum CashflowAnalytics {
         let starts = period.bucketStarts(calendar)
         var buckets = starts.map { CashBucket(start: $0) }
         let positions = Dictionary(uniqueKeysWithValues: starts.enumerated().map { ($1, $0) })
-        let components: Set<Calendar.Component> = period.unit == .month ? [.year, .month, .day] : [.year, .month]
+        let components: Set<Calendar.Component> = period.bucketComponent == .day
+            ? [.year, .month, .day] : [.year, .month]
         for entry in entries where !entry.excluded && period.contains(entry.date, calendar: calendar) {
             guard let key = calendar.date(from: calendar.dateComponents(components, from: entry.date)),
                   let position = positions[key] else { continue }
@@ -171,14 +229,14 @@ enum CashflowAnalytics {
             guard level == .second, !entry.subcategory.isEmpty else { return first }
             return entry.subcategory
         }
-        let previous = period.shifted(by: -1, calendar: calendar)
+        let previous = period.previous(calendar)
         var current: [String: (amount: Decimal, count: Int)] = [:]
         var before: [String: Decimal] = [:]
         for entry in entries where entry.kind == kind && !entry.excluded {
             if period.contains(entry.date, calendar: calendar) {
                 let old = current[name(entry)] ?? (0, 0)
                 current[name(entry)] = (old.amount + entry.base, old.count + 1)
-            } else if previous.contains(entry.date, calendar: calendar) {
+            } else if previous?.contains(entry.date, calendar: calendar) == true {
                 before[name(entry), default: 0] += entry.base
             }
         }

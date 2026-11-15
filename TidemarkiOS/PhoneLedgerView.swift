@@ -32,12 +32,7 @@ struct PhoneLedgerView: View {
         var id: Date { day }
     }
 
-    private var monthTitle: String {
-        let formatter = DateFormatter()
-        formatter.locale = L10n.current.locale
-        formatter.setLocalizedDateFormatFromTemplate(app.cashPeriod.unit == .month ? "yMMM" : "y")
-        return formatter.string(from: app.cashPeriod.start)
-    }
+    private var monthTitle: String { app.cashPeriod.title }
 
     private func matches(_ transaction: Transaction, _ query: String) -> Bool {
         [transaction.category, transaction.subcategory, transaction.note, transaction.tags, transaction.address,

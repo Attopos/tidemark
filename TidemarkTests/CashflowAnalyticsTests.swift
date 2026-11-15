@@ -48,6 +48,33 @@ final class CashflowAnalyticsTests: XCTestCase {
         XCTAssertFalse(march.contains(day(2026, 4, 1, hour: 0), calendar: calendar), "the end is exclusive")
     }
 
+    func testWeekRangeAndAllPeriods() {
+        let week = CashPeriod(unit: .week, containing: day(2026, 3, 18), calendar: calendar)
+        XCTAssertEqual(week.start, day(2026, 3, 15, hour: 0))
+        XCTAssertEqual(week.bucketStarts(calendar).count, 7)
+        XCTAssertEqual(week.shifted(by: 1, calendar: calendar).start, day(2026, 3, 22, hour: 0))
+
+        let range = CashPeriod(from: day(2026, 3, 10), through: day(2026, 3, 1), calendar: calendar)
+        XCTAssertEqual(range.start, day(2026, 3, 1, hour: 0))
+        XCTAssertEqual(range.end(calendar), day(2026, 3, 11, hour: 0))
+        XCTAssertEqual(range.bucketComponent, .day)
+        let next = range.shifted(by: 1, calendar: calendar)
+        XCTAssertEqual(next.start, day(2026, 3, 11, hour: 0))
+        XCTAssertEqual(next.end(calendar), day(2026, 3, 21, hour: 0))
+        XCTAssertEqual(CashflowAnalytics.summary(entries, in: range, calendar: calendar).expense, 100)
+
+        let all = CashPeriod.all(spanning: entries.map(\.date), now: day(2026, 3, 20), calendar: calendar)
+        XCTAssertEqual(all.start, day(2026, 2, 1, hour: 0))
+        XCTAssertEqual(all.end(calendar), day(2026, 5, 1, hour: 0))
+        XCTAssertEqual(all.bucketStarts(calendar).count, 3)
+        XCTAssertNil(all.previous(calendar))
+        XCTAssertEqual(all.shifted(by: 1, calendar: calendar), all)
+        let food = CashflowAnalytics.categories(entries, kind: .expense, level: .first, in: all, calendar: calendar)
+            .first { $0.name == "Food" }
+        XCTAssertEqual(food?.amount, 135)
+        XCTAssertEqual(food?.change, 135)
+    }
+
     func testSummaryCountsOnlyIncomeAndExpense() {
         let summary = CashflowAnalytics.summary(entries, in: march, now: day(2026, 3, 10), calendar: calendar)
         XCTAssertEqual(summary.expense, 100)
