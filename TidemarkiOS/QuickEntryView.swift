@@ -7,7 +7,7 @@ import SwiftData
 // actually use (most used first), optionally its second level, then type the
 // amount on a built-in keypad that also adds and subtracts. Account and date
 // sit in chips above the keypad, defaulting to the last account used. Every
-// other field (refund, reimbursement, tags) is one tap away in the full
+// other field (refund, reimbursement) is one tap away in the full
 // editor, which "More" opens with what is typed so far.
 
 struct QuickEntryView: View {
@@ -29,8 +29,6 @@ struct QuickEntryView: View {
     @State private var showsMore = false
     @State private var showsDate = false
     @State private var claim = false
-    @State private var tags = ""
-    @State private var showsTags = false
     /// Records saved in this sitting with "Record" (enter another).
     @State private var savedCount = 0
 
@@ -305,7 +303,7 @@ struct QuickEntryView: View {
 
     private var entryPanel: some View {
         VStack(spacing: 10) {
-            // Account, tags, reimbursement, date — like the chips above iCost's keypad.
+            // Account, reimbursement, date — like the chips above iCost's keypad.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     if kind != .transfer {
@@ -317,10 +315,6 @@ struct QuickEntryView: View {
                             chip(icon: "creditcard", text: accounts.first { $0.id == accountID }?.name ?? tr("Account"))
                         }
                     }
-                    Button { showsTags = true } label: {
-                        chip(icon: "tag", text: tags.isEmpty ? tr("Tags") : tags)
-                    }
-                    .buttonStyle(.plain)
                     if kind == .expense {
                         Button { claim.toggle() } label: {
                             chip(icon: claim ? "checkmark.circle.fill" : "circle", text: tr("Reimburse"),
@@ -383,10 +377,6 @@ struct QuickEntryView: View {
         .padding(.top, 10)
         .padding(.bottom, 6)
         .background(DS.page)
-        .alert(tr("Tags"), isPresented: $showsTags) {
-            TextField(tr("Tags"), text: $tags)
-            Button(tr("Done")) {}
-        }
     }
 
     private func chip(icon: String, text: String, active: Bool = false) -> some View {
@@ -456,7 +446,6 @@ struct QuickEntryView: View {
                                  category: kind == .transfer ? "Transfer" : category,
                                  subcategory: kind == .transfer ? "" : subcategory,
                                  note: note.trimmingCharacters(in: .whitespaces),
-                                 tags: tags.trimmingCharacters(in: .whitespaces),
                                  account: account,
                                  transferAccount: kind == .transfer ? accounts.first { $0.id == transferAccountID } : nil)
         if kind == .expense && claim { record.claimStatus = .pending }

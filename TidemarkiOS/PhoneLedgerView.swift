@@ -35,7 +35,7 @@ struct PhoneLedgerView: View {
     private var monthTitle: String { app.cashPeriod.title }
 
     private func matches(_ transaction: Transaction, _ query: String) -> Bool {
-        [transaction.category, transaction.subcategory, transaction.note, transaction.tags, transaction.address,
+        [transaction.category, transaction.subcategory, transaction.note, transaction.address,
          transaction.account?.name ?? "", transaction.transferAccount?.name ?? "", "\(transaction.amount)"]
             .contains { $0.lowercased().contains(query) }
     }

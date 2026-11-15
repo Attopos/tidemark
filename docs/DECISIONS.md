@@ -17,3 +17,7 @@
 
 - 应用锁只在 iPhone，用 LocalAuthentication 的 deviceOwnerAuthentication；开关都要先验证。Mac 的「投资组合锁」是另一回事（只锁投资组合页，iPhone 没有该页），保持不动。
 - 导出格式全部取自真实 iCost 导出：表名、21 列与顺序、全文本单元格、支出为负；自写 ZIP+XLSX，不引入依赖。iCost 偶尔写「50.0」这类非规范数字，我们写规范形式，数值相同。
+
+## 2026-11-15 删除标签
+
+- 只删界面、导入和导出里的标签；SwiftData/CloudKit 的 tags 字段保留，避免改模型破坏同步和迁移。导出保留 Tag 列（留空），格式仍与 iCost 一致。

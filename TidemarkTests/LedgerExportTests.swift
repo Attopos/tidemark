@@ -104,7 +104,7 @@ final class LedgerExportTests: XCTestCase {
         XCTAssertEqual(records[4].category, "Lend", "the original type survives as the label")
         XCTAssertEqual(records[5].refundAmount, 40)
         XCTAssertEqual(records[0].address, "Street 1")
-        XCTAssertEqual(records[1].tags, "work")
+        XCTAssertEqual(records[1].tags, "", "tags are not imported")
         XCTAssertNotNil(records[0].rawPayload)
         XCTAssertTrue(records.allSatisfy { $0.source == .icost })
     }

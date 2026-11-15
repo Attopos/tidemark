@@ -211,7 +211,7 @@ struct LedgerView: View {
             // Search covers everything, not just the period on screen.
             title = trf("Results for “%@”", search)
             shown = transactions.filter { transaction in
-                [transaction.category, transaction.subcategory, transaction.note, transaction.tags,
+                [transaction.category, transaction.subcategory, transaction.note,
                  transaction.address, transaction.account?.name ?? "", transaction.transferAccount?.name ?? "",
                  "\(transaction.amount)"].contains { $0.lowercased().contains(query) }
             }

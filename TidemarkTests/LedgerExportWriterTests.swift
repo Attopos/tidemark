@@ -9,7 +9,7 @@ final class LedgerExportWriterTests: XCTestCase {
     private let sample: [[String]] = [
         LedgerExportWriter.header,
         ["2026/03/01 08:00:00", "Expense", "-18.8", "Food", "Breakfast", "Wallet", "", "bun & <tea>", "CNY", "", "AC.", "Street 1", "", "", "", "", "", "", "", "", ""],
-        ["2026/03/01 09:00:00", "Income", "80", "Salary", "", "Bank", "", "", "CNY", "work", "AC.", "", "", "", "", "", "", "", "", "", ""],
+        ["2026/03/01 09:00:00", "Income", "80", "Salary", "", "Bank", "", "", "CNY", "", "AC.", "", "", "", "", "", "", "", "", "", ""],
         ["2026/03/02 10:00:00", "Transfer", "300", "Transfer", "", "Bank", "Wallet", "", "CNY", "", "AC.", "", "", "", "", "", "", "", "", "", ""],
         ["2026/03/03 11:00:00", "Repayment", "120", "Repayment", "", "Bank", "Visa Credit", "", "CNY", "", "AC.", "", "", "", "", "", "", "", "", "", ""],
         ["2026/03/04 12:00:00", "Lend", "50", "Transfer", "", "Bank", "Friend", "", "CNY", "", "AC.", "", "", "", "", "", "", "", "", "", ""],

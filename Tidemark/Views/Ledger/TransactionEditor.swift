@@ -28,7 +28,6 @@ struct TransactionEditor: View {
     @State private var arrivalText: String
     @State private var date: Date
     @State private var note: String
-    @State private var tags: String
     @State private var refundText: String
     @State private var excluded: Bool
     @State private var claim: ClaimStatus
@@ -57,7 +56,6 @@ struct TransactionEditor: View {
         }
         _date = State(initialValue: transaction?.date ?? initialDate)
         _note = State(initialValue: transaction?.note ?? "")
-        _tags = State(initialValue: transaction?.tags ?? "")
         _refundText = State(initialValue: transaction.map { text($0.refundAmount) } ?? "")
         _excluded = State(initialValue: transaction?.excludeFromStats ?? false)
         _claim = State(initialValue: transaction?.claimStatus ?? .none)
@@ -85,7 +83,6 @@ struct TransactionEditor: View {
         accountID = preset.accountID
         transferAccountID = preset.transferAccountID
         note = preset.note
-        tags = preset.tags
     }
 
     private func saveAsTemplate() {
@@ -97,7 +94,6 @@ struct TransactionEditor: View {
         preset.accountID = accountID
         preset.transferAccountID = isFlow ? nil : transferAccountID
         preset.note = note
-        preset.tags = tags
         context.insert(preset)
         try? context.save()
         savedTemplate = true
@@ -204,10 +200,6 @@ struct TransactionEditor: View {
                 GridRow {
                     label(tr("Note"))
                     field("", text: $note)
-                }
-                GridRow {
-                    label(tr("Tags"))
-                    field("", text: $tags)
                 }
                 if kind == .expense {
                     GridRow {
@@ -317,7 +309,6 @@ struct TransactionEditor: View {
         target.currencyCode = resolvedCurrency
         target.account = accounts.first { $0.id == accountID }
         target.note = note
-        target.tags = tags.trimmingCharacters(in: .whitespaces)
         target.updatedAt = Date()
         if isFlow {
             target.category = category.trimmingCharacters(in: .whitespaces)

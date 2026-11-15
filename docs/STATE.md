@@ -8,6 +8,7 @@ iPhone 版在 TestFlight（Build 4），同步走 Production iCloud 数据库。
 
 ## 下一步
 
+- 投资组合上 iPhone，功能与 Mac 一致，只是布局不同。
 - 在真机上试一遍应用锁和导出分享，导出文件拿回 iCost 试导入。
 - 继续 TestFlight 测试，收集问题。
 
@@ -16,3 +17,4 @@ iPhone 版在 TestFlight（Build 4），同步走 Production iCloud 数据库。
 - 日常记账仍在 iCost，Tidemark 只记资产快照，不做预测。
 - 构建测试通过后直接更新文档、合并进 main 并 push，不用再问。
 - 导出不含投资买卖和余额调整（iCost 没有这些类型）。表头固定英文，因为只有英文版真实导出可核对。
+- 标签功能已删除：界面不再显示或编辑，导入忽略 Tag 列，导出 Tag 列留空；模型和同步里的 tags 字段保留不动。

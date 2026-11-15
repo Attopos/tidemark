@@ -6,7 +6,7 @@ import CryptoKit
 //
 // Reads the spreadsheet a bookkeeping app exports (one row per record:
 // date, type, amount, two category levels, source and destination account,
-// remark, currency, tag, ledger, address, refund, discount, fee) and writes
+// remark, currency, ledger, address, refund, discount, fee) and writes
 // it into the ledger. Columns are found by header name, so their order and
 // any extra columns do not matter.
 //
@@ -33,7 +33,6 @@ struct LedgerExportRow: Equatable {
     var transferAccount: String
     var remark: String
     var currency: String
-    var tags: String
     var ledger: String
     var address: String
     var refund: Decimal
@@ -97,7 +96,7 @@ enum LedgerExportImporter {
 
     private enum Column: CaseIterable {
         case date, type, amount, category, subcategory, account, transferAccount, remark,
-             currency, tags, ledger, address, refund, discount, fee
+             currency, ledger, address, refund, discount, fee
 
         var aliases: [String] {
             switch self {
@@ -110,7 +109,6 @@ enum LedgerExportImporter {
             case .transferAccount: return ["account 2", "账户2", "账户 2"]
             case .remark: return ["remark", "备注"]
             case .currency: return ["currency", "货币", "币种"]
-            case .tags: return ["tag", "tags", "标签"]
             case .ledger: return ["ledger", "账本"]
             case .address: return ["address", "地址", "位置"]
             case .refund: return ["refund", "退款"]
@@ -197,7 +195,6 @@ enum LedgerExportImporter {
                 transferAccount: cell(.transferAccount).trimmingCharacters(in: .whitespaces),
                 remark: cell(.remark),
                 currency: currency.isEmpty ? "CNY" : currency,
-                tags: cell(.tags).trimmingCharacters(in: .whitespaces),
                 ledger: cell(.ledger).trimmingCharacters(in: .whitespaces),
                 address: cell(.address).trimmingCharacters(in: .whitespaces),
                 refund: abs(refund), discount: abs(discount), fee: abs(fee),
@@ -279,7 +276,6 @@ enum LedgerExportImporter {
                 category: isFlow ? row.category : row.typeLabel,
                 subcategory: isFlow ? row.subcategory : "",
                 note: row.remark,
-                tags: row.tags,
                 account: account(named: row.account, fallbackCurrency: row.currency),
                 transferAccount: isFlow ? nil : account(named: row.transferAccount, fallbackCurrency: row.currency),
                 source: .icost,

@@ -5,9 +5,10 @@ import Foundation
 // Writes the ledger as iCost's own export: sheet "收支账单", the 21 columns
 // below in this order, dates "yyyy/MM/dd HH:mm:ss" in local time, every cell
 // text, expense amounts negative and the rest positive, refund/discount/fee
-// blank when zero. Transfer-like rows use their type (Transfer, Lend…) with
-// "Transfer" as the category; repayments use "Repayment" for both. Records
-// iCost has no type for (investments, adjustments) are left out.
+// blank when zero, Tag always blank (Tidemark has no tags). Transfer-like
+// rows use their type (Transfer, Lend…) with "Transfer" as the category;
+// repayments use "Repayment" for both. Records iCost has no type for
+// (investments, adjustments) are left out.
 
 enum LedgerExportWriter {
     static let sheetName = "收支账单"
@@ -64,7 +65,7 @@ enum LedgerExportWriter {
             let isFlow = record.kind == .expense || record.kind == .income
             var row = [formatter.string(from: record.date), type, amount, category, subcategory,
                        record.account?.name ?? "", isFlow ? "" : (record.transferAccount?.name ?? ""),
-                       record.note, record.currencyCode, record.tags, ledger.isEmpty ? defaultLedger : ledger,
+                       record.note, record.currencyCode, "", ledger.isEmpty ? defaultLedger : ledger,
                        record.address, optional(record.refundAmount), optional(record.discountAmount),
                        optional(record.feeAmount)]
             row += Array(repeating: "", count: header.count - row.count)
