@@ -44,3 +44,9 @@
 
 - 推翻当天「导出照 iCost 自己的导出格式」：iCost 帮助文档说它的导出不适合再导入，导入只认模板（file.icostapp.com/icost_template.xlsx）。Tidemark 导出改为模板格式，导入两种都读；转账的具体类型（Lend/Repayment）写在一级分类里以便读回。
 - 导入时，指纹不同但「同一秒同类型」且旧指纹已不在文件里的记录视为在 iCost 里改过，原地更新；文件里没有的记录只报告不删除。
+
+## 2026-11-16 录入页共用、同步状态后台写
+
+- iPhone 与 Mac 新增记录都用 QuickEntryView（编辑仍用 TransactionEditor）；输入放进 @Observable EntryInput，按键只重绘键盘；分类统计每次打开读一次。
+- 「图片」不存附件（模型没有图片字段，加字段要改 CloudKit 结构），而是截图识别后填入金额、日期、备注、分类。
+- 同步轮询无变化时不写 sync-state；写入改到后台串行队列，连续多次只写最新一份。

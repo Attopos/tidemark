@@ -10,6 +10,9 @@ import SwiftData
 final class PerfProbe: NSObject {
     static var isOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF"] != nil }
     static var shotsOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_SHOTS"] != nil }
+    static var entryOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF_ENTRY"] != nil }
+    static let openEntry = Notification.Name("probe.openEntry")
+    static let entryKey = Notification.Name("probe.entryKey")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
     /// TIDEMARK_IMPORT_TEST=1: reads Documents/import-test.xlsx the way Import
@@ -66,7 +69,7 @@ final class PerfProbe: NSObject {
         last = link.timestamp
     }
 
-    private func measure(_ work: () -> Void) async -> (worst: Double, stalled: Double, firstFrame: Double) {
+    private func measure(wait: Int = 1500, _ work: () -> Void) async -> (worst: Double, stalled: Double, firstFrame: Double) {
         last = 0; worst = 0; stalled = 0
         let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
         link.add(to: .main, forMode: .common)
@@ -76,9 +79,41 @@ final class PerfProbe: NSObject {
         await Task.yield()
         try? await Task.sleep(for: .milliseconds(1))
         let firstFrame = CACurrentMediaTime() - start
-        try? await Task.sleep(for: .milliseconds(1500))
+        try? await Task.sleep(for: .milliseconds(wait))
         link.invalidate()
         return (worst * 1000, stalled * 1000, firstFrame * 1000)
+    }
+
+    /// TIDEMARK_PERF_ENTRY=1: opens quick entry, taps categories and keys
+    /// (never saves) and logs each tap's worst frame to perf-entry.log.
+    func runEntry(app: AppState) async {
+        try? await Task.sleep(for: .seconds(6))
+        app.section = .ledger
+        try? await Task.sleep(for: .seconds(1))
+        var lines = ["perf-entry \(Date())"]
+        let open = await measure { NotificationCenter.default.post(name: Self.openEntry, object: nil) }
+        lines.append(String(format: "open: worst %.0f ms, stalled %.0f ms", open.worst, open.stalled))
+        let keys = ["cat:0", "1", "2", ".", "5", "+×", "3", "cat:1", "cat:2", "8", "⌫", "−÷", "4", "cat:3", "9", "9",
+                    "noop", "noop", "noop", "noop", "noop", "noop", "noop", "noop"]
+        var worstKey = 0.0, sum = 0.0
+        for key in keys {
+            let r = await measure(wait: 500) { NotificationCenter.default.post(name: Self.entryKey, object: key) }
+            worstKey = max(worstKey, r.worst); sum += r.worst
+            lines.append(String(format: "%@: worst %.0f ms", key, r.worst))
+        }
+        lines.append(String(format: "taps: mean worst %.0f ms, max %.0f ms", sum / Double(keys.count), worstKey))
+        NotificationCenter.default.post(name: Self.entryKey, object: "cat:0")
+        try? await Task.sleep(for: .milliseconds(600))
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            for (i, window) in scene.windows.enumerated() {
+                let data = UIGraphicsImageRenderer(bounds: window.bounds).pngData { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                try? data.write(to: URL.applicationSupportDirectory.appending(path: "entry-shot-\(i).png"))
+            }
+        }
+        let url = URL.applicationSupportDirectory.appending(path: "perf-entry.log")
+        try? (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
     }
 
     func run(app: AppState) async {
