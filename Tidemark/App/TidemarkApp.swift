@@ -28,6 +28,7 @@ struct TidemarkApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(storageError: storageError)
+                .fontDesign(.rounded)
                 .environment(appState)
                 .environment(sync)
                 .frame(minWidth: 600, minHeight: 560)

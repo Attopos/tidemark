@@ -256,7 +256,7 @@ struct QuickEntryView: View {
         HStack(spacing: 0) {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(DS.bgPrimary))
@@ -269,7 +269,7 @@ struct QuickEntryView: View {
             kindSwitch
             Button { showsDate.toggle() } label: {
                 Text(Calendar.current.isDateInToday(date) ? tr("Today") : Fmt.dateMedium.string(from: date))
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(DS.accentText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -288,7 +288,7 @@ struct QuickEntryView: View {
                 let selected = option == kind
                 Button { kind = option } label: {
                     Text(option.displayName)
-                        .font(.system(size: 15, weight: selected ? .bold : .medium))
+                        .font(.system(size: 15, weight: selected ? .semibold : .medium))
                         .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
                         .fixedSize()
                         .padding(.horizontal, 13)
@@ -404,7 +404,7 @@ struct QuickEntryView: View {
                         } label: {
                             EntryChip(text: account?.name ?? tr("Account")) {
                                 Image(systemName: "creditcard.fill")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(DS.ink)
                                     .frame(width: 24, height: 24)
                                     .background(Circle().fill(DS.accent))
@@ -453,7 +453,7 @@ struct QuickEntryView: View {
     @ViewBuilder private var imageChip: some View {
         let label = EntryChip(text: tr("Image")) {
             Image(systemName: readingImage ? "hourglass" : "photo")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .frame(width: 24, height: 24)
                 .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(DS.violet))
@@ -625,7 +625,7 @@ private struct EntryCategoryCell: View {
                         Text(emoji).font(.system(size: size * 0.46))
                     } else {
                         Text(String(parts.label.prefix(1)).uppercased())
-                            .font(.system(size: size * 0.42, weight: .bold))
+                            .font(.system(size: size * 0.42, weight: .semibold))
                             .foregroundStyle(selected ? DS.ink : DS.textPrimary)
                     }
                 }
@@ -633,13 +633,13 @@ private struct EntryCategoryCell: View {
                 .overlay(alignment: .bottomTrailing) {
                     if hasChildren {
                         Image(systemName: "ellipsis.circle.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(DS.bgSecondary, DS.textPrimary)
                             .offset(x: 3, y: 1)
                     }
                 }
                 Text((parts.emoji ?? "") + parts.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -660,7 +660,7 @@ private struct EntryChip<Icon: View>: View {
     var body: some View {
         HStack(spacing: 7) {
             icon()
-            Text(text).font(.system(size: 15, weight: .semibold)).lineLimit(1)
+            Text(text).font(.system(size: 15, weight: .medium)).lineLimit(1)
         }
         .foregroundStyle(DS.textPrimary)
         .padding(.leading, 8)
@@ -720,7 +720,7 @@ private struct EntryPad: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 Text(Fmt.money(input.amount ?? 0, currency))
-                    .font(DS.money(34, weight: .bold))
+                    .font(DS.money(34, weight: .semibold))
                     .foregroundStyle(amountColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -740,7 +740,7 @@ private struct EntryPad: View {
                 HStack(spacing: 5) {
                     Image(systemName: "clock").font(.system(size: 13, weight: .medium))
                     Text(date.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                        .font(.system(size: 15, weight: .medium).monospacedDigit())
                 }
                 .foregroundStyle(DS.textSecondary)
                 .padding(.horizontal, 10)
@@ -753,7 +753,7 @@ private struct EntryPad: View {
                     .onSubmit { padFocused = true }
                 Button(action: onMore) {
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(DS.textPrimary)
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(DS.bgPrimary.opacity(0.6)))
@@ -785,7 +785,7 @@ private struct EntryPad: View {
                 default: Text(key)
                 }
             }
-            .font(.system(size: isDone || isAgain ? 18 : 25, weight: isDone || isAgain ? .bold : .regular)
+            .font(.system(size: isDone || isAgain ? 18 : 25, weight: isDone || isAgain ? .semibold : .regular)
                 .monospacedDigit())
             .foregroundStyle(isDone ? DS.ink : DS.textPrimary)
             .frame(maxWidth: .infinity)

@@ -51,3 +51,8 @@
 - 「图片」不存附件（模型没有图片字段，加字段要改 CloudKit 结构），而是截图识别后填入金额、日期、备注、分类。
 - 同步轮询无变化时不写 sync-state；写入改到后台串行队列，连续多次只写最新一份。
 - 录入页照 iCost 截图 1:1：边距 10pt（不用全局 25pt）、选中色用青柠代替 iCost 的红；右上角在 iCost 是账本，Tidemark 没有账本，改放日期；分类圆圈用按名称匹配的 SF Symbols 线条图标，匹配不到才用 emoji。
+
+## 2026-11-16 字体变轻、变圆
+
+- 用户嫌数字和英文太粗太宽：全 App 改 SF Pro Rounded（根视图 .fontDesign(.rounded)，PageTitle 的字形度量同步用圆体），所有字重降一档（bold→semibold、semibold→medium）。
+- 大号金额（≥24pt）用比例数字，列表里的小金额仍用等宽数字以便对齐。圆体没有 condensed 字宽，所以「窄字宽」这一项没做。

@@ -140,7 +140,7 @@ struct PhoneLedgerView: View {
             }
             HStack(spacing: 8) {
                 Text(monthTitle)
-                    .font(.system(size: 19, weight: .bold).monospacedDigit())
+                    .font(.system(size: 19, weight: .semibold).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                 RoundIconButton(symbol: "chevron.left", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: -1) }
                 RoundIconButton(symbol: "chevron.right", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: 1) }
@@ -150,7 +150,7 @@ struct PhoneLedgerView: View {
                     if showsCalendar { app.cashPeriod = CashPeriod(unit: .month, containing: app.cashPeriod.start) }
                 } label: {
                     Text(tr("Calendar"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(showsCalendar ? DS.ink : DS.textSecondary)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 7)
@@ -180,10 +180,10 @@ struct PhoneLedgerView: View {
     private func summaryCard(_ summary: CashSummary, code: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("Expense"))
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(FlowPalette.expense)
             Text(Fmt.money(summary.expense, code))
-                .font(DS.money(34, weight: .bold))
+                .font(DS.money(34, weight: .semibold))
                 .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -222,7 +222,7 @@ struct PhoneLedgerView: View {
                     Text("\(tr("Inc")) \(Fmt.money(group.income, code))").foregroundStyle(FlowPalette.income)
                 }
             }
-            .font(.system(size: 13, weight: .semibold).monospacedDigit())
+            .font(.system(size: 13, weight: .medium).monospacedDigit())
             .foregroundStyle(DS.textTertiary)
             .lineLimit(1)
             .minimumScaleFactor(0.75)
@@ -277,7 +277,7 @@ struct PhoneLedgerView: View {
     private var addButton: some View {
         Button { creating = true } label: {
             Image(systemName: "plus")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .frame(width: 66, height: 66)
                 .background(DS.accent)

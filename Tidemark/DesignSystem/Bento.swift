@@ -29,7 +29,7 @@ extension DS {
     static let limeDeep = Color(hex: 0x9CB84A)
     static let ink = Color(hex: 0x141414)
 
-    static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .semibold) }
+    static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .medium) }
 }
 
 /// Dark rounded card with an optional title row.
@@ -45,7 +45,7 @@ struct Panel<Content: View, Accessory: View>: View {
                 HStack(spacing: 10) {
                     if let icon {
                         Image(systemName: icon)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(DS.textPrimary)
                             .frame(width: 30, height: 30)
                             .background(DS.tile)
@@ -166,7 +166,7 @@ struct CapsuleSwitch<Value: Hashable>: View {
                 let selected = option == selection
                 Button { selection = option } label: {
                     Text(label(option))
-                        .font(.system(size: compact ? 11.5 : 13, weight: .semibold))
+                        .font(.system(size: compact ? 11.5 : 13, weight: .medium))
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(selected ? DS.ink : DS.textSecondary)
@@ -198,7 +198,7 @@ struct LimeCheckboxStyle: ToggleStyle {
                     )
                     .overlay(
                         Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .heavy))
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(DS.ink)
                             .opacity(configuration.isOn ? 1 : 0)
                     )

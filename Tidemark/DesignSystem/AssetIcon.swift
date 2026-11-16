@@ -174,7 +174,7 @@ struct AssetIcon: View {
     /// Black text on a solid tint disc: the look for anything without a logo.
     private func textBadge(_ text: String, scale: CGFloat) -> some View {
         Text(text)
-            .font(.system(size: size * scale, weight: .heavy))
+            .font(.system(size: size * scale, weight: .bold))
             .foregroundStyle(Color.black)
             .multilineTextAlignment(.center)
             .lineSpacing(-size * 0.06)
@@ -193,7 +193,7 @@ struct AssetIcon: View {
                 duotone(mark.image, key: "index|" + name + symbol, fill: true)
             case .text(let label):
                 Text(label)
-                    .font(.system(size: size * 0.25, weight: .black))
+                    .font(.system(size: size * 0.25, weight: .heavy))
                     .italic()
                     .kerning(-0.3)
                     .foregroundStyle(Color.black)

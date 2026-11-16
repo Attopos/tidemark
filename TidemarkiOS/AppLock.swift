@@ -108,13 +108,13 @@ struct LockScreenView: View {
         VStack(spacing: 18) {
             Spacer()
             Image(systemName: "lock.fill")
-                .font(.system(size: 30, weight: .semibold))
+                .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(DS.heroInk)
                 .frame(width: 72, height: 72)
                 .background(DS.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             Text(tr("Tidemark is locked"))
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(DS.textPrimary)
             if let message = lock.message {
                 Text(message)
@@ -128,7 +128,7 @@ struct LockScreenView: View {
                 Task { await lock.unlock() }
             } label: {
                 Label(trf("Unlock with %@", lock.biometryName), systemImage: lock.biometryIcon)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(DS.heroInk)
                     .frame(maxWidth: .infinity, minHeight: 54)
                     .background(DS.accent)
@@ -148,7 +148,7 @@ struct PrivacyCover: View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
             Image(systemName: "lock.fill")
-                .font(.system(size: 30, weight: .semibold))
+                .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(DS.textSecondary)
         }
     }

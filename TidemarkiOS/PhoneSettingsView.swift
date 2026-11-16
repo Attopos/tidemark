@@ -108,7 +108,7 @@ struct SetupIcon: View {
 
     var body: some View {
         Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 14, weight: .medium))
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)
             .background(color)
@@ -153,7 +153,7 @@ struct SetupLink<Destination: View>: View {
                     Text(value).font(.system(size: 17)).foregroundStyle(DS.textTertiary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(DS.textTertiary)
             }
         }
@@ -182,7 +182,7 @@ struct SetupChoice: View {
             SetupRowLabel(title: title) {
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(DS.accentText)
                 }
             }
@@ -363,7 +363,7 @@ struct ImportDataView: View {
                 Button { picking = true } label: {
                     SetupRowLabel(icon: "doc.badge.plus", color: .indigo, title: tr("Choose an iCost export (.xlsx)")) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
@@ -547,7 +547,7 @@ struct ExportDataView: View {
                     Button { export() } label: {
                         SetupRowLabel(icon: "doc.badge.arrow.up", color: .orange, title: tr("Create export file")) {
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(DS.textTertiary)
                         }
                     }

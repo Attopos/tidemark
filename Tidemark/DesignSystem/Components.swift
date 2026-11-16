@@ -86,7 +86,7 @@ struct AccentButtonStyle: ButtonStyle {
     var prominent = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: 15, weight: .medium))
             .lineLimit(1)
             .foregroundStyle(prominent ? DS.heroInk : DS.accentText)
             .padding(.horizontal, 14)
@@ -146,7 +146,7 @@ struct EmptyStateView: View {
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(DS.textTertiary)
             Text(title)
-                .font(.system(size: 19, weight: .semibold))
+                .font(.system(size: 19, weight: .medium))
                 .foregroundStyle(DS.textPrimary)
             Text(message)
                 .font(DS.body)
@@ -312,7 +312,7 @@ struct AmountsToggle: View {
     var body: some View {
         Button { hidden.toggle() } label: {
             Image(systemName: hidden ? "eye.slash" : "eye")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(DS.textSecondary)
                 .frame(width: 30, height: 30)
                 .background(DS.tile)
@@ -331,7 +331,7 @@ struct FloatingAddButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "plus")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .frame(width: 62, height: 62)
                 .background(DS.accent)

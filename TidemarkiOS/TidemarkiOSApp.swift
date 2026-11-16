@@ -29,6 +29,7 @@ struct TidemarkiOSApp: App {
     var body: some Scene {
         WindowGroup {
             PhoneRootView(storageError: storageError)
+                .fontDesign(.rounded)
                 .environment(appState)
                 .environment(appLock)
                 .environment(sync)
