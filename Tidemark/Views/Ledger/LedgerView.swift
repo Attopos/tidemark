@@ -110,7 +110,7 @@ struct LedgerView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(DS.textTertiary)
             TextField(tr("Search"), text: $search)
                 .textFieldStyle(.plain)
@@ -149,7 +149,7 @@ struct LedgerView: View {
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(DS.textTertiary)
             Text(tr("No records yet"))
-                .font(.system(size: 19, weight: .semibold))
+                .font(.system(size: 19, weight: .medium))
                 .foregroundStyle(DS.textPrimary)
             Text(tr("Add a record, or import a bookkeeping export (.xlsx) from Settings or by dropping it here."))
                 .font(DS.body)
@@ -311,7 +311,7 @@ struct MonthCalendar: View {
         } label: {
             VStack(spacing: 1) {
                 Text("\(calendar.component(.day, from: bucket.start))")
-                    .font(.system(size: 13, weight: isToday ? .bold : .medium))
+                    .font(.system(size: 13, weight: isToday ? .semibold : .medium))
                     .foregroundStyle(selected ? DS.ink : (isToday ? DS.accentText : DS.textPrimary))
                 Text(begun ? "-\(compact(bucket.expense))" : " ")
                     .foregroundStyle(ink ?? (bucket.expense > 0 ? FlowPalette.expense : DS.textTertiary))

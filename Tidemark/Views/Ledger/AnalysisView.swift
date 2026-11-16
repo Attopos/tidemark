@@ -149,7 +149,7 @@ struct SummaryTable: View {
                     Text(tr("Income"))
                     Text(tr("Balance"))
                 }
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 12.5, weight: .medium))
                 .foregroundStyle(DS.textSecondary)
                 Divider().overlay(DS.border)
                 line(tr("Total"), summary.expense, summary.income, summary.balance, strong: true)
@@ -174,7 +174,7 @@ struct SummaryTable: View {
             Text(Fmt.money(balance, code, showSign: true))
                 .foregroundStyle(balance >= 0 ? FlowPalette.income : FlowPalette.expense)
         }
-        .font(.system(size: 13, weight: strong ? .semibold : .regular).monospacedDigit())
+        .font(.system(size: 13, weight: strong ? .medium : .regular).monospacedDigit())
         .lineLimit(1)
     }
 }

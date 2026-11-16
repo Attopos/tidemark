@@ -22,8 +22,8 @@ struct PageTitle<Trailing: View>: View {
         HStack(spacing: 10) {
             Text(title)
                 #if os(iOS)
-                .font(.system(size: Self.size, weight: .bold))
-                .padding(.leading, -TextMetrics.leftBearing(of: title, size: Self.size, weight: .bold))
+                .font(.system(size: Self.size, weight: .semibold))
+                .padding(.leading, -TextMetrics.leftBearing(of: title, size: Self.size, weight: .semibold))
                 #else
                 .font(DS.title(30))
                 #endif
@@ -34,8 +34,8 @@ struct PageTitle<Trailing: View>: View {
             trailing
         }
         #if os(iOS)
-        .frame(height: TextMetrics.lineHeight(size: Self.size, weight: .bold))
-        .padding(.top, DS.phoneTopMargin - TextMetrics.capInset(size: Self.size, weight: .bold))
+        .frame(height: TextMetrics.lineHeight(size: Self.size, weight: .semibold))
+        .padding(.top, DS.phoneTopMargin - TextMetrics.capInset(size: Self.size, weight: .semibold))
         #endif
     }
 }
@@ -44,7 +44,10 @@ struct PageTitle<Trailing: View>: View {
 /// Where a line of system text actually draws inside its frame, so edges of
 /// letters (not of their boxes) can sit on the page margins.
 enum TextMetrics {
-    static func font(size: CGFloat, weight: UIFont.Weight) -> UIFont { .systemFont(ofSize: size, weight: weight) }
+    static func font(size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: weight)
+        return base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: size) } ?? base
+    }
 
     static func lineHeight(size: CGFloat, weight: UIFont.Weight) -> CGFloat { font(size: size, weight: weight).lineHeight }
 
@@ -96,7 +99,7 @@ struct RoundIcon: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.4, weight: .bold))
+            .font(.system(size: size * 0.4, weight: .semibold))
             .foregroundStyle(active ? DS.ink : DS.textPrimary)
             .frame(width: size, height: size)
             .background(active ? DS.accent : DS.tile)

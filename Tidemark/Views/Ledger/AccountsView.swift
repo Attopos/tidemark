@@ -98,7 +98,7 @@ struct AccountsView: View {
                 Toggle(tr("Show archived"), isOn: $showArchived)
             } label: {
                 Text(tr("More"))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(DS.textSecondary)
                     .padding(.horizontal, 12)
                     .frame(height: 30)
@@ -110,7 +110,7 @@ struct AccountsView: View {
             .fixedSize()
             Button { creating = true } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(DS.ink)
                     .frame(width: 30, height: 30)
                     .background(DS.accent)
@@ -138,17 +138,17 @@ struct AccountsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text(tr("Net Assets"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(DS.textSecondary)
                     Button { app.amountsHidden.toggle() } label: {
                         Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(DS.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
                 Text(Fmt.money(net.assets - net.debts, snapshot.code))
-                    .font(DS.money(30, weight: .bold))
+                    .font(DS.money(30, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -183,7 +183,7 @@ struct AccountsView: View {
     private func smallCard(_ title: String, _ value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(DS.ink)
                 .frame(width: 28, height: 28)
                 .background(tint)
@@ -194,7 +194,7 @@ struct AccountsView: View {
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
                 Text(value)
-                    .font(DS.money(15, weight: .semibold))
+                    .font(DS.money(15, weight: .medium))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -232,7 +232,7 @@ struct AccountsView: View {
                     Button { withAnimation(.easeInOut(duration: 0.2)) { toggle(group) } } label: {
                         HStack(spacing: 4) {
                             Text(group.displayName)
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(DS.textPrimary)
                             Text("(\(members.count))")
                                 .font(.system(size: 12.5))
@@ -243,7 +243,7 @@ struct AccountsView: View {
                                 .foregroundStyle(DS.textTertiary)
                                 .lineLimit(1)
                             Image(systemName: folded ? "chevron.right" : "chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(DS.textTertiary)
                         }
                         .padding(.horizontal, 4)
@@ -291,7 +291,7 @@ struct AccountsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(account.name)
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         if !account.includeInNetWorth { TagChip(text: tr("Not counted"), color: DS.textSecondary) }
@@ -307,7 +307,7 @@ struct AccountsView: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(Fmt.money(isCredit ? owed : balance, account.currencyCode))
-                        .font(DS.money(15, weight: .semibold))
+                        .font(DS.money(15, weight: .medium))
                         .foregroundStyle(!isCredit && balance < 0 ? FlowPalette.expense : DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
@@ -381,7 +381,7 @@ struct AccountIcon: View {
 
     var body: some View {
         Text(String(account.name.prefix(1)).uppercased())
-            .font(.system(size: size * 0.4, weight: .bold))
+            .font(.system(size: size * 0.4, weight: .semibold))
             .foregroundStyle(account.group == .payable ? Color.white : DS.ink)
             .frame(width: size, height: size)
             .background(tint)
@@ -584,7 +584,7 @@ struct ReconcileSheet: View {
                     ForEach(accounts) { account in
                         VStack(alignment: .leading, spacing: 6) {
                             Text("\(account.name) · \(account.currencyCode)")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(DS.textPrimary)
                                 .lineLimit(1)
                             HStack(spacing: 10) {

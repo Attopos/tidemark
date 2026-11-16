@@ -278,7 +278,7 @@ struct TransactionEditor: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(DS.textSecondary)
                 }
                 .menuStyle(.borderlessButton)

@@ -81,11 +81,11 @@ struct CategoryIcon: View {
                 Text(emoji).font(.system(size: size * 0.5))
             } else if let symbol = CategoryName.glyph(for: name) ?? (kind.isConsumptionFlow ? nil : kind.icon) {
                 Image(systemName: symbol)
-                    .font(.system(size: size * 0.4, weight: .semibold))
+                    .font(.system(size: size * 0.4, weight: .medium))
                     .foregroundStyle(DS.textPrimary)
             } else {
                 Text(String(parts.label.prefix(1)).uppercased())
-                    .font(.system(size: size * 0.42, weight: .bold))
+                    .font(.system(size: size * 0.42, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
             }
         }
