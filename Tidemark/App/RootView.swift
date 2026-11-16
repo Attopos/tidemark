@@ -53,7 +53,7 @@ struct RootView: View {
         .overlay {
             if dropTargeted { DropHint() }
         }
-        .sheet(isPresented: $app.addingRecord) { TransactionEditor(transaction: nil) }
+        .sheet(isPresented: $app.addingRecord) { QuickEntryView() }
         .sheet(item: $app.pendingReceipt) { TransactionEditor(transaction: nil, draft: $0.draft) }
         .sheet(isPresented: $app.ocrImportPresented) {
             ScreenshotImportFlow()

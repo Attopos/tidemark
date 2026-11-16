@@ -117,6 +117,9 @@ struct PhoneLedgerView: View {
                 .presentationDetents([.large])
         }
         .onChange(of: app.cashPeriod) { _, _ in selectedDay = nil }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openEntry)) { _ in creating = true }
+        #endif
     }
 
     // MARK: Pieces

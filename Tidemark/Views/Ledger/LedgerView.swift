@@ -73,7 +73,7 @@ struct LedgerView: View {
         .background(DS.page)
         .sheet(item: $editing) { TransactionEditor(transaction: $0) }
         .sheet(isPresented: $creating) {
-            TransactionEditor(transaction: nil, defaultDate: selectedDay)
+            QuickEntryView(defaultDate: selectedDay)
         }
         .onChange(of: app.cashPeriod) { _, period in
             let today = Calendar.current.startOfDay(for: Date())

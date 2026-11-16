@@ -330,7 +330,7 @@ final class CloudSync {
             try await push(to: database)
             try await pull(from: database)
             if case .off = phase { return }
-            phase = .idle
+            if phase != .idle { phase = .idle }
         } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
             // The zone went away (or never existed here): start over from local data.
             log("zone missing on the server; creating it and uploading again")
@@ -570,11 +570,16 @@ final class CloudSync {
         while more {
             let changes = try await database.recordZoneChanges(inZoneWith: Self.zoneID, since: token)
             let modifications = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
-            applyFetched(modifications: modifications, deletions: changes.deletions.map(\.recordID.recordName))
+            let deletions = changes.deletions.map(\.recordID.recordName)
+            applyFetched(modifications: modifications, deletions: deletions)
             token = changes.changeToken
-            state.token = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken,
-                                                            requiringSecureCoding: true)
+            let archived = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken,
+                                                             requiringSecureCoding: true)
             more = changes.moreComing
+            // The 2-second poll mostly comes back empty; rewriting the whole
+            // state file then stalled the main thread every time.
+            guard archived != state.token || !modifications.isEmpty || !deletions.isEmpty else { continue }
+            state.token = archived
             persist()
         }
     }
@@ -865,9 +870,12 @@ final class CloudSync {
 
     // MARK: State, log, errors
 
+    private let writer = StateWriter()
+
+    /// Encodes and writes off the main thread; the file is megabytes.
     private func persist() {
-        guard let data = try? JSONEncoder().encode(state) else { return }
-        try? data.write(to: Self.stateURL, options: .atomic)
+        let snapshot = state
+        writer.write(to: Self.stateURL) { try? JSONEncoder().encode(snapshot) }
     }
 
     private func note(_ error: Error, doing what: String) {
@@ -955,3 +963,25 @@ final class SyncPushDelegate: NSObject, NSApplicationDelegate {
     }
 }
 #endif
+
+/// Serial background writes of the sync state; a burst keeps only the latest.
+private final class StateWriter: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.shizhengcao.Tidemark.sync-state", qos: .utility)
+    private let lock = NSLock()
+    private var pending: (() -> Data?)?
+
+    func write(to url: URL, _ encode: @escaping () -> Data?) {
+        lock.lock()
+        let scheduled = pending != nil
+        pending = encode
+        lock.unlock()
+        guard !scheduled else { return }
+        queue.async { [self] in
+            lock.lock()
+            let job = pending
+            pending = nil
+            lock.unlock()
+            if let data = job?() { try? data.write(to: url, options: .atomic) }
+        }
+    }
+}
