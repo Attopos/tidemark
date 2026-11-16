@@ -177,49 +177,40 @@ struct QuickEntryView: View {
     private var account: Account? { accounts.first { $0.id == accountID } }
     private var names: [String] { stats.categories[kind] ?? [] }
     private func subs(_ parent: String) -> [String] { stats.subcategories[kind]?[parent] ?? [] }
-    private var tint: Color { kind == .income ? DS.lime : kind == .expense ? DS.violet : DS.textTertiary }
+
+    /// iCost's entry page sits 10pt from the edges, not the app's usual 25.
+    private static let margin: CGFloat = 10
 
     // MARK: Body
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            if savedCount > 0 {
-                Text(trf("%d recorded", savedCount))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(DS.textTertiary)
-                    .padding(.bottom, 2)
-            }
             if kind == .transfer {
                 transferPickers
                 Spacer(minLength: 0)
             } else {
                 categoryGrid
             }
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 chips
                 if showsDate {
                     DatePicker("", selection: $date)
                         .labelsHidden()
                         .datePickerStyle(.compact)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Self.margin)
                 }
                 EntryPad(input: input, kind: kind, currency: account?.currencyCode ?? "CNY",
-                         category: kind == .transfer ? "" : (subcategory.isEmpty ? category : subcategory),
-                         date: date, onSave: save)
+                         date: date, onMore: openMore, onSave: save)
+                    .padding(.horizontal, Self.margin)
             }
-            .padding(.horizontal, margin)
-            .padding(.top, 12)
+            .padding(.top, 6)
             .padding(.bottom, 8)
-            .background {
-                UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24, style: .continuous)
-                    .fill(DS.panel)
-                    .ignoresSafeArea(edges: .bottom)
-            }
         }
-        .background(DS.page)
+        .background(DS.bgSecondary.ignoresSafeArea())
         #if os(macOS)
-        .frame(width: 460, height: 760)
+        .frame(width: 460, height: 780)
         #endif
         .onAppear(perform: load)
         .onChange(of: kind) { _, _ in
@@ -248,16 +239,9 @@ struct QuickEntryView: View {
         .onReceive(NotificationCenter.default.publisher(for: PerfProbe.entryKey)) { note in
             guard let key = note.object as? String, key != "noop" else { return }
             if key.hasPrefix("cat:"), let i = Int(key.dropFirst(4)), i < names.count { pick(names[i]) }
+            else if key == "sub:0", let first = subs(category).first { subcategory = first }
             else { input.press(key) }
         }
-        #endif
-    }
-
-    private var margin: CGFloat {
-        #if os(iOS)
-        DS.phoneMargin
-        #else
-        20
         #endif
     }
 
@@ -272,47 +256,53 @@ struct QuickEntryView: View {
         HStack(spacing: 0) {
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundStyle(DS.textPrimary)
-                    .frame(width: 40, height: 40)
-                    .background(DS.tile)
-                    .clipShape(Circle())
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(DS.bgPrimary))
+                    .overlay(Circle().strokeBorder(DS.border, lineWidth: 1))
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
             .frame(maxWidth: .infinity, alignment: .leading)
-            CapsuleSwitch(options: Self.kinds, selection: $kind) { $0.displayName }
-                .fixedSize()
-            Group {
-                if kind != .transfer {
-                    Menu {
-                        ForEach(accounts) { item in
-                            Button("\(item.name) · \(item.currencyCode)") { accountID = item.id }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(account?.name ?? tr("Account"))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.textPrimary)
-                        .padding(.horizontal, 11)
-                        .frame(height: 32)
-                        .background(DS.tile)
-                        .clipShape(Capsule())
-                    }
-                    .menuIndicator(.hidden)
-                    .buttonStyle(.plain)
-                    .fixedSize()
-                }
+            kindSwitch
+            Button { showsDate.toggle() } label: {
+                Text(Calendar.current.isDateInToday(date) ? tr("Today") : Fmt.dateMedium.string(from: date))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(DS.accentText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, margin)
-        .padding(.top, 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
         .padding(.bottom, 10)
+    }
+
+    private var kindSwitch: some View {
+        HStack(spacing: 0) {
+            ForEach(Self.kinds, id: \.self) { option in
+                let selected = option == kind
+                Button { kind = option } label: {
+                    Text(option.displayName)
+                        .font(.system(size: 15, weight: selected ? .bold : .medium))
+                        .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
+                        .fixedSize()
+                        .padding(.horizontal, 13)
+                        .frame(height: 30)
+                        .background(Capsule().fill(selected ? DS.bgElevated.opacity(1) : .clear))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Capsule().fill(DS.bgPrimary))
+        .overlay(Capsule().strokeBorder(DS.border, lineWidth: 1))
+        .fixedSize()
     }
 
     // MARK: Categories
@@ -323,32 +313,32 @@ struct QuickEntryView: View {
     }
 
     private var categoryGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 5)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 5)
         let names = names
         let rows = stride(from: 0, to: names.count, by: 5).map { Array(names[$0..<Swift.min($0 + 5, names.count)]) }
         return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(spacing: 18) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    LazyVGrid(columns: columns, spacing: 14) {
+                    LazyVGrid(columns: columns, spacing: 18) {
                         ForEach(row, id: \.self) { name in
-                            CategoryCell(name: name, kind: kind, selected: category == name, size: 48,
-                                         tint: tint, hasChildren: !subs(name).isEmpty) { pick(name) }
+                            EntryCategoryCell(name: name, selected: category == name, size: 46,
+                                              hasChildren: !subs(name).isEmpty) { pick(name) }
                         }
                     }
                     if row.contains(category), !subs(category).isEmpty {
-                        LazyVGrid(columns: columns, spacing: 14) {
+                        LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(subs(category), id: \.self) { name in
-                                CategoryCell(name: name, kind: kind, selected: subcategory == name, size: 40,
-                                             tint: tint, hasChildren: false) {
+                                EntryCategoryCell(name: name, selected: subcategory == name, size: 42,
+                                                  hasChildren: false) {
                                     subcategory = subcategory == name ? "" : name
                                 }
                             }
                         }
                         .padding(.vertical, 14)
-                        .padding(.horizontal, 4)
-                        .background(DS.panel)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+                        .background(DS.bgElevated.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .padding(.horizontal, 6)
+                        .transition(.opacity)
                     }
                 }
                 if names.isEmpty {
@@ -358,7 +348,7 @@ struct QuickEntryView: View {
                         .frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-            .padding(.horizontal, margin)
+            .padding(.horizontal, 4)
             .padding(.top, 4)
             .padding(.bottom, 14)
             .animation(.easeOut(duration: 0.16), value: category)
@@ -373,7 +363,7 @@ struct QuickEntryView: View {
                 .foregroundStyle(DS.textTertiary)
             accountMenu(title: tr("To"), selection: $transferAccountID)
         }
-        .padding(.horizontal, margin)
+        .padding(.horizontal, Self.margin)
         .padding(.vertical, 16)
     }
 
@@ -393,7 +383,7 @@ struct QuickEntryView: View {
             .font(.system(size: 16, weight: .medium))
             .padding(.horizontal, 16)
             .frame(height: 50)
-            .background(DS.panel)
+            .background(DS.bgElevated)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .menuIndicator(.hidden)
@@ -403,40 +393,71 @@ struct QuickEntryView: View {
     // MARK: Chips
 
     private var chips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button { showsDate.toggle() } label: {
-                    EntryChip(icon: "calendar", text: Calendar.current.isDateInToday(date)
-                              ? tr("Today") : Fmt.dateMedium.string(from: date), active: showsDate)
-                }
-                .buttonStyle(.plain)
-                if kind == .expense {
-                    Button { claim.toggle() } label: {
-                        EntryChip(icon: claim ? "checkmark.circle.fill" : "arrow.uturn.left.circle",
-                                  text: tr("Reimburse"), active: claim)
+        HStack(spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if kind != .transfer {
+                        Menu {
+                            ForEach(accounts) { item in
+                                Button("\(item.name) · \(item.currencyCode)") { accountID = item.id }
+                            }
+                        } label: {
+                            EntryChip(text: account?.name ?? tr("Account")) {
+                                Image(systemName: "creditcard.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(DS.ink)
+                                    .frame(width: 24, height: 24)
+                                    .background(Circle().fill(DS.accent))
+                            }
+                        }
+                        .menuIndicator(.hidden)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-                if kind != .transfer {
-                    Button { excluded.toggle() } label: {
-                        EntryChip(icon: excluded ? "eye.slash.fill" : "eye.slash", text: tr("Not counted"),
-                                  active: excluded)
+                    if kind == .expense {
+                        Button { claim.toggle() } label: {
+                            EntryChip(text: tr("Reimburse"), active: claim) {
+                                Image(systemName: claim ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(claim ? DS.accentText : DS.textSecondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    if kind != .transfer {
+                        Button { excluded.toggle() } label: {
+                            EntryChip(text: tr("Not counted"), active: excluded) {
+                                Image(systemName: excluded ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(excluded ? DS.accentText : DS.textSecondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    imageChip
                 }
-                imageChip
-                Button { openMore() } label: {
-                    EntryChip(icon: "ellipsis", text: tr("More"))
-                }
-                .buttonStyle(.plain)
+                .padding(.leading, Self.margin)
+                .padding(.trailing, 4)
             }
-            .padding(.horizontal, margin)
+            Button { openMore() } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(DS.textPrimary)
+                    .frame(width: 34, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, Self.margin)
         }
-        .padding(.horizontal, -margin)
     }
 
     @ViewBuilder private var imageChip: some View {
-        let label = EntryChip(icon: readingImage ? "hourglass" : "photo", text: tr("Image"))
+        let label = EntryChip(text: tr("Image")) {
+            Image(systemName: readingImage ? "hourglass" : "photo")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(DS.ink)
+                .frame(width: 24, height: 24)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(DS.violet))
+        }
         #if os(iOS)
         PhotosPicker(selection: $photo, matching: .images) { label }
             .buttonStyle(.plain)
@@ -486,7 +507,7 @@ struct QuickEntryView: View {
 
     // MARK: Save
 
-    /// Done saves and closes; Again saves and clears for the next one.
+    /// Done saves and closes; Record saves and clears for the next one.
     private func save(closing: Bool) {
         if input.hasOperator {
             input.set(amount: input.amount)
@@ -526,33 +547,103 @@ struct QuickEntryView: View {
 
 // MARK: - Pieces
 
-private struct CategoryCell: View {
+/// Line glyphs for the entry grid, like iCost's; the emoji stays in the label.
+enum EntryGlyph {
+    private static let table: [(words: [String], symbol: String)] = [
+        (["subway", "metro", "地铁"], "tram"),
+        (["train", "火车", "高铁"], "train.side.front.car"),
+        (["taxi", "打车", "出租"], "car"),
+        (["bike", "bicycle", "单车", "自行车"], "bicycle"),
+        (["aircraft", "plane", "flight", "飞机", "机票"], "airplane"),
+        (["bus", "公交"], "bus"),
+        (["car rent", "租车"], "car.side"),
+        (["motor", "摩托", "电动车"], "scooter"),
+        (["parking", "停车"], "parkingsign.circle"),
+        (["relation", "social", "人情", "社交"], "person.2"),
+        (["ferry", "轮渡", "船"], "ferry"),
+        (["transp", "交通"], "tram"),
+        (["meal", "正餐", "饭"], "fork.knife"),
+        (["fruit", "水果"], "carrot"),
+        (["bread", "面包"], "takeoutbag.and.cup.and.straw"),
+        (["cook", "做饭", "买菜"], "frying.pan"),
+        (["protein", "肉", "蛋"], "fish"),
+        (["sweet", "dessert", "甜"], "birthday.cake"),
+        (["vege", "蔬菜"], "leaf"),
+        (["snack", "零食"], "popcorn"),
+        (["food", "餐", "吃"], "fork.knife"),
+        (["drink", "coffee", "tea", "饮", "咖啡", "奶茶"], "cup.and.saucer"),
+        (["accom", "rent", "hotel", "住", "房"], "building.2"),
+        (["daily", "日用"], "basket"),
+        (["digital", "数码", "phone", "手机"], "iphone"),
+        (["sport", "gym", "fitness", "运动", "健身"], "figure.run"),
+        (["travel", "旅"], "globe.asia.australia"),
+        (["entertain", "game", "娱乐", "游戏"], "gamecontroller"),
+        (["movie", "电影"], "film"),
+        (["study", "learn", "course", "学", "书"], "book"),
+        (["work", "office", "工作", "办公"], "briefcase"),
+        (["outfit", "cloth", "衣", "服"], "tshirt"),
+        (["pet", "cat", "dog", "宠"], "pawprint"),
+        (["health", "medic", "hospital", "医", "药"], "waveform.path.ecg"),
+        (["beauty", "美"], "sparkles"),
+        (["invest", "投资"], "chart.line.uptrend.xyaxis"),
+        (["insur", "保险"], "shield"),
+        (["utilit", "electric", "水电"], "bolt"),
+        (["subscri", "订阅", "会员"], "repeat"),
+        (["salary", "工资", "薪"], "banknote"),
+        (["part time", "兼职", "freelance"], "clock"),
+        (["bonus", "奖金"], "star"),
+        (["interest", "利息", "dividend", "分红"], "percent"),
+        (["refund", "退款"], "arrow.uturn.backward"),
+        (["resale", "二手"], "arrow.triangle.2.circlepath"),
+        (["gift", "favor", "红包", "礼"], "gift"),
+    ]
+
+    static func symbol(for name: String) -> String? {
+        let label = CategoryName.label(name).lowercased()
+        return table.first { $0.words.contains(where: label.contains) }?.symbol
+    }
+}
+
+private struct EntryCategoryCell: View {
     let name: String
-    let kind: TransactionKind
     let selected: Bool
     let size: CGFloat
-    let tint: Color
     let hasChildren: Bool
     let action: () -> Void
 
     var body: some View {
+        let parts = CategoryName.split(name)
         Button(action: action) {
-            VStack(spacing: 6) {
-                CategoryIcon(name: name, kind: kind, size: size)
-                    .background(Circle().fill(selected ? tint : .clear))
-                    .overlay(alignment: .bottomTrailing) {
-                        if hasChildren {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .font(.system(size: 12))
-                                .foregroundStyle(DS.textPrimary, DS.panel)
-                                .offset(x: 2, y: 2)
-                        }
+            VStack(spacing: 7) {
+                ZStack {
+                    Circle().fill(selected ? DS.accent : DS.bgElevated)
+                    if let symbol = EntryGlyph.symbol(for: name) {
+                        Image(systemName: symbol)
+                            .font(.system(size: size * 0.42, weight: .regular))
+                            .foregroundStyle(selected ? DS.ink : DS.textPrimary)
+                    } else if let emoji = parts.emoji {
+                        Text(emoji).font(.system(size: size * 0.46))
+                    } else {
+                        Text(String(parts.label.prefix(1)).uppercased())
+                            .font(.system(size: size * 0.42, weight: .bold))
+                            .foregroundStyle(selected ? DS.ink : DS.textPrimary)
                     }
-                Text(CategoryName.label(name))
-                    .font(.system(size: 11.5, weight: selected ? .bold : .medium))
-                    .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
+                }
+                .frame(width: size, height: size)
+                .overlay(alignment: .bottomTrailing) {
+                    if hasChildren {
+                        Image(systemName: "ellipsis.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(DS.bgSecondary, DS.textPrimary)
+                            .offset(x: 3, y: 1)
+                    }
+                }
+                Text((parts.emoji ?? "") + parts.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 2)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -561,21 +652,21 @@ private struct CategoryCell: View {
     }
 }
 
-private struct EntryChip: View {
-    let icon: String
+private struct EntryChip<Icon: View>: View {
     let text: String
     var active = false
+    @ViewBuilder let icon: () -> Icon
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 12, weight: .semibold))
-            Text(text).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+        HStack(spacing: 7) {
+            icon()
+            Text(text).font(.system(size: 15, weight: .semibold)).lineLimit(1)
         }
-        .foregroundStyle(active ? DS.ink : DS.textPrimary)
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(active ? DS.accent : DS.tile)
-        .clipShape(Capsule())
+        .foregroundStyle(DS.textPrimary)
+        .padding(.leading, 8)
+        .padding(.trailing, 13)
+        .frame(height: 36)
+        .background(Capsule().fill(active ? DS.accentDark : DS.bgElevated))
     }
 }
 
@@ -584,20 +675,21 @@ private struct EntryPad: View {
     @Bindable var input: EntryInput
     let kind: TransactionKind
     let currency: String
-    let category: String
     let date: Date
+    let onMore: () -> Void
     let onSave: (_ closing: Bool) -> Void
     @FocusState private var padFocused: Bool
 
-    private static let rows = [["1", "2", "3", "⌫"], ["4", "5", "6", "+×"],
-                               ["7", "8", "9", "−÷"], ["again", "0", ".", "done"]]
+    private static let rows = [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
+                               ["7", "8", "9", "again"], [".", "0", "⌫", "done"]]
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             card
-            VStack(spacing: 8) {
+                .padding(.bottom, 4)
+            VStack(spacing: 7) {
                 ForEach(Self.rows, id: \.self) { row in
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         ForEach(row, id: \.self) { key($0) }
                     }
                 }
@@ -620,53 +712,59 @@ private struct EntryPad: View {
         #endif
     }
 
+    private var amountColor: Color {
+        kind == .income ? FlowPalette.income : kind == .expense ? FlowPalette.expense : DS.textPrimary
+    }
+
     private var card: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
-                if !category.isEmpty {
-                    CategoryIcon(name: category, kind: kind, size: 28)
-                    Text(CategoryName.label(category))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.textSecondary)
-                        .lineLimit(1)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Text(Fmt.money(input.amount ?? 0, currency))
+                    .font(DS.money(34, weight: .bold))
+                    .foregroundStyle(amountColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .layoutPriority(1)
                 Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 1) {
-                    if input.hasOperator {
-                        Text(input.expression)
-                            .font(.system(size: 13).monospacedDigit())
-                            .foregroundStyle(DS.textTertiary)
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                    }
-                    Text(Fmt.money(input.amount ?? 0, currency))
-                        .font(DS.money(32, weight: .bold))
-                        .foregroundStyle(kind == .income ? FlowPalette.income
-                                         : kind == .expense ? FlowPalette.expense : DS.textPrimary)
+                if input.hasOperator {
+                    Text(input.expression)
+                        .font(.system(size: 14).monospacedDigit())
+                        .foregroundStyle(DS.textTertiary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5)
+                        .truncationMode(.head)
                 }
-                .layoutPriority(1)
             }
+            .frame(height: 62)
             Divider().overlay(DS.border)
-            HStack(spacing: 8) {
-                Text(date.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 13, weight: .medium).monospacedDigit())
-                    .foregroundStyle(DS.textSecondary)
-                    .padding(.horizontal, 9)
-                    .frame(height: 26)
-                    .background(DS.tile)
-                    .clipShape(Capsule())
+            HStack(spacing: 10) {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock").font(.system(size: 13, weight: .medium))
+                    Text(date.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                }
+                .foregroundStyle(DS.textSecondary)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(Capsule().fill(DS.bgPrimary.opacity(0.6)))
                 TextField(tr("Add a note"), text: $input.note)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15))
+                    .font(.system(size: 16))
                     .foregroundStyle(DS.textPrimary)
                     .onSubmit { padFocused = true }
+                Button(action: onMore) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(DS.textPrimary)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(DS.bgPrimary.opacity(0.6)))
+                }
+                .buttonStyle(.plain)
             }
+            .frame(height: 50)
         }
-        .padding(14)
-        .background(DS.page)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal, 16)
+        .background(DS.bgElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func key(_ key: String) -> some View {
@@ -679,7 +777,7 @@ private struct EntryPad: View {
         } label: {
             Group {
                 switch key {
-                case "⌫": Image(systemName: "delete.left")
+                case "⌫": Image(systemName: "delete.left.fill").font(.system(size: 22))
                 case "+×": Text("+ ×")
                 case "−÷": Text("− ÷")
                 case "again": Text(tr("Again"))
@@ -687,13 +785,13 @@ private struct EntryPad: View {
                 default: Text(key)
                 }
             }
-            .font(.system(size: isDone || isAgain ? 17 : 23, weight: isDone || isAgain ? .bold : .medium)
+            .font(.system(size: isDone || isAgain ? 18 : 25, weight: isDone || isAgain ? .bold : .regular)
                 .monospacedDigit())
             .foregroundStyle(isDone ? DS.ink : DS.textPrimary)
             .frame(maxWidth: .infinity)
             .frame(height: keyHeight)
-            .background(isDone ? DS.accent : DS.tile)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(isDone ? DS.accent : DS.bgElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -701,7 +799,7 @@ private struct EntryPad: View {
 
     private var keyHeight: CGFloat {
         #if os(iOS)
-        52
+        49
         #else
         44
         #endif

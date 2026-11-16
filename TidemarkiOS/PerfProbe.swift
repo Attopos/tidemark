@@ -102,7 +102,10 @@ final class PerfProbe: NSObject {
             lines.append(String(format: "%@: worst %.0f ms", key, r.worst))
         }
         lines.append(String(format: "taps: mean worst %.0f ms, max %.0f ms", sum / Double(keys.count), worstKey))
-        NotificationCenter.default.post(name: Self.entryKey, object: "cat:0")
+        for key in ["cat:0", "sub:0", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫"] {
+            NotificationCenter.default.post(name: Self.entryKey, object: key)
+            try? await Task.sleep(for: .milliseconds(150))
+        }
         try? await Task.sleep(for: .milliseconds(600))
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
             for (i, window) in scene.windows.enumerated() {
