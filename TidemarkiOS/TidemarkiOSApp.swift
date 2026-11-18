@@ -30,6 +30,7 @@ struct TidemarkiOSApp: App {
         WindowGroup {
             PhoneRootView(storageError: storageError)
                 .fontDesign(.rounded)
+                .monospacedDigit()
                 .environment(appState)
                 .environment(appLock)
                 .environment(sync)

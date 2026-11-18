@@ -1,45 +1,45 @@
 import SwiftUI
 
 enum AccountBrand: Equatable {
+    case emblem(String)
+    case glyph(String, color: UInt32)
     case bank(mark: String, color: UInt32)
     case symbol(String, color: UInt32)
-    case wordmark(String, color: UInt32)
     case flag(String)
     case mastercard
 
-    private static let banks: [(words: [String], mark: String, color: UInt32)] = [
-        (["cmbc", "民生"], "民", 0x00A0E9),
-        (["bocom", "交通银行", "交行"], "交", 0x1D2088),
-        (["boc", "中国银行", "中行", "bank of china"], "中", 0xB81C22),
-        (["icbc", "工商", "工行"], "工", 0xC7000B),
-        (["ccb", "建设银行", "建行"], "建", 0x0066B3),
-        (["abc", "农业银行", "农行"], "农", 0x00936B),
-        (["cmb", "招商", "招行"], "招", 0xD7000F),
-        (["citic", "中信"], "信", 0xE60012),
-        (["psbc", "邮储", "邮政"], "邮", 0x007F3D),
-        (["spdb", "浦发"], "浦", 0x0E3E8E),
-        (["cib", "兴业"], "兴", 0x004B9C),
-        (["ceb", "光大"], "光", 0x6B2C91),
-        (["pingan", "平安"], "平", 0xFF6600),
-        (["cgb", "广发"], "广", 0xC8102E),
-        (["hxb", "华夏"], "华", 0xD7000F),
-        (["webank", "微众"], "微", 0x2F6BFF),
-        (["hsbc", "汇丰"], "H", 0xDB0011),
-        (["revolut"], "R", 0x191C1F),
-        (["wise"], "W", 0x9FE870),
-        (["paypal"], "P", 0x003087),
+    private static let banks: [(words: [String], brand: AccountBrand)] = [
+        (["cmbc", "民生"], .emblem("acct-cmbc")),
+        (["bocom", "交通银行", "交行"], .emblem("acct-bocom")),
+        (["boc", "中国银行", "中行", "bank of china"], .emblem("acct-boc")),
+        (["icbc", "工商", "工行"], .emblem("acct-icbc")),
+        (["ccb", "建设银行", "建行"], .emblem("acct-ccb")),
+        (["abc", "农业银行", "农行"], .emblem("acct-abc")),
+        (["cmb", "招商", "招行"], .emblem("acct-cmb")),
+        (["citic", "中信"], .emblem("acct-citic")),
+        (["psbc", "邮储", "邮政"], .emblem("acct-psbc")),
+        (["spdb", "浦发"], .emblem("acct-spdb")),
+        (["cib", "兴业"], .emblem("acct-cib")),
+        (["bob", "北京银行"], .emblem("acct-bob")),
+        (["bosh", "上海银行"], .emblem("acct-bosh")),
+        (["hsbc", "汇丰"], .glyph("acct-hsbc", color: 0xDB0011)),
+        (["revolut"], .glyph("acct-revolut", color: 0x191C1F)),
+        (["wise"], .glyph("acct-wise", color: 0x163300)),
+        (["paypal"], .glyph("acct-paypal", color: 0x003087)),
+        (["ceb", "光大"], .bank(mark: "光", color: 0x6B2C91)),
+        (["pingan", "平安"], .bank(mark: "平", color: 0xFF6600)),
+        (["cgb", "广发"], .bank(mark: "广", color: 0xC8102E)),
+        (["hxb", "华夏"], .bank(mark: "华", color: 0xD7000F)),
+        (["webank", "微众"], .bank(mark: "微", color: 0x2F6BFF)),
     ]
 
-    private static let flags: [String: String] = [
-        "CNY": "🇨🇳", "USD": "🇺🇸", "EUR": "🇪🇺", "THB": "🇹🇭", "KRW": "🇰🇷", "VND": "🇻🇳", "EGP": "🇪🇬",
-        "GEL": "🇬🇪", "TRY": "🇹🇷", "JPY": "🇯🇵", "HKD": "🇭🇰", "GBP": "🇬🇧", "TWD": "🇹🇼", "SGD": "🇸🇬",
-        "AUD": "🇦🇺", "CAD": "🇨🇦", "CHF": "🇨🇭", "MOP": "🇲🇴", "MYR": "🇲🇾", "IDR": "🇮🇩", "PHP": "🇵🇭",
-        "INR": "🇮🇳", "AED": "🇦🇪", "RUB": "🇷🇺", "MXN": "🇲🇽", "NZD": "🇳🇿",
+    static let flagCurrencies: Set<String> = [
+        "CNY", "USD", "EUR", "THB", "KRW", "VND", "EGP", "GEL", "TRY", "JPY", "HKD", "GBP", "TWD", "SGD",
+        "AUD", "CAD", "CHF", "MOP", "MYR", "IDR", "PHP", "INR", "AED", "RUB", "MXN", "NZD",
     ]
 
     private static func currencyIn(_ name: String) -> String? {
-        let words = name.uppercased().split { !$0.isLetter }.map(String.init)
-        return words.first { flags[$0] != nil }
+        name.uppercased().split { !$0.isLetter }.map(String.init).first { flagCurrencies.contains($0) }
     }
 
     static func match(name: String, typeLabel: String, currency: String, isCash: Bool) -> AccountBrand? {
@@ -50,23 +50,20 @@ enum AccountBrand: Equatable {
                 return text.split { !$0.isLetter }.contains { $0 == Substring(word) }
             }
         }
-        if has(["wechat", "微信", "weixin"]) { return .symbol("bubble.left.and.bubble.right.fill", color: 0x07C160) }
-        if has(["yeb", "余额宝", "yu'e", "yue bao"]) || text.contains("yu'e bao") { return .wordmark("余", color: 0xFF6A00) }
-        if has(["alipay", "支付宝", "花呗", "huabei"]) { return .wordmark("支", color: 0x1677FF) }
-        if has(["unionpay", "银联"]) { return .wordmark("银联", color: 0xE21836) }
-        for bank in banks where has(bank.words) { return .bank(mark: bank.mark, color: bank.color) }
-        if has(["visa"]) { return .wordmark("VISA", color: 0x1A1F71) }
+        if has(["wechat", "微信", "weixin"]) { return .glyph("acct-wechat", color: 0x07C160) }
+        if has(["yeb", "余额宝", "yu'e", "yue bao"]) { return .glyph("acct-alipay", color: 0xFF6A00) }
+        if has(["alipay", "支付宝", "花呗", "huabei"]) { return .glyph("acct-alipay", color: 0x1677FF) }
+        for bank in banks where has(bank.words) { return bank.brand }
+        if has(["visa"]) { return .glyph("acct-visa", color: 0x1A1F71) }
         if has(["mastercard", "master"]) { return .mastercard }
-        if has(["t-money", "tmoney", "octopus", "transit", "metro", "公交", "地铁", "交通卡", "suica"]) || text.contains("t-money") {
+        if has(["t-money", "tmoney", "octopus", "transit", "metro", "公交", "地铁", "交通卡", "suica"]) {
             return .symbol("tram.fill", color: 0x2E8BFF)
         }
         if has(["coffee", "cafe", "咖啡", "starbucks", "luckin"]) { return .symbol("cup.and.saucer.fill", color: 0x8B5A3C) }
         if has(["shop", "store", "店", "超市", "mall"]) { return .symbol("bag.fill", color: 0xE07A2F) }
         if isCash || has(["cash", "现金"]) {
-            if let code = currencyIn(name) ?? (flags[currency.uppercased()] != nil ? currency.uppercased() : nil),
-               let flag = flags[code] {
-                return .flag(flag)
-            }
+            let code = currencyIn(name) ?? currency.uppercased()
+            if flagCurrencies.contains(code) { return .flag(code) }
             return .symbol("banknote.fill", color: 0x3BA55C)
         }
         return nil
@@ -79,6 +76,19 @@ extension Account {
     }
 }
 
+enum AccountIconImages {
+    @MainActor private static var cache: [String: PlatformImage] = [:]
+
+    @MainActor
+    static func image(_ name: String) -> PlatformImage? {
+        if let hit = cache[name] { return hit }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
+              let image = PlatformImage.load(url) else { return nil }
+        cache[name] = image
+        return image
+    }
+}
+
 struct AccountBrandBadge: View {
     let brand: AccountBrand
     var size: CGFloat
@@ -87,12 +97,35 @@ struct AccountBrandBadge: View {
         content
             .frame(width: size, height: size)
             .clipShape(Circle())
-            .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func picture(_ name: String) -> some View {
+        if let image = AccountIconImages.image(name) {
+            Image(platformImage: image).resizable().interpolation(.high).scaledToFit()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
         switch brand {
+        case .emblem(let name):
+            ZStack {
+                Circle().fill(Color.white)
+                picture(name).padding(size * 0.17)
+            }
+        case .glyph(let name, let color):
+            ZStack {
+                Circle().fill(Color(hex: color))
+                picture(name)
+                    .colorInvert()
+                    .padding(size * 0.24)
+            }
+        case .flag(let code):
+            ZStack {
+                Circle().fill(Color.white)
+                picture("flag-\(code.lowercased())")
+            }
         case .bank(let mark, let color):
             ZStack {
                 Circle().fill(Color.white)
@@ -107,23 +140,6 @@ struct AccountBrandBadge: View {
                 Image(systemName: name)
                     .font(.system(size: size * 0.42, weight: .regular))
                     .foregroundStyle(.white)
-            }
-        case .wordmark(let text, let color):
-            ZStack {
-                Circle().fill(Color(hex: color))
-                Text(text)
-                    .font(.system(size: size * (text.count > 2 ? 0.26 : 0.42), weight: .semibold, design: .default))
-                    .italic(text == "VISA")
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.5)
-                    .padding(.horizontal, size * 0.1)
-            }
-        case .flag(let flag):
-            ZStack {
-                Circle().fill(Color.white)
-                Text(flag)
-                    .font(.system(size: size * 1.25))
-                    .fixedSize()
             }
         case .mastercard:
             ZStack {

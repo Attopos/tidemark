@@ -29,6 +29,7 @@ struct TidemarkApp: App {
         WindowGroup {
             RootView(storageError: storageError)
                 .fontDesign(.rounded)
+                .monospacedDigit()
                 .environment(appState)
                 .environment(sync)
                 .frame(minWidth: 600, minHeight: 560)
