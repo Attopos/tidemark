@@ -134,10 +134,8 @@ enum DS {
     static let body = Font.system(size: 15)
     static let caption = Font.system(size: 13.5)
 
-    /// Monetary figures: tabular in lists so columns line up, proportional
-    /// when large and alone (tabular 1s and dots look gappy and wide).
     static func money(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        size >= 24 ? .system(size: size, weight: weight) : .system(size: size, weight: weight).monospacedDigit()
+        .system(size: size, weight: weight).monospacedDigit()
     }
     static let moneyHero = money(40, weight: .medium)
     static let moneyLarge = money(28, weight: .medium)
