@@ -100,7 +100,7 @@ struct PhoneLedgerView: View {
             addButton
         }
         .background(DS.page)
-        .sheet(item: $editing) { TransactionEditor(transaction: $0) }
+        .sheet(item: $editing) { RecordDetailView(transaction: $0) }
         .sheet(item: $pendingReceipt) { TransactionEditor(transaction: nil, draft: $0.draft) }
         .onChange(of: receiptItem) { _, item in
             guard let item else { return }
@@ -119,6 +119,9 @@ struct PhoneLedgerView: View {
         .onChange(of: app.cashPeriod) { _, _ in selectedDay = nil }
         #if DEBUG
         .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openEntry)) { _ in creating = true }
+        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openDetail)) { _ in
+            editing = transactions.first { !$0.address.isEmpty } ?? transactions.first
+        }
         #endif
     }
 
@@ -140,7 +143,7 @@ struct PhoneLedgerView: View {
             }
             HStack(spacing: 8) {
                 Text(monthTitle)
-                    .font(.system(size: 19, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 19, weight: .medium).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                 RoundIconButton(symbol: "chevron.left", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: -1) }
                 RoundIconButton(symbol: "chevron.right", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: 1) }
@@ -150,7 +153,7 @@ struct PhoneLedgerView: View {
                     if showsCalendar { app.cashPeriod = CashPeriod(unit: .month, containing: app.cashPeriod.start) }
                 } label: {
                     Text(tr("Calendar"))
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(showsCalendar ? DS.ink : DS.textSecondary)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 7)
@@ -180,10 +183,10 @@ struct PhoneLedgerView: View {
     private func summaryCard(_ summary: CashSummary, code: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("Expense"))
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(FlowPalette.expense)
             Text(Fmt.money(summary.expense, code))
-                .font(DS.money(34, weight: .semibold))
+                .font(DS.money(34, weight: .medium))
                 .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -222,11 +225,10 @@ struct PhoneLedgerView: View {
                     Text("\(tr("Inc")) \(Fmt.money(group.income, code))").foregroundStyle(FlowPalette.income)
                 }
             }
-            .font(.system(size: 13, weight: .medium).monospacedDigit())
+            .font(.system(size: 13, weight: .regular).monospacedDigit())
             .foregroundStyle(DS.textTertiary)
             .lineLimit(1)
             .minimumScaleFactor(0.75)
-            .padding(.horizontal, 4)
 
             VStack(spacing: 0) {
                 ForEach(Array(group.records.enumerated()), id: \.element.id) { index, record in
@@ -234,7 +236,7 @@ struct PhoneLedgerView: View {
                         .padding(.vertical, 4)
                         .onTapGesture { editing = record }
                         .contextMenu {
-                            Button(tr("Edit…")) { editing = record }
+                            Button(tr("Details…")) { editing = record }
                             if record.claimStatus == .pending {
                                 Button(tr("Mark as claimed")) {
                                     record.claimAmount = record.amount - record.refundAmount
@@ -277,7 +279,7 @@ struct PhoneLedgerView: View {
     private var addButton: some View {
         Button { creating = true } label: {
             Image(systemName: "plus")
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 28, weight: .medium))
                 .foregroundStyle(DS.ink)
                 .frame(width: 66, height: 66)
                 .background(DS.accent)

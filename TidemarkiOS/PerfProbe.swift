@@ -12,6 +12,7 @@ final class PerfProbe: NSObject {
     static var shotsOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_SHOTS"] != nil }
     static var entryOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF_ENTRY"] != nil }
     static let openEntry = Notification.Name("probe.openEntry")
+    static let openDetail = Notification.Name("probe.openDetail")
     static let entryKey = Notification.Name("probe.entryKey")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
@@ -40,19 +41,27 @@ final class PerfProbe: NSObject {
     func shoot(app: AppState) async {
         try? await Task.sleep(for: .seconds(5))
         let hidden = app.amountsHidden
-        app.amountsHidden = true
+        app.amountsHidden = ProcessInfo.processInfo.environment["TIDEMARK_SHOTS_AMOUNTS"] == nil
+        func capture(_ name: String) {
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+            for (index, window) in scene.windows.enumerated() where !window.isHidden {
+                let data = UIGraphicsImageRenderer(bounds: window.bounds).pngData { _ in
+                    window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                }
+                try? data.write(to: URL.applicationSupportDirectory.appending(path: "shot-\(name)-\(index).png"))
+            }
+        }
         for section in AppSection.allCases {
             app.section = section
             try? await Task.sleep(for: .milliseconds(1500))
-            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                  let window = scene.windows.first(where: \.isKeyWindow) ?? scene.windows.first else { continue }
-            let data = UIGraphicsImageRenderer(bounds: window.bounds).pngData { _ in
-                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-            }
-            try? data.write(to: URL.applicationSupportDirectory.appending(path: "shot-\(section.rawValue).png"))
+            capture(section.rawValue)
         }
-        app.amountsHidden = hidden
         app.section = .ledger
+        try? await Task.sleep(for: .milliseconds(1000))
+        NotificationCenter.default.post(name: Self.openDetail, object: nil)
+        try? await Task.sleep(for: .milliseconds(1500))
+        capture("detail")
+        app.amountsHidden = hidden
     }
 
     private var link: CADisplayLink?

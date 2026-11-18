@@ -31,7 +31,7 @@ struct ScreenshotImportFlow: View {
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 13.5, weight: .regular))
                         .foregroundStyle(DS.textSecondary)
                 }
                 .buttonStyle(.plain)
@@ -63,7 +63,7 @@ struct ScreenshotImportFlow: View {
                                 .font(.system(size: 36))
                                 .foregroundStyle(DS.accentText)
                             Text(tr("Saved to Portfolio"))
-                                .font(.system(size: 18, weight: .semibold))
+                                .font(.system(size: 18, weight: .medium))
                                 .foregroundStyle(DS.textPrimary)
                             Text(session.savedSummary)
                                 .font(DS.body)
@@ -440,7 +440,7 @@ private struct MissingHoldingsCard: View {
         if session.missing.contains(where: { !updated.contains($0.id) }) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(tr("Not in this screenshot"))
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
                 Text(tr("Tick the ones you no longer hold. They are marked as sold on the valuation date; their history is kept."))
                     .font(.system(size: 12))
@@ -490,7 +490,7 @@ private struct DraftCard: View {
                     .labelsHidden()
                 TextField(holding.platform == .binance ? tr("Asset name") : tr("Fund name"), text: $holding.name)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
                 flaggedIcon("name")
                 TextField(tr("Code"), text: $holding.code)
@@ -501,7 +501,7 @@ private struct DraftCard: View {
                 Spacer()
                 if let reason = holding.excludedReason {
                     Text(reason)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(DS.textSecondary)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2.5)
@@ -528,7 +528,7 @@ private struct DraftCard: View {
                         .help(tr("Similar name, not identical. Click to update that holding instead of adding a new one."))
                     }
                     Text(tr("new"))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(DS.positive)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2.5)

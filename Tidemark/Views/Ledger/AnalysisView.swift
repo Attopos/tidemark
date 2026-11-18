@@ -80,7 +80,7 @@ struct AnalysisView: View {
             }
         }
         .background(DS.page)
-        .sheet(item: $editing) { TransactionEditor(transaction: $0) }
+        .sheet(item: $editing) { RecordDetailView(transaction: $0) }
     }
 
     private func figuresPanel(_ summary: CashSummary, code: String) -> some View {
@@ -149,7 +149,7 @@ struct SummaryTable: View {
                     Text(tr("Income"))
                     Text(tr("Balance"))
                 }
-                .font(.system(size: 12.5, weight: .medium))
+                .font(.system(size: 12.5, weight: .regular))
                 .foregroundStyle(DS.textSecondary)
                 Divider().overlay(DS.border)
                 line(tr("Total"), summary.expense, summary.income, summary.balance, strong: true)

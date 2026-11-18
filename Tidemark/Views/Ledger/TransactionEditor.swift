@@ -148,7 +148,7 @@ struct TransactionEditor: View {
                         }
                     } label: {
                         Label(tr("Template"), systemImage: "square.on.square")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 13, weight: .regular))
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
@@ -278,7 +278,7 @@ struct TransactionEditor: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(DS.textSecondary)
                 }
                 .menuStyle(.borderlessButton)

@@ -71,7 +71,7 @@ struct LedgerView: View {
             }
         }
         .background(DS.page)
-        .sheet(item: $editing) { TransactionEditor(transaction: $0) }
+        .sheet(item: $editing) { RecordDetailView(transaction: $0) }
         .sheet(isPresented: $creating) {
             QuickEntryView(defaultDate: selectedDay)
         }
@@ -110,7 +110,7 @@ struct LedgerView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(DS.textTertiary)
             TextField(tr("Search"), text: $search)
                 .textFieldStyle(.plain)
@@ -149,7 +149,7 @@ struct LedgerView: View {
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(DS.textTertiary)
             Text(tr("No records yet"))
-                .font(.system(size: 19, weight: .medium))
+                .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(DS.textPrimary)
             Text(tr("Add a record, or import a bookkeeping export (.xlsx) from Settings or by dropping it here."))
                 .font(DS.body)
@@ -288,7 +288,7 @@ struct MonthCalendar: View {
             HStack(spacing: 4) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(.system(size: 11.5, weight: .regular))
                         .foregroundStyle(DS.textTertiary)
                         .frame(maxWidth: .infinity)
                 }
@@ -318,7 +318,7 @@ struct MonthCalendar: View {
                 Text(begun ? "+\(compact(bucket.income))" : " ")
                     .foregroundStyle(ink ?? (bucket.income > 0 ? FlowPalette.income : DS.textTertiary))
             }
-            .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+            .font(.system(size: 9.5, weight: .regular).monospacedDigit())
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .frame(maxWidth: .infinity)

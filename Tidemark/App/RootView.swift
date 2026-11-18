@@ -147,16 +147,16 @@ private struct SectionRail: View {
         return Button { selection = section } label: {
             VStack(spacing: 4) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .regular))
                     .overlay(alignment: .topTrailing) {
                         if let badge {
                             Image(systemName: badge)
-                                .font(.system(size: 8, weight: .semibold))
+                                .font(.system(size: 8, weight: .medium))
                                 .offset(x: 9, y: -5)
                         }
                     }
                 Text(section.title)
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(.system(size: 10.5, weight: .regular))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -181,7 +181,7 @@ private struct PortfolioLock: View {
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(DS.textTertiary)
             Text(tr("Portfolio is locked"))
-                .font(.system(size: 19, weight: .medium))
+                .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(DS.textPrimary)
             Text(tr("Use your Mac password or Touch ID to open it. It locks again when you leave the page or the app."))
                 .font(DS.body)
@@ -214,11 +214,11 @@ private struct ImportNotice: View {
             Image(systemName: failed ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .foregroundStyle(failed ? DS.warning : DS.accentText)
             Text(message)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(DS.textPrimary)
             Button(action: dismiss) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(DS.textSecondary)
             }
             .buttonStyle(.plain)
@@ -243,7 +243,7 @@ private struct DropHint: View {
                     .foregroundStyle(DS.accentText)
                 Text(app.section == .portfolio ? tr("Drop holdings screenshots to import")
                      : tr("Drop a receipt screenshot or a bookkeeping export"))
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
             }
             .padding(28)

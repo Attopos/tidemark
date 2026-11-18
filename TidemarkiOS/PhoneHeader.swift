@@ -11,7 +11,7 @@ struct PhoneHeader<Leading: View, Trailing: View>: View {
     var body: some View {
         ZStack {
             Text(title)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .regular))
                 .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 72)
@@ -25,8 +25,8 @@ struct PhoneHeader<Leading: View, Trailing: View>: View {
         .tint(DS.textPrimary)
         .frame(height: Self.rowHeight)
         .padding(.horizontal, DS.phoneMargin)
-        .padding(.top, DS.phoneTopMargin - (Self.rowHeight - TextMetrics.lineHeight(size: 17, weight: .medium)) / 2
-                 - TextMetrics.capInset(size: 17, weight: .medium))
+        .padding(.top, DS.phoneTopMargin - (Self.rowHeight - TextMetrics.lineHeight(size: 17, weight: .regular)) / 2
+                 - TextMetrics.capInset(size: 17, weight: .regular))
         .padding(.bottom, 10)
     }
 
@@ -55,7 +55,7 @@ struct PhoneBackButton: View {
     var body: some View {
         Button { dismiss() } label: {
             Image(systemName: "chevron.left")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .regular))
                 .frame(width: 32, height: 32, alignment: .leading)
                 .contentShape(Rectangle())
         }

@@ -32,7 +32,12 @@ struct TidemarkApp: App {
                 .environment(appState)
                 .environment(sync)
                 .frame(minWidth: 600, minHeight: 560)
-                .task { sync?.start() }
+                .task {
+                    #if DEBUG
+                    AccountSeed.applyFromEnvironment(container.mainContext)
+                    #endif
+                    sync?.start()
+                }
         }
         .modelContainer(container)
         .windowStyle(.hiddenTitleBar)

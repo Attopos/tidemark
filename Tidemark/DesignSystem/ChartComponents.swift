@@ -53,7 +53,7 @@ struct AllocationDonut: View {
                             .font(DS.caption)
                             .foregroundStyle(DS.textSecondary)
                             .lineLimit(1)
-                        MoneyText(hovered.value, code, font: DS.money(17, weight: .semibold), compact: true)
+                        MoneyText(hovered.value, code, font: DS.money(17, weight: .medium), compact: true)
                         if total > 0 {
                             Text(Fmt.percent((hovered.value / total).doubleValue, showSign: false))
                                 .font(DS.caption)
@@ -61,10 +61,10 @@ struct AllocationDonut: View {
                         }
                     } else {
                         Text(centerLabel.uppercased())
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 11, weight: .regular))
                             .tracking(1)
                             .foregroundStyle(DS.textTertiary)
-                        MoneyText(total, code, font: DS.money(17, weight: .semibold), compact: true)
+                        MoneyText(total, code, font: DS.money(17, weight: .medium), compact: true)
                     }
                 }
                 .frame(width: diameter * 0.52)
