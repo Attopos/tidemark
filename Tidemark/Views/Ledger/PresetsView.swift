@@ -50,7 +50,7 @@ struct PresetsView: View {
                     }
                 } label: {
                     Label(tr("Add"), systemImage: "plus")
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 14, weight: .regular).monospacedDigit())
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -73,7 +73,7 @@ struct PresetsView: View {
                         if !group.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(type.title)
-                                    .font(.system(size: 13, weight: .regular))
+                                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                                     .foregroundStyle(DS.textSecondary)
                                 ForEach(group) { row($0, type: type) }
                             }
@@ -113,17 +113,17 @@ struct PresetsView: View {
                          kind: preset.kind, size: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(preset.name)
-                    .font(.system(size: 14.5, weight: .regular))
+                    .font(.system(size: 14.5, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                 Text(subtitle(preset, type: type))
-                    .font(.system(size: 12))
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(Fmt.money(preset.amount, preset.currencyCode))
-                .font(DS.money(14, weight: .regular))
+                .font(DS.money(14))
                 .foregroundStyle(FlowPalette.amountColor(preset.kind))
                 .fixedSize()
         }
@@ -277,7 +277,7 @@ struct PresetEditor: View {
             }
             if type != .template {
                 Text(tr("Records are added on each due date, including dates already past. Deleting one does not bring it back."))
-                    .font(.system(size: 12))
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -299,7 +299,7 @@ struct PresetEditor: View {
     private func row<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         GridRow {
             Text(title)
-                .font(.system(size: 13))
+                .font(.system(size: 13).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 .frame(width: 92, alignment: .leading)
             content()
@@ -309,7 +309,7 @@ struct PresetEditor: View {
     private func field(_ text: Binding<String>, placeholder: String) -> some View {
         TextField(placeholder, text: text)
             .textFieldStyle(.plain)
-            .font(.system(size: 14))
+            .font(.system(size: 14).monospacedDigit())
             .foregroundStyle(DS.textPrimary)
             .padding(.horizontal, 10)
             .frame(height: 30)

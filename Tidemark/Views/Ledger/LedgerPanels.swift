@@ -116,7 +116,7 @@ struct PeriodBar: View {
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
                 .frame(width: 28, height: 28)
                 .background(DS.tile)
@@ -187,11 +187,11 @@ struct StatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.system(size: 12.5, weight: .regular))
+                .font(.system(size: 12.5, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 .lineLimit(1)
             Text(isCount ? "\(NSDecimalNumber(decimal: value).intValue)" : Fmt.money(value, code, showSign: signed))
-                .font(DS.money(17, weight: .regular))
+                .font(DS.money(17))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
@@ -216,10 +216,10 @@ struct HeroFigure: View {
         Panel {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                 Text(value.map { Fmt.money($0, code) } ?? Fmt.privacyMask)
-                    .font(DS.money(28, weight: .medium))
+                    .font(DS.money(28))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -301,7 +301,7 @@ struct FlowBarsPanel: View {
         Panel(title: tr("Statistics"), accessory: {
             Button { asLine.toggle() } label: {
                 Image(systemName: asLine ? "chart.bar" : "chart.xyaxis.line")
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.system(size: 12, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                     .frame(width: 28, height: 28)
                     .background(DS.tile)
@@ -377,7 +377,7 @@ struct FlowBarsPanel: View {
                     AxisMarks(values: .automatic(desiredCount: 6)) { _ in
                         AxisValueLabel(format: period.bucketComponent == .day
                                        ? .dateTime.day() : .dateTime.month(.abbreviated))
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 10.5).monospacedDigit())
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
@@ -479,7 +479,7 @@ struct NetTrendPanel: View {
                     AxisMarks(values: .automatic(desiredCount: 5)) { _ in
                         AxisValueLabel(format: period.bucketComponent == .day
                                        ? .dateTime.month(.defaultDigits).day() : .dateTime.month(.abbreviated))
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 10.5).monospacedDigit())
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
@@ -565,11 +565,11 @@ struct CategoryPanel: View {
             .chartLegend(.hidden)
             VStack(spacing: 3) {
                 Text(hovered.map(CategoryName.label) ?? kind.displayName)
-                    .font(.system(size: 12, weight: .regular))
+                    .font(.system(size: 12, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                     .lineLimit(1)
                 Text(Fmt.money(stats.first { $0.name == hovered }?.amount ?? total, code))
-                    .font(DS.money(17, weight: .medium))
+                    .font(DS.money(17))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -590,7 +590,7 @@ struct CategoryPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(CategoryName.label(stat.name))
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 14, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                     Text(Fmt.percent(stat.share, decimals: 2, showSign: false))
@@ -598,7 +598,7 @@ struct CategoryPanel: View {
                         .foregroundStyle(DS.textSecondary)
                     Spacer(minLength: 6)
                     Text(Fmt.money(stat.amount, code))
-                        .font(DS.money(14, weight: .regular))
+                        .font(DS.money(14))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
@@ -622,7 +622,7 @@ struct CategoryPanel: View {
                 }
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .regular))
+                .font(.system(size: 11, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
             }
             .padding(.horizontal, 10)
@@ -694,7 +694,7 @@ struct RecordRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 14, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                     if transaction.claimStatus != .none {
@@ -706,20 +706,20 @@ struct RecordRow: View {
                     }
                 }
                 Text(subtitle)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(amountText)
-                    .font(DS.money(14, weight: .regular))
+                    .font(DS.money(14))
                     .foregroundStyle(FlowPalette.amountColor(transaction.kind))
                     .opacity(transaction.excludeFromStats && transaction.canBeExcluded ? 0.45 : 1)
                     .lineLimit(1)
                     .fixedSize()
                 Text(accountText)
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11.5).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
             }
@@ -776,7 +776,7 @@ struct RecordList: View {
                 }
                 if transactions.count > limit {
                     Text(trf("Showing the first %d of %d", limit, transactions.count))
-                        .font(.system(size: 12))
+                        .font(.system(size: 12).monospacedDigit())
                         .foregroundStyle(DS.textTertiary)
                         .padding(.top, 8)
                 }
@@ -845,7 +845,7 @@ struct CategoryDetailSheet: View {
                     AxisGridLine().foregroundStyle(DS.border.opacity(0.6))
                     AxisValueLabel {
                         if let amount = value.as(Double.self) {
-                            Text(Fmt.moneyCompact(Decimal(amount), code)).font(.system(size: 10.5))
+                            Text(Fmt.moneyCompact(Decimal(amount), code)).font(.system(size: 10.5).monospacedDigit())
                                 .foregroundStyle(DS.textTertiary)
                         }
                     }
@@ -856,7 +856,7 @@ struct CategoryDetailSheet: View {
                     AxisValueLabel(format: step.unit == .year ? .dateTime.year()
                                    : (step.unit == .week ? .dateTime.month(.defaultDigits).day()
                                       : .dateTime.month(.abbreviated)))
-                        .font(.system(size: 10.5)).foregroundStyle(DS.textTertiary)
+                        .font(.system(size: 10.5).monospacedDigit()).foregroundStyle(DS.textTertiary)
                 }
             }
             .frame(height: 140)
@@ -866,7 +866,7 @@ struct CategoryDetailSheet: View {
                         HStack(spacing: 10) {
                             CategoryIcon(name: stat.name, kind: selection.kind, size: 26)
                             Text(CategoryName.label(stat.name))
-                                .font(.system(size: 13.5, weight: .regular))
+                                .font(.system(size: 13.5, weight: .regular).monospacedDigit())
                                 .foregroundStyle(DS.textPrimary)
                                 .lineLimit(1)
                             Text(Fmt.percent(stat.share, decimals: 1, showSign: false))
@@ -874,7 +874,7 @@ struct CategoryDetailSheet: View {
                                 .foregroundStyle(DS.textSecondary)
                             Spacer()
                             Text(Fmt.money(stat.amount, code))
-                                .font(DS.money(13.5, weight: .regular))
+                                .font(DS.money(13.5))
                                 .foregroundStyle(DS.textPrimary)
                         }
                     }

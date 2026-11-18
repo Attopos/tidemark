@@ -108,7 +108,7 @@ struct SetupIcon: View {
 
     var body: some View {
         Image(systemName: icon)
-            .font(.system(size: 14, weight: .regular))
+            .font(.system(size: 14, weight: .regular).monospacedDigit())
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)
             .background(color)
@@ -126,7 +126,7 @@ struct SetupRowLabel<Trailing: View>: View {
         HStack(spacing: 14) {
             if let icon { SetupIcon(icon: icon, color: color) }
             Text(title)
-                .font(.system(size: 17))
+                .font(.system(size: 17).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             Spacer(minLength: 8)
             trailing
@@ -150,10 +150,10 @@ struct SetupLink<Destination: View>: View {
         } label: {
             SetupRowLabel(icon: icon, color: color, title: title) {
                 if let value {
-                    Text(value).font(.system(size: 17)).foregroundStyle(DS.textTertiary)
+                    Text(value).font(.system(size: 17).monospacedDigit()).foregroundStyle(DS.textTertiary)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: 14, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
             }
         }
@@ -182,7 +182,7 @@ struct SetupChoice: View {
             SetupRowLabel(title: title) {
                 if selected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .regular))
+                        .font(.system(size: 15, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.accentText)
                 }
             }
@@ -363,7 +363,7 @@ struct ImportDataView: View {
                 Button { picking = true } label: {
                     SetupRowLabel(icon: "doc.badge.plus", color: .indigo, title: tr("Choose an iCost export (.xlsx)")) {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .regular))
+                            .font(.system(size: 14, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
@@ -548,7 +548,7 @@ struct ExportDataView: View {
                     Button { export() } label: {
                         SetupRowLabel(icon: "doc.badge.arrow.up", color: .orange, title: tr("Create export file")) {
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .regular))
+                                .font(.system(size: 14, weight: .regular).monospacedDigit())
                                 .foregroundStyle(DS.textTertiary)
                         }
                     }

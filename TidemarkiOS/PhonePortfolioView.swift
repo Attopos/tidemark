@@ -74,13 +74,13 @@ struct PhonePortfolioView: View {
                 .padding(.top, PageTitle<EmptyView>.pageTop)
             Spacer()
             Image(systemName: "lock.fill")
-                .font(.system(size: 26, weight: .regular))
+                .font(.system(size: 26, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.ink)
                 .frame(width: 64, height: 64)
                 .background(DS.accent)
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             Text(tr("Portfolio is locked"))
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 20, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             if let message = app.unlockMessage {
                 Text(message)
@@ -157,7 +157,7 @@ struct PhonePortfolioView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(Fmt.money(summary.total, code))
-                        .font(DS.money(34, weight: .regular))
+                        .font(DS.money(34))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
@@ -228,7 +228,7 @@ struct PhonePortfolioView: View {
                                 .fill(group.exposure.markColor)
                                 .frame(width: 12, height: 12)
                             Text(group.exposure.displayName)
-                                .font(.system(size: 15, weight: .regular))
+                                .font(.system(size: 15, weight: .regular).monospacedDigit())
                                 .foregroundStyle(DS.textPrimary)
                             Spacer()
                             Text(Fmt.percent(summary.share(group.baseValue), showSign: false))
@@ -260,7 +260,7 @@ struct PhonePortfolioView: View {
                       color: color)
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.name)
-                    .font(.system(size: 14.5, weight: .regular))
+                    .font(.system(size: 14.5, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 4) {

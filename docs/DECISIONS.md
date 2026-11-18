@@ -71,3 +71,4 @@
 
 - 自绘徽章被嫌丑，换成 GitHub 上有许可证的 SVG：circle-flags（MIT）、feathermore/Banklogo（MIT）、payment-webfont-cn 与 simple-icons（CC0），银行只裁出徽标部分转 180px PNG；cellier/bank-icon-cn 更全但没有许可证，没用。余额宝没有开源图标，用支付宝字形配橙色。
 - 用户要「金融终端式」数字：根视图加 .monospacedDigit()，金额字体一律等宽数字，推翻 11-16「大金额用比例数字」。
+- 根视图的 .monospacedDigit() 管不到显式写了 .font(.system(...)) 的文字，所以给所有 .system(size:) 字体都直接加 .monospacedDigit()；DS.money 去掉字重参数，金额只有一种字重；投资组合格子和饼图的「¥32.5k」改成完整金额。

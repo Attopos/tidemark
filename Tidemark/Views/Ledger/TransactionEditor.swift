@@ -148,7 +148,7 @@ struct TransactionEditor: View {
                         }
                     } label: {
                         Label(tr("Template"), systemImage: "square.on.square")
-                            .font(.system(size: 13, weight: .regular))
+                            .font(.system(size: 13, weight: .regular).monospacedDigit())
                     }
                     .menuStyle(.borderlessButton)
                     .fixedSize()
@@ -252,7 +252,7 @@ struct TransactionEditor: View {
 
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13))
+            .font(.system(size: 13).monospacedDigit())
             .foregroundStyle(DS.textSecondary)
             .frame(width: 78, alignment: .leading)
     }
@@ -260,7 +260,7 @@ struct TransactionEditor: View {
     private func field(_ placeholder: String, text: Binding<String>) -> some View {
         TextField(placeholder, text: text)
             .textFieldStyle(.plain)
-            .font(.system(size: 14))
+            .font(.system(size: 14).monospacedDigit())
             .foregroundStyle(DS.textPrimary)
             .padding(.horizontal, 10)
             .frame(height: 30)
@@ -278,7 +278,7 @@ struct TransactionEditor: View {
                     }
                 } label: {
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                 }
                 .menuStyle(.borderlessButton)

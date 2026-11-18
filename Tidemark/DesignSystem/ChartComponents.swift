@@ -53,7 +53,7 @@ struct AllocationDonut: View {
                             .font(DS.caption)
                             .foregroundStyle(DS.textSecondary)
                             .lineLimit(1)
-                        MoneyText(hovered.value, code, font: DS.money(17, weight: .medium), compact: true)
+                        MoneyText(hovered.value, code, font: DS.money(17))
                         if total > 0 {
                             Text(Fmt.percent((hovered.value / total).doubleValue, showSign: false))
                                 .font(DS.caption)
@@ -61,10 +61,10 @@ struct AllocationDonut: View {
                         }
                     } else {
                         Text(centerLabel.uppercased())
-                            .font(.system(size: 11, weight: .regular))
+                            .font(.system(size: 11, weight: .regular).monospacedDigit())
                             .tracking(1)
                             .foregroundStyle(DS.textTertiary)
-                        MoneyText(total, code, font: DS.money(17, weight: .medium), compact: true)
+                        MoneyText(total, code, font: DS.money(17))
                     }
                 }
                 .frame(width: diameter * 0.52)
@@ -75,7 +75,7 @@ struct AllocationDonut: View {
                 ForEach(slices) { slice in
                     LegendRow(color: slice.color,
                               label: slice.label,
-                              value: Fmt.moneyCompact(slice.value, code),
+                              value: Fmt.money(slice.value, code),
                               share: total > 0 ? Fmt.percent((slice.value / total).doubleValue, showSign: false) : nil,
                               dimmed: hoveredSlice != nil && hoveredSlice?.id != slice.id)
                 }

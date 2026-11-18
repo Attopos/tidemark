@@ -31,7 +31,7 @@ struct ScreenshotImportFlow: View {
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 13.5, weight: .regular))
+                        .font(.system(size: 13.5, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                 }
                 .buttonStyle(.plain)
@@ -60,10 +60,10 @@ struct ScreenshotImportFlow: View {
                         VStack(spacing: 14) {
                             Spacer()
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 36))
+                                .font(.system(size: 36).monospacedDigit())
                                 .foregroundStyle(DS.accentText)
                             Text(tr("Saved to Portfolio"))
-                                .font(.system(size: 18, weight: .medium))
+                                .font(.system(size: 18, weight: .medium).monospacedDigit())
                                 .foregroundStyle(DS.textPrimary)
                             Text(session.savedSummary)
                                 .font(DS.body)
@@ -77,7 +77,7 @@ struct ScreenshotImportFlow: View {
                     case .failed(let message):
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 28))
+                                .font(.system(size: 28).monospacedDigit())
                                 .foregroundStyle(DS.negative)
                             Text(message)
                                 .font(DS.body)
@@ -204,7 +204,7 @@ struct ScreenshotImportFlow: View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: "text.viewfinder")
-                .font(.system(size: 38, weight: .light))
+                .font(.system(size: 38, weight: .light).monospacedDigit())
                 .foregroundStyle(dropTargeted ? DS.accentText : DS.textTertiary)
             HStack(spacing: 10) {
                 #if os(macOS)
@@ -328,7 +328,7 @@ private struct OCRReviewStage: View {
                         if !session.accountTotalText.isEmpty {
                             HStack(spacing: 8) {
                                 Image(systemName: "sum")
-                                    .font(.system(size: 13.5))
+                                    .font(.system(size: 13.5).monospacedDigit())
                                     .foregroundStyle(DS.finBlue)
                                 Text(tr("Account total detected:"))
                                     .font(DS.caption)
@@ -440,10 +440,10 @@ private struct MissingHoldingsCard: View {
         if session.missing.contains(where: { !updated.contains($0.id) }) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(tr("Not in this screenshot"))
-                    .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: 14, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                 Text(tr("Tick the ones you no longer hold. They are marked as sold on the valuation date; their history is kept."))
-                    .font(.system(size: 12))
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                 ForEach($session.missing) { $item in
                     if !updated.contains(item.id) {
@@ -490,7 +490,7 @@ private struct DraftCard: View {
                     .labelsHidden()
                 TextField(holding.platform == .binance ? tr("Asset name") : tr("Fund name"), text: $holding.name)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(size: 15, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                 flaggedIcon("name")
                 TextField(tr("Code"), text: $holding.code)
@@ -501,7 +501,7 @@ private struct DraftCard: View {
                 Spacer()
                 if let reason = holding.excludedReason {
                     Text(reason)
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.system(size: 12, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2.5)
@@ -528,7 +528,7 @@ private struct DraftCard: View {
                         .help(tr("Similar name, not identical. Click to update that holding instead of adding a new one."))
                     }
                     Text(tr("new"))
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.system(size: 12, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.positive)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2.5)
@@ -565,9 +565,9 @@ private struct DraftCard: View {
     private func chip(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 11))
+                .font(.system(size: 11).monospacedDigit())
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: 12).monospacedDigit())
                 .lineLimit(1)
         }
         .foregroundStyle(color)
@@ -581,7 +581,7 @@ private struct DraftCard: View {
     private func flaggedIcon(_ key: String) -> some View {
         if holding.flaggedFields.contains(key) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 11.5))
+                .font(.system(size: 11.5).monospacedDigit())
                 .foregroundStyle(DS.warning)
                 .help("Low OCR confidence — verify against the screenshot")
         }
@@ -591,7 +591,7 @@ private struct DraftCard: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
                 Text(label)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                 flaggedIcon(key)
             }

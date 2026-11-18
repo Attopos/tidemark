@@ -133,12 +133,12 @@ struct RecordDetailView: View {
     private var header: some View {
         ZStack {
             Text(tr("Record Details"))
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             HStack {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 16, weight: .medium).monospacedDigit())
                         .foregroundStyle(DS.textPrimary)
                         .frame(width: 40, height: 40)
                         .background(DS.tile)
@@ -167,9 +167,9 @@ struct RecordDetailView: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: symbol)
-                    .font(.system(size: 21, weight: .regular))
+                    .font(.system(size: 21, weight: .regular).monospacedDigit())
                 Text(title)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(size: 15, weight: .regular).monospacedDigit())
             }
             .foregroundStyle(tint)
             .frame(width: 92, height: 82)
@@ -197,7 +197,7 @@ struct RecordDetailView: View {
     private func rowView(_ row: Row) -> some View {
         HStack(alignment: .center, spacing: 14) {
             Text(row.label)
-                .font(.system(size: 16, weight: .regular))
+                .font(.system(size: 16, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
                 .fixedSize()
             Spacer(minLength: 12)
@@ -207,7 +207,7 @@ struct RecordDetailView: View {
                 .multilineTextAlignment(.trailing)
                 .lineLimit(3)
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 12, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
                 .opacity(row.opensEditor ? 1 : 0)
         }
@@ -221,7 +221,7 @@ struct RecordDetailView: View {
         Toggle(isOn: Binding(get: { transaction.excludeFromStats },
                              set: { _ in transaction.toggleExcluded(in: context) })) {
             Text(transaction.kind == .income ? tr("Exclude from income") : tr("Exclude from expense"))
-                .font(.system(size: 16, weight: .regular))
+                .font(.system(size: 16, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
         }
         .toggleStyle(.switch)

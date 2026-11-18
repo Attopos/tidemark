@@ -149,7 +149,7 @@ struct SummaryTable: View {
                     Text(tr("Income"))
                     Text(tr("Balance"))
                 }
-                .font(.system(size: 12.5, weight: .regular))
+                .font(.system(size: 12.5, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 Divider().overlay(DS.border)
                 line(tr("Total"), summary.expense, summary.income, summary.balance, strong: true)
