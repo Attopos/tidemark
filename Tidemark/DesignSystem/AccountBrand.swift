@@ -23,7 +23,7 @@ enum AccountBrand: Equatable {
         (["bob", "北京银行"], .emblem("acct-bob")),
         (["bosh", "上海银行"], .emblem("acct-bosh")),
         (["hsbc", "汇丰"], .glyph("acct-hsbc", color: 0xDB0011)),
-        (["revolut"], .glyph("acct-revolut", color: 0x191C1F)),
+        (["revolut"], .glyph("acct-revolut", color: 0x0075EB)),
         (["wise"], .glyph("acct-wise", color: 0x163300)),
         (["paypal"], .glyph("acct-paypal", color: 0x003087)),
         (["ceb", "光大"], .bank(mark: "光", color: 0x6B2C91)),

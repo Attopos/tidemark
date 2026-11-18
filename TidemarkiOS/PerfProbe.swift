@@ -14,6 +14,7 @@ final class PerfProbe: NSObject {
     static let openEntry = Notification.Name("probe.openEntry")
     static let openDetail = Notification.Name("probe.openDetail")
     static let openAccountEditor = Notification.Name("probe.openAccountEditor")
+    static let pushAccountType = Notification.Name("probe.pushAccountType")
     static let entryKey = Notification.Name("probe.entryKey")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
@@ -69,6 +70,9 @@ final class PerfProbe: NSObject {
         NotificationCenter.default.post(name: Self.openAccountEditor, object: nil)
         try? await Task.sleep(for: .milliseconds(1500))
         capture("account-new")
+        NotificationCenter.default.post(name: Self.pushAccountType, object: nil)
+        try? await Task.sleep(for: .milliseconds(1500))
+        capture("account-form")
         app.amountsHidden = hidden
     }
 
