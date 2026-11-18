@@ -110,11 +110,11 @@ struct LedgerView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 12, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
             TextField(tr("Search"), text: $search)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .font(.system(size: 13).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             if !search.isEmpty {
                 Button { search = "" } label: {
@@ -146,10 +146,10 @@ struct LedgerView: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "tray")
-                .font(.system(size: 36, weight: .light))
+                .font(.system(size: 36, weight: .light).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
             Text(tr("No records yet"))
-                .font(.system(size: 19, weight: .regular))
+                .font(.system(size: 19, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             Text(tr("Add a record, or import a bookkeeping export (.xlsx) from Settings or by dropping it here."))
                 .font(DS.body)
@@ -288,7 +288,7 @@ struct MonthCalendar: View {
             HStack(spacing: 4) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
-                        .font(.system(size: 11.5, weight: .regular))
+                        .font(.system(size: 11.5, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textTertiary)
                         .frame(maxWidth: .infinity)
                 }
@@ -311,7 +311,7 @@ struct MonthCalendar: View {
         } label: {
             VStack(spacing: 1) {
                 Text("\(calendar.component(.day, from: bucket.start))")
-                    .font(.system(size: 13, weight: isToday ? .semibold : .medium))
+                    .font(.system(size: 13, weight: isToday ? .semibold : .medium).monospacedDigit())
                     .foregroundStyle(selected ? DS.ink : (isToday ? DS.accentText : DS.textPrimary))
                 Text(begun ? "-\(compact(bucket.expense))" : " ")
                     .foregroundStyle(ink ?? (bucket.expense > 0 ? FlowPalette.expense : DS.textTertiary))

@@ -101,12 +101,12 @@ private struct SheetHeader<Trailing: View>: View {
     var body: some View {
         ZStack {
             Text(title)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             HStack {
                 Button { dismiss() } label: {
                     Image(systemName: back ? "chevron.left" : "xmark")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 15, weight: .medium).monospacedDigit())
                         .foregroundStyle(DS.textPrimary)
                         .frame(width: 40, height: 40)
                         .background(DS.tile)
@@ -142,11 +142,11 @@ struct AccountTypePicker: View {
                         } label: {
                             HStack {
                                 Text(group.displayName)
-                                    .font(.system(size: 17, weight: .medium))
+                                    .font(.system(size: 17, weight: .medium).monospacedDigit())
                                     .foregroundStyle(DS.textPrimary)
                                 Spacer()
                                 Image(systemName: folded.contains(group) ? "chevron.right" : "chevron.down")
-                                    .font(.system(size: 13, weight: .regular))
+                                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                                     .foregroundStyle(DS.textTertiary)
                             }
                             .padding(.top, 12)
@@ -160,11 +160,11 @@ struct AccountTypePicker: View {
                                         HStack(spacing: 14) {
                                             AccountBrandBadge(brand: preset.brand, size: 38)
                                             Text(tr(preset.label))
-                                                .font(.system(size: 16, weight: .medium))
+                                                .font(.system(size: 16, weight: .medium).monospacedDigit())
                                                 .foregroundStyle(DS.textPrimary)
                                             Spacer()
                                             Image(systemName: "chevron.right")
-                                                .font(.system(size: 12, weight: .regular))
+                                                .font(.system(size: 12, weight: .regular).monospacedDigit())
                                                 .foregroundStyle(DS.textTertiary)
                                         }
                                         .padding(.horizontal, 18)
@@ -291,7 +291,7 @@ struct AccountForm: View {
             SheetHeader(title: account == nil ? tr("Add account") : tr("Edit account"), back: account == nil) {
                 Button { save() } label: {
                     Text(tr("Save"))
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 15, weight: .medium).monospacedDigit())
                         .foregroundStyle(canSave ? DS.ink : DS.textTertiary)
                         .padding(.horizontal, 16)
                         .frame(height: 36)
@@ -307,7 +307,7 @@ struct AccountForm: View {
                     VStack(spacing: 10) {
                         AccountBrandBadge(brand: badge, size: 64)
                         Text(typeLabel.isEmpty ? group.displayName : typeLabel)
-                            .font(.system(size: 14))
+                            .font(.system(size: 14).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -336,7 +336,7 @@ struct AccountForm: View {
                     }
                     if nameTaken {
                         Text(tr("Another account already has this name."))
-                            .font(.system(size: 13))
+                            .font(.system(size: 13).monospacedDigit())
                             .foregroundStyle(FlowPalette.expense)
                             .padding(.leading, 18)
                     }
@@ -371,7 +371,7 @@ struct AccountForm: View {
 
                     if account != nil {
                         Text(tr("Changing this moves the opening balance; records stay as they are."))
-                            .font(.system(size: 13))
+                            .font(.system(size: 13).monospacedDigit())
                             .foregroundStyle(DS.textTertiary)
                             .padding(.horizontal, 18)
                     }
@@ -400,7 +400,7 @@ struct AccountForm: View {
 
     private func label(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 16))
+            .font(.system(size: 16).monospacedDigit())
             .foregroundStyle(DS.textPrimary)
             .fixedSize()
     }
@@ -410,7 +410,7 @@ struct AccountForm: View {
             label(title)
             TextField("", text: text, prompt: Text(prompt).foregroundStyle(DS.textTertiary))
                 .textFieldStyle(.plain)
-                .font(.system(size: 16))
+                .font(.system(size: 16).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 .multilineTextAlignment(.trailing)
                 .autocorrectionDisabled()

@@ -29,7 +29,7 @@ extension DS {
     static let limeDeep = Color(hex: 0x9CB84A)
     static let ink = Color(hex: 0x141414)
 
-    static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .regular) }
+    static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .regular).monospacedDigit() }
 }
 
 /// Dark rounded card with an optional title row.
@@ -45,7 +45,7 @@ struct Panel<Content: View, Accessory: View>: View {
                 HStack(spacing: 10) {
                     if let icon {
                         Image(systemName: icon)
-                            .font(.system(size: 13, weight: .regular))
+                            .font(.system(size: 13, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textPrimary)
                             .frame(width: 30, height: 30)
                             .background(DS.tile)
@@ -84,7 +84,7 @@ struct TagChip: View {
     let color: Color
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .regular))
+            .font(.system(size: 12, weight: .regular).monospacedDigit())
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
@@ -166,7 +166,7 @@ struct CapsuleSwitch<Value: Hashable>: View {
                 let selected = option == selection
                 Button { selection = option } label: {
                     Text(label(option))
-                        .font(.system(size: compact ? 11.5 : 13, weight: .regular))
+                        .font(.system(size: compact ? 11.5 : 13, weight: .regular).monospacedDigit())
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(selected ? DS.ink : DS.textSecondary)
@@ -198,7 +198,7 @@ struct LimeCheckboxStyle: ToggleStyle {
                     )
                     .overlay(
                         Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
                             .foregroundStyle(DS.ink)
                             .opacity(configuration.isOn ? 1 : 0)
                     )

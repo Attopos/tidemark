@@ -22,7 +22,7 @@ struct PageTitle<Trailing: View>: View {
         HStack(spacing: 10) {
             Text(title)
                 #if os(iOS)
-                .font(.system(size: Self.size, weight: .medium))
+                .font(.system(size: Self.size, weight: .medium).monospacedDigit())
                 .padding(.leading, -TextMetrics.leftBearing(of: title, size: Self.size, weight: .medium))
                 #else
                 .font(DS.title(30))
@@ -99,7 +99,7 @@ struct RoundIcon: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.4, weight: .medium))
+            .font(.system(size: size * 0.4, weight: .medium).monospacedDigit())
             .foregroundStyle(active ? DS.ink : DS.textPrimary)
             .frame(width: size, height: size)
             .background(active ? DS.accent : DS.tile)

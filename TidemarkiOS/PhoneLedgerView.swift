@@ -153,7 +153,7 @@ struct PhoneLedgerView: View {
                     if showsCalendar { app.cashPeriod = CashPeriod(unit: .month, containing: app.cashPeriod.start) }
                 } label: {
                     Text(tr("Calendar"))
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 14, weight: .regular).monospacedDigit())
                         .foregroundStyle(showsCalendar ? DS.ink : DS.textSecondary)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 7)
@@ -173,7 +173,7 @@ struct PhoneLedgerView: View {
                 .foregroundStyle(DS.textPrimary)
                 .autocorrectionDisabled()
         }
-        .font(.system(size: 16))
+        .font(.system(size: 16).monospacedDigit())
         .padding(.horizontal, 14)
         .frame(height: 42)
         .background(DS.tile)
@@ -183,10 +183,10 @@ struct PhoneLedgerView: View {
     private func summaryCard(_ summary: CashSummary, code: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("Expense"))
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: 15, weight: .regular).monospacedDigit())
                 .foregroundStyle(FlowPalette.expense)
             Text(Fmt.money(summary.expense, code))
-                .font(DS.money(34, weight: .medium))
+                .font(DS.money(34))
                 .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
@@ -279,7 +279,7 @@ struct PhoneLedgerView: View {
     private var addButton: some View {
         Button { creating = true } label: {
             Image(systemName: "plus")
-                .font(.system(size: 28, weight: .medium))
+                .font(.system(size: 28, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.ink)
                 .frame(width: 66, height: 66)
                 .background(DS.accent)

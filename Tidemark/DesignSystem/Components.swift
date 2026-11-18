@@ -86,7 +86,7 @@ struct AccentButtonStyle: ButtonStyle {
     var prominent = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .regular))
+            .font(.system(size: 15, weight: .regular).monospacedDigit())
             .lineLimit(1)
             .foregroundStyle(prominent ? DS.heroInk : DS.accentText)
             .padding(.horizontal, 14)
@@ -100,7 +100,7 @@ struct AccentButtonStyle: ButtonStyle {
 struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 15, weight: .regular))
+            .font(.system(size: 15, weight: .regular).monospacedDigit())
             .lineLimit(1)
             .foregroundStyle(DS.textPrimary)
             .padding(.horizontal, 13)
@@ -121,7 +121,7 @@ struct FreshnessLabel: View {
             let stale = Date().timeIntervalSince(date) > staleAfterDays * 86_400
             HStack(spacing: 4) {
                 Image(systemName: stale ? "clock.badge.exclamationmark" : "clock")
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11.5).monospacedDigit())
                 Text("\(tr("Updated")) \(Fmt.relative(date))")
                     .font(DS.caption)
             }
@@ -143,10 +143,10 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 36, weight: .light))
+                .font(.system(size: 36, weight: .light).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
             Text(title)
-                .font(.system(size: 19, weight: .regular))
+                .font(.system(size: 19, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textPrimary)
             Text(message)
                 .font(DS.body)
@@ -232,7 +232,7 @@ struct IssueBanner: View {
     var body: some View {
         HStack(spacing: 9) {
             Image(systemName: issue.icon)
-                .font(.system(size: 14.5))
+                .font(.system(size: 14.5).monospacedDigit())
                 .foregroundStyle(issue.severity == .warning ? DS.warning : DS.finBlue)
             Text(issue.message)
                 .font(DS.caption)
@@ -312,7 +312,7 @@ struct AmountsToggle: View {
     var body: some View {
         Button { hidden.toggle() } label: {
             Image(systemName: hidden ? "eye.slash" : "eye")
-                .font(.system(size: 13, weight: .regular))
+                .font(.system(size: 13, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 .frame(width: 30, height: 30)
                 .background(DS.tile)
@@ -331,7 +331,7 @@ struct FloatingAddButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "plus")
-                .font(.system(size: 26, weight: .medium))
+                .font(.system(size: 26, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.ink)
                 .frame(width: 62, height: 62)
                 .background(DS.accent)

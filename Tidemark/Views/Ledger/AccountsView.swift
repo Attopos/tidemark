@@ -130,17 +130,17 @@ struct AccountsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text(tr("Net Assets"))
-                        .font(.system(size: 16, weight: .regular))
+                        .font(.system(size: 16, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                     Button { app.amountsHidden.toggle() } label: {
                         Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
-                            .font(.system(size: 14, weight: .regular))
+                            .font(.system(size: 14, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
                 Text(Fmt.money(net.assets - net.debts, snapshot.code))
-                    .font(DS.money(38, weight: .medium))
+                    .font(DS.money(38))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -176,18 +176,18 @@ struct AccountsView: View {
     private func smallCard(_ title: String, _ value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.ink)
                 .frame(width: 30, height: 30)
                 .background(tint)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14))
+                    .font(.system(size: 14).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
                 Text(value)
-                    .font(DS.money(17, weight: .regular))
+                    .font(DS.money(17))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -226,10 +226,10 @@ struct AccountsView: View {
                     Button { withAnimation(.easeInOut(duration: 0.2)) { toggle(group) } } label: {
                         HStack(spacing: 4) {
                             Text(group.displayName)
-                                .font(.system(size: 17, weight: .medium))
+                                .font(.system(size: 17, weight: .medium).monospacedDigit())
                                 .foregroundStyle(DS.textPrimary)
                             Text("(\(members.count))")
-                                .font(.system(size: 14))
+                                .font(.system(size: 14).monospacedDigit())
                                 .foregroundStyle(DS.textTertiary)
                             Spacer(minLength: 8)
                             Text("\(tr("Balance")): \(Fmt.money(total, snapshot.code))")
@@ -237,7 +237,7 @@ struct AccountsView: View {
                                 .foregroundStyle(DS.textTertiary)
                                 .lineLimit(1)
                             Image(systemName: folded ? "chevron.right" : "chevron.down")
-                                .font(.system(size: 12, weight: .regular))
+                                .font(.system(size: 12, weight: .regular).monospacedDigit())
                                 .foregroundStyle(DS.textTertiary)
                         }
                         .contentShape(Rectangle())
@@ -284,7 +284,7 @@ struct AccountsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(account.name)
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 16, weight: .medium).monospacedDigit())
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         if !account.includeInNetWorth { TagChip(text: tr("Not counted"), color: DS.textSecondary) }
@@ -292,7 +292,7 @@ struct AccountsView: View {
                     }
                     ForEach(subtitleLines(account), id: \.self) { line in
                         Text(line)
-                            .font(.system(size: 14))
+                            .font(.system(size: 14).monospacedDigit())
                             .foregroundStyle(DS.textTertiary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -301,7 +301,7 @@ struct AccountsView: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(Fmt.money(isCredit ? owed : balance, account.currencyCode))
-                        .font(DS.money(17, weight: .regular))
+                        .font(DS.money(17))
                         .foregroundStyle(!isCredit && balance < 0 ? FlowPalette.expense : DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
@@ -378,7 +378,7 @@ struct AccountIcon: View {
             AccountBrandBadge(brand: brand, size: size)
         } else {
             Text(String(account.name.prefix(1)).uppercased())
-                .font(.system(size: size * 0.4, weight: .medium))
+                .font(.system(size: size * 0.4, weight: .medium).monospacedDigit())
                 .foregroundStyle(account.group == .payable ? Color.white : DS.ink)
                 .frame(width: size, height: size)
                 .background(tint)
@@ -431,7 +431,7 @@ struct ReconcileSheet: View {
                     ForEach(accounts) { account in
                         VStack(alignment: .leading, spacing: 6) {
                             Text("\(account.name) · \(account.currencyCode)")
-                                .font(.system(size: 14, weight: .regular))
+                                .font(.system(size: 14, weight: .regular).monospacedDigit())
                                 .foregroundStyle(DS.textPrimary)
                                 .lineLimit(1)
                             HStack(spacing: 10) {
@@ -455,7 +455,7 @@ struct ReconcileSheet: View {
                                     get: { archived.contains(account.id) },
                                     set: { if $0 { archived.insert(account.id) } else { archived.remove(account.id) } }))
                                     .toggleStyle(LimeCheckboxStyle())
-                                    .font(.system(size: 12.5))
+                                    .font(.system(size: 12.5).monospacedDigit())
                                     .foregroundStyle(DS.textSecondary)
                                     .lineLimit(1)
                                     .fixedSize()
