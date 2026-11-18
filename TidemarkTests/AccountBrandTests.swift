@@ -29,6 +29,11 @@ final class AccountBrandTests: XCTestCase {
         let names = ["acct-boc", "acct-icbc", "acct-ccb", "acct-abc", "acct-cmb", "acct-citic", "acct-bocom", "acct-psbc",
                      "acct-spdb", "acct-cib", "acct-cmbc", "acct-bob", "acct-bosh", "acct-wechat", "acct-alipay", "acct-visa",
                      "acct-paypal", "acct-revolut", "acct-wise", "acct-hsbc"]
+            + AccountTypePreset.all.compactMap { preset -> String? in
+                if case .glyph(let name, _) = preset.brand { return name }
+                if case .emblem(let name) = preset.brand { return name }
+                return nil
+            }
             + AccountBrand.flagCurrencies.map { "flag-\($0.lowercased())" }
         for name in names {
             XCTAssertNotNil(Bundle.main.url(forResource: name, withExtension: "png"), name)
