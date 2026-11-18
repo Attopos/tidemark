@@ -73,6 +73,9 @@ struct AccountsView: View {
             AccountEditor(account: account, currentBalance: snapshot.balances[account.id] ?? account.openingBalance)
         }
         .sheet(isPresented: $creating) { AccountEditor(account: nil, currentBalance: 0) }
+        #if os(iOS) && DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openAccountEditor)) { _ in creating = true }
+        #endif
         .sheet(isPresented: $reconciling) {
             ReconcileSheet(accounts: snapshot.accounts, balances: snapshot.balances)
         }
@@ -390,9 +393,19 @@ struct AccountEditor: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
+    @Query private var allAccounts: [Account]
+
     let account: Account?
     /// Balance computed from the ledger when the sheet opened.
     let currentBalance: Decimal
+
+    private static let typePresets = ["Debit Card", "Credit Card", "Cash", "WeChat Wallet", "Alipay", "Yu'E Bao",
+                                      "Membership Card", "Transit Card", "Lend", "Borrow"]
+
+    private static var currencies: [String] {
+        let first = ["CNY", "USD", "EUR", "HKD", "JPY", "GBP"]
+        return first + Fmt.currencySymbols.keys.filter { !first.contains($0) }.sorted()
+    }
 
     @State private var name: String
     @State private var group: AccountGroup
@@ -418,7 +431,8 @@ struct AccountEditor: View {
         _billingText = State(initialValue: account?.billingDay.map(String.init) ?? "")
         _repaymentText = State(initialValue: account?.repaymentDay.map(String.init) ?? "")
         _currency = State(initialValue: account?.currencyCode ?? "CNY")
-        _balanceText = State(initialValue: NSDecimalNumber(decimal: currentBalance.rounded(2)).stringValue)
+        let owes = account.map { $0.group == .credit || $0.group == .payable } ?? false
+        _balanceText = State(initialValue: NSDecimalNumber(decimal: (owes ? -currentBalance : currentBalance).rounded(2)).stringValue)
         _note = State(initialValue: account?.note ?? "")
         _counted = State(initialValue: account?.includeInNetWorth ?? true)
         _archived = State(initialValue: account?.isArchived ?? false)
@@ -429,9 +443,28 @@ struct AccountEditor: View {
                 locale: Locale(identifier: "en_US_POSIX"))
     }
 
+    private var owes: Bool { group == .credit || group == .payable }
+
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+
+    private var nameTaken: Bool {
+        allAccounts.contains { $0.id != account?.id && $0.name.trimmingCharacters(in: .whitespaces).lowercased() == trimmedName.lowercased() }
+    }
+
+    private var preview: AccountBrand? {
+        AccountBrand.match(name: trimmedName, typeLabel: typeLabel, currency: currency,
+                           isCash: resolvedKind == .cash)
+    }
+
+    private var resolvedKind: AccountKind {
+        guard group == .fund else { return group.kind }
+        let text = "\(name) \(typeLabel)".lowercased()
+        if account?.kind == .cash || text.contains("cash") || text.contains("现金") { return .cash }
+        return .payment
+    }
+
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && balance != nil
-            && currency.trimmingCharacters(in: .whitespaces).count >= 3
+        !trimmedName.isEmpty && !nameTaken && balance != nil
     }
 
     var body: some View {
@@ -443,9 +476,32 @@ struct AccountEditor: View {
                 CapsuleSwitch(options: AccountGroup.allCases, selection: $group) { $0.shortName }
             }
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                row(tr("Name")) { field($name) }
-                row(tr("Currency")) { field($currency).frame(width: 90) }
-                row(tr("Balance now")) {
+                row(tr("Name")) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 10) {
+                            field($name)
+                            if let preview {
+                                AccountBrandBadge(brand: preview, size: 30)
+                            }
+                        }
+                        if nameTaken {
+                            Text(tr("Another account already has this name."))
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(FlowPalette.expense)
+                        }
+                    }
+                }
+                row(tr("Currency")) {
+                    Picker("", selection: $currency) {
+                        ForEach(Self.currencies, id: \.self) { code in
+                            Text("\(code) \(Fmt.symbol(for: code).trimmingCharacters(in: .whitespaces))").tag(code)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
+                row(owes ? tr("Owed now") : tr("Balance now")) {
                     VStack(alignment: .leading, spacing: 4) {
                         field($balanceText).signedAmountKeyboard()
                         Text(tr("Changing this moves the opening balance; records stay as they are."))
@@ -455,7 +511,23 @@ struct AccountEditor: View {
                 }
                 row(tr("Description")) { field($note) }
                 row(tr("Card number")) { field($cardNumber) }
-                row(tr("Type")) { field($typeLabel) }
+                row(tr("Type")) {
+                    HStack(spacing: 8) {
+                        field($typeLabel)
+                        Menu {
+                            ForEach(Self.typePresets, id: \.self) { preset in
+                                Button(tr(preset)) { typeLabel = tr(preset) }
+                            }
+                        } label: {
+                            Image(systemName: "chevron.down.circle")
+                                .font(.system(size: 18, weight: .regular))
+                                .foregroundStyle(DS.textSecondary)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                    }
+                }
                 if group == .credit {
                     row(tr("Credit limit")) { field($limitText).amountKeyboard() }
                     row(tr("Statement day")) { field($billingText).frame(width: 70) }
@@ -483,6 +555,9 @@ struct AccountEditor: View {
             }
         }
         .editorSheet(width: 440)
+        .onChange(of: owes) { _, _ in
+            if let value = balance, value != 0 { balanceText = NSDecimalNumber(decimal: -value).stringValue }
+        }
     }
 
     private func row<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -510,10 +585,10 @@ struct AccountEditor: View {
     private func save() {
         guard let balance else { return }
         let code = currency.trimmingCharacters(in: .whitespaces).uppercased()
-        let target = account ?? Account(name: name, kind: group.kind, currencyCode: code)
-        target.name = name.trimmingCharacters(in: .whitespaces)
+        let target = account ?? Account(name: trimmedName, kind: resolvedKind, currencyCode: code)
+        target.name = trimmedName
         target.group = group
-        target.kind = group == .fund && account?.kind == .cash ? .cash : group.kind
+        target.kind = resolvedKind
         target.cardNumber = cardNumber.trimmingCharacters(in: .whitespaces)
         target.typeLabel = typeLabel.trimmingCharacters(in: .whitespaces)
         func day(_ text: String) -> Int? { Int(text.trimmingCharacters(in: .whitespaces)).flatMap { (1...31).contains($0) ? $0 : nil } }
@@ -528,7 +603,8 @@ struct AccountEditor: View {
         target.isArchived = archived
         target.updatedAt = Date()
         // Opening balance absorbs the difference, so the ledger keeps adding up.
-        target.openingBalance += balance - currentBalance.rounded(2)
+        let entered = owes ? -balance : balance
+        target.openingBalance += entered - currentBalance.rounded(2)
         if account == nil { context.insert(target) }
         try? context.save()
         dismiss()

@@ -13,6 +13,7 @@ final class PerfProbe: NSObject {
     static var entryOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF_ENTRY"] != nil }
     static let openEntry = Notification.Name("probe.openEntry")
     static let openDetail = Notification.Name("probe.openDetail")
+    static let openAccountEditor = Notification.Name("probe.openAccountEditor")
     static let entryKey = Notification.Name("probe.entryKey")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
@@ -61,6 +62,13 @@ final class PerfProbe: NSObject {
         NotificationCenter.default.post(name: Self.openDetail, object: nil)
         try? await Task.sleep(for: .milliseconds(1500))
         capture("detail")
+        UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+            .first?.dismiss(animated: false)
+        app.section = .accounts
+        try? await Task.sleep(for: .milliseconds(1200))
+        NotificationCenter.default.post(name: Self.openAccountEditor, object: nil)
+        try? await Task.sleep(for: .milliseconds(1500))
+        capture("account-new")
         app.amountsHidden = hidden
     }
 
