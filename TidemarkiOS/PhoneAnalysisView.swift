@@ -96,7 +96,7 @@ struct PhoneAnalysisView: View {
                 }
             } label: {
                 Text(period.title)
-                    .font(.system(size: 18, weight: .medium).monospacedDigit())
+                    .font(.system(size: 18, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -111,7 +111,7 @@ struct PhoneAnalysisView: View {
     private func arrow(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(DS.ink)
                 .frame(width: 34, height: 34)
                 .background(DS.accent)
@@ -171,13 +171,13 @@ struct PhoneCard<Accessory: View, Content: View>: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(DS.ink)
                     .frame(width: 24, height: 24)
                     .background(DS.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 Text(title)
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 19, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -212,9 +212,9 @@ struct PhoneChip: View {
         Button(action: action) {
             HStack(spacing: 3) {
                 Text(text)
-                Image(systemName: "arrow.left.arrow.right").font(.system(size: 10, weight: .semibold))
+                Image(systemName: "arrow.left.arrow.right").font(.system(size: 10, weight: .medium))
             }
-            .font(.system(size: 12.5, weight: .medium))
+            .font(.system(size: 12.5, weight: .regular))
             .foregroundStyle(DS.textSecondary)
             .lineLimit(1)
             .fixedSize()
@@ -234,7 +234,7 @@ struct PhoneFocusChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 15, weight: .medium).monospacedDigit())
+            .font(.system(size: 15, weight: .regular).monospacedDigit())
             .foregroundStyle(DS.textPrimary)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -289,7 +289,7 @@ struct PhoneOverviewCard: View {
             Spacer(minLength: 8)
             Button { withAnimation(.snappy) { showsMore.toggle() } } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(DS.textSecondary)
                     .rotationEffect(.degrees(showsMore ? 90 : 0))
                     .frame(width: 32, height: 32)
@@ -323,12 +323,12 @@ struct PhoneOverviewCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text(title).lineLimit(1).minimumScaleFactor(0.8)
-                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .medium))
                 }
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(DS.textSecondary)
                 Text(Fmt.money(value, code, showSign: signed))
-                    .font(DS.money(22, weight: .semibold))
+                    .font(DS.money(22, weight: .medium))
                     .foregroundStyle(color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
@@ -404,14 +404,14 @@ struct PhoneStatisticsCard: View {
         let lineColor = color(mode == .balance ? summary.balance : 1)
         PhoneCard(title: title, icon: "chart.xyaxis.line") {
             Text(trf("Avg: %@", Fmt.money(average, code)))
-                .font(.system(size: 13, weight: .medium).monospacedDigit())
+                .font(.system(size: 13, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 6)
             Button { asLine.toggle() } label: {
                 Image(systemName: asLine ? "chart.bar.xaxis" : "chart.xyaxis.line")
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(DS.textSecondary)
                     .frame(width: 42, height: 32)
                     .background(DS.tile)
@@ -488,7 +488,7 @@ extension View {
                 AxisValueLabel(centered: false, collisionResolution: .disabled) {
                     if let date = value.as(Date.self) {
                         Text(PhoneChartAxis.label(date, period: period))
-                            .font(.system(size: 13, weight: .medium).monospacedDigit())
+                            .font(.system(size: 13, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                 }
@@ -501,7 +501,7 @@ extension View {
                 AxisValueLabel {
                     if let amount = value.as(Double.self) {
                         Text(Fmt.moneyCompact(Decimal(amount), code))
-                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                            .font(.system(size: 12, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                 }
@@ -570,7 +570,7 @@ struct PhoneCategoriesCard: View {
                 if stats.count > Self.collapsedCount {
                     Button { withAnimation(.snappy) { showsAll.toggle() } } label: {
                         Text(showsAll ? tr("Fold") : trf("Show all %d", stats.count))
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 16, weight: .regular))
                             .foregroundStyle(DS.textSecondary)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .contentShape(Rectangle())
@@ -602,7 +602,7 @@ struct PhoneCategoriesCard: View {
                 VStack(alignment: .leading, spacing: 9) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(CategoryName.label(stat.name))
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         Text(Fmt.percent(stat.share, decimals: 2, showSign: false))
@@ -620,7 +620,7 @@ struct PhoneCategoriesCard: View {
                 }
                 VStack(alignment: .trailing, spacing: 6) {
                     Text(Fmt.money(stat.amount, code))
-                        .font(DS.money(17, weight: .medium))
+                        .font(DS.money(17, weight: .regular))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
@@ -640,7 +640,7 @@ struct PhoneCategoriesCard: View {
                     }
                 } label: {
                     Image(systemName: isOpen ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(DS.textTertiary)
                         .frame(width: 24, height: 44)
                         .contentShape(Rectangle())
@@ -659,12 +659,12 @@ struct PhoneCategoriesCard: View {
                             HStack(spacing: 10) {
                                 CategoryIcon(name: sub.name, kind: kind, size: 30)
                                 Text(CategoryName.label(sub.name))
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(.system(size: 15, weight: .regular))
                                     .foregroundStyle(DS.textPrimary)
                                     .lineLimit(1)
                                 Spacer(minLength: 6)
                                 Text("\(Fmt.money(sub.amount, code)) [\(sub.count)/\(Fmt.percent(sub.share, decimals: 2, showSign: false))]")
-                                    .font(.system(size: 14, weight: .medium).monospacedDigit())
+                                    .font(.system(size: 14, weight: .regular).monospacedDigit())
                                     .foregroundStyle(DS.textSecondary)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
@@ -741,7 +741,7 @@ struct PhoneCalloutDonut: View {
                         Text(callout.percent).monospacedDigit()
                         Text(callout.label)
                     }
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(.system(size: 11.5, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -752,12 +752,12 @@ struct PhoneCalloutDonut: View {
                     VStack(spacing: 4) {
                         HStack(spacing: 3) {
                             Text(title)
-                            Image(systemName: "arrow.left.arrow.right").font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "arrow.left.arrow.right").font(.system(size: 11, weight: .medium))
                         }
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(DS.textSecondary)
                         Text(value)
-                            .font(DS.money(19, weight: .semibold))
+                            .font(DS.money(19, weight: .medium))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
@@ -953,7 +953,7 @@ struct PhoneSummaryCard: View {
                     Text(tr("Income"))
                     Text(tr("Balance"))
                 }
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(DS.textSecondary)
                 line(tr("Total"), summary.expense, summary.income, summary.balance, strong: true)
                 line(tr("Average"), summary.averageExpense, summary.averageIncome, summary.averageBalance, strong: true)
@@ -1054,6 +1054,6 @@ struct PhoneRecordsSheet: View {
             }
         }
         .scrollIndicators(.hidden)
-        .sheet(item: $editing) { TransactionEditor(transaction: $0) }
+        .sheet(item: $editing) { RecordDetailView(transaction: $0) }
     }
 }

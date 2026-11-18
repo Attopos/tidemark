@@ -24,7 +24,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .portfolio: return tr("Portfolio")
         case .ledger: return tr("Ledger")
-        case .accounts: return tr("Accounts")
+        case .accounts: return tr("Assets")
         case .analysis: return tr("Analysis")
         case .settings: return tr("Settings")
         }
@@ -236,6 +236,7 @@ final class AppState {
             if stats.updated > 0 { message += " · " + trf("%d updated", stats.updated) }
             if stats.accountsCreated > 0 { message += " · " + trf("%d accounts created", stats.accountsCreated) }
             if stats.rejected > 0 { message += " · " + trf("%d rows could not be read", stats.rejected) }
+            message += "\n" + tr("iCost exports carry records but not account balances. If a balance differs from iCost, set it in Assets › ⋯ › Reconcile.")
             ledgerImportMessage = message
             ledgerImportFailed = false
             if stats.inserted > 0 { section = .ledger }

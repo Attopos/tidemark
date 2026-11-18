@@ -50,7 +50,7 @@ struct PresetsView: View {
                     }
                 } label: {
                     Label(tr("Add"), systemImage: "plus")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 14, weight: .regular))
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
@@ -73,7 +73,7 @@ struct PresetsView: View {
                         if !group.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(type.title)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 13, weight: .regular))
                                     .foregroundStyle(DS.textSecondary)
                                 ForEach(group) { row($0, type: type) }
                             }
@@ -113,7 +113,7 @@ struct PresetsView: View {
                          kind: preset.kind, size: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(preset.name)
-                    .font(.system(size: 14.5, weight: .medium))
+                    .font(.system(size: 14.5, weight: .regular))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                 Text(subtitle(preset, type: type))
@@ -123,7 +123,7 @@ struct PresetsView: View {
             }
             Spacer(minLength: 8)
             Text(Fmt.money(preset.amount, preset.currencyCode))
-                .font(DS.money(14, weight: .medium))
+                .font(DS.money(14, weight: .regular))
                 .foregroundStyle(FlowPalette.amountColor(preset.kind))
                 .fixedSize()
         }

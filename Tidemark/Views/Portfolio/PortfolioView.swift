@@ -130,7 +130,7 @@ struct PortfolioView: View {
     private var settingsButton: some View {
         Button { app.section = .settings } label: {
             Image(systemName: "gearshape")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(DS.textSecondary)
                 .frame(width: 31, height: 31)
                 .background(DS.bgElevated)
@@ -148,7 +148,7 @@ struct PortfolioView: View {
                 .font(.system(size: 36, weight: .light))
                 .foregroundStyle(DS.textTertiary)
             Text(tr("No holdings yet"))
-                .font(.system(size: 19, weight: .medium))
+                .font(.system(size: 19, weight: .regular))
                 .foregroundStyle(DS.textPrimary)
             Text(tr("Import a holdings screenshot to get started."))
                 .font(DS.body)
@@ -243,7 +243,7 @@ struct PortfolioView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(Fmt.money(total, app.baseCurrency))
-                        .font(DS.money(40, weight: .medium))
+                        .font(DS.money(40, weight: .regular))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
@@ -287,7 +287,7 @@ struct PortfolioView: View {
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(group.exposure.displayName)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(group.exposure.ink)
                     .lineLimit(2)
                 Spacer(minLength: 22)
@@ -295,7 +295,7 @@ struct PortfolioView: View {
                     .font(.system(size: 13).monospacedDigit())
                     .foregroundStyle(group.exposure.ink.opacity(0.65))
                 Text(Fmt.moneyCompact(group.baseValue, baseCurrency))
-                    .font(DS.money(26, weight: .semibold))
+                    .font(DS.money(26, weight: .medium))
                     .foregroundStyle(group.exposure.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -521,7 +521,7 @@ struct PortfolioView: View {
                     if renaming {
                         TextField("", text: $draft)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 14.5, weight: .medium))
+                            .font(.system(size: 14.5, weight: .regular))
                             .foregroundStyle(DS.textPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -539,7 +539,7 @@ struct PortfolioView: View {
                             }
                     } else {
                         Text(row.name)
-                            .font(.system(size: 14.5, weight: .medium))
+                            .font(.system(size: 14.5, weight: .regular))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                             .onTapGesture(count: 2) { startRename() }
@@ -590,7 +590,7 @@ struct PortfolioView: View {
 
     private func columnHeader(_ text: String, width: CGFloat?, alignment: Alignment) -> some View {
         Text(text.uppercased())
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 11, weight: .regular))
             .tracking(1)
             .foregroundStyle(DS.textTertiary)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)
@@ -621,7 +621,7 @@ struct BalanceSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(tr("Update balance"))
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(DS.textPrimary)
             Text(holding.asset?.displayName ?? "—")
                 .font(DS.body)

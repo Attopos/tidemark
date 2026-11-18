@@ -126,24 +126,24 @@ enum DS {
 
     /// Oversized editorial page heading ("Portfolio overview")
     static func editorial(_ size: CGFloat = 38) -> Font {
-        .system(size: size, weight: .semibold)
+        .system(size: size, weight: .medium)
     }
-    static let sectionTitle = Font.system(size: 17, weight: .medium)
+    static let sectionTitle = Font.system(size: 17, weight: .regular)
     /// Small uppercase section label
-    static let label = Font.system(size: 13, weight: .medium)
+    static let label = Font.system(size: 13, weight: .regular)
     static let body = Font.system(size: 15)
     static let caption = Font.system(size: 13.5)
 
     /// Monetary figures: tabular in lists so columns line up, proportional
     /// when large and alone (tabular 1s and dots look gappy and wide).
-    static func money(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
+    static func money(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         size >= 24 ? .system(size: size, weight: weight) : .system(size: size, weight: weight).monospacedDigit()
     }
-    static let moneyHero = money(40, weight: .semibold)
-    static let moneyLarge = money(28, weight: .semibold)
+    static let moneyHero = money(40, weight: .medium)
+    static let moneyLarge = money(28, weight: .medium)
     static let moneyMedium = money(19)
-    static let moneySmall = money(15, weight: .medium)
-    static let moneyTable = money(15, weight: .medium)
+    static let moneySmall = money(15, weight: .regular)
+    static let moneyTable = money(15, weight: .regular)
 }
 
 // MARK: - Shared style modifiers

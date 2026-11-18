@@ -54,7 +54,7 @@ struct PhoneRootView: View {
                 .tabItem { Label(tr("Ledger"), systemImage: AppSection.ledger.icon) }
                 .tag(AppSection.ledger)
             StableTab { AccountsView() }.equatable()
-                .tabItem { Label(tr("Accounts"), systemImage: AppSection.accounts.icon) }
+                .tabItem { Label(tr("Assets"), systemImage: AppSection.accounts.icon) }
                 .tag(AppSection.accounts)
             StableTab { PhonePortfolioView() }.equatable()
                 .tabItem { Label(tr("Portfolio"), systemImage: AppSection.portfolio.icon) }

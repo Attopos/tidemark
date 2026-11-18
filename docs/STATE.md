@@ -1,25 +1,24 @@
 # 状态
 
-更新：2026-11-16
+更新：2026-11-18
 
 ## 现在
 
-从 2026-11-16 起日常记账改用 Tidemark。iCost 最新导出（2026-11-15 22:21，2658 行）已在 iPhone 上导入并同步到 Mac：两边各 2658 条，最新一条 11-15 11:52，一条在 iCost 里改过的账单（11-09 火车 361→581）被原地更新，没有重复。
-iPhone 与 Mac 功能一致、布局不同；全 App 用 SF Pro Rounded（根视图 .fontDesign），字重整体比原来降一档，24pt 以上的金额用比例数字；五个标签页共用 PageTitle，边距 25pt。投资组合在两端同步。
-导入：iCost 导出（21 列）和导入模板都能读，改过的账单按「同一秒+同类型」原地更新，文件里没有的只计数不删；先显示「将新增/将更新/已存在/文件中没有」再确认；iPhone 可从「文件」选择，或在 iCost 里把文件分享给 Tidemark。
-任何收支记录都能设为「不计入」：长按记录选「不计入支出/收入」、快速记账的「不计入」按钮、编辑页开关；行上显示「不计入」并淡化金额，统计不算、账户余额照算。
-录入（iPhone 与 Mac 同一个 QuickEntryView）按用户给的 iCost 截图复刻、边距 10pt：关闭 + 支出/收入/转账 + 右上日期；线条图标分类网格（标签带 emoji），选中后该行下展开二级面板；快捷标签（账户、报销、不计入、图片＝截图识别）+ 齿轮＝完整编辑器；金额/时间/备注卡片；键盘 1-2-3-+× / 4-5-6-−÷ / 7-8-9-再记 / .-0-⌫-完成。Mac 可直接用键盘输入数字和运算符。
-卡顿已修（真机测）：同步每 2 秒轮询都在主线程重写 7 MB 的 sync-state，造成每 2 秒约 80 ms 卡顿；现在无变化不写、写入放后台。录入页每次按键最差帧从 140–170 ms 降到 17–25 ms。
-导出：iCost 的导入模板格式（表 icost_template，10 列中文表头，金额为正数），在 iCost「设置 › 账单导入 › 模板导入」可导入；Mac 设置里也能导出。
+日常记账用 Tidemark（从 2026-11-16 起）；iCost 导出（2026-11-15，2658 行）已导入，iPhone 与 Mac 同步一致。
+点开任一账单进入「账单详情」（照 iCost）：编辑/删除 + 分组卡片（类型、账本、日期、金额、币种、账户、备注、图片、地址、优惠/退款/手续费/报销、不计入开关），iPhone 和 Mac 共用 RecordDetailView。
+资产页照 iCost 排版：净资产卡、借入/借出、分组「资金账户 (n)」+ 余额；账户自动配内置图标（各大银行、余额宝、微信、支付宝、Visa/Master、交通卡、咖啡/商店、各币种现金国旗），按名称和类型匹配，匹配不到用首字母。
+账户余额已对齐 iCost 截图（2026-11-18）：iCost 导出不带初始余额，所以按「iCost 余额 − 已导入账单」写入各账户的初始余额；iCost 资产页里没有的账户余额置 0 并归档；负债 ¥267.29 记在新建的信用账户「YEB Credit」。Tidemark 里 11-15 之后的新账单照常叠加（YEB 因此比 iCost 少 ¥322.41）。
+字体：SF Pro Rounded，字重再降一档（semibold→medium，medium→regular）；iPhone 边距 25pt、分组标题与卡片左对齐、滚动条隐藏。
+导出仍是 iCost 导入模板（10 列），导入两种格式都读，往返测试通过；导入后提示「余额不一致去对账」。
 
 ## 下一步
 
-- 在 iPhone 的 iCost 里试导入一次 Tidemark 导出的文件，确认分类、账户、转账类型都对。
-- 用几天看录入流程是否还有缺口。
+- 用户在 iPhone 上看一遍详情页、资产页和字体粗细是否满意。
+- 「YEB Credit」名字是暂定的，用户可在资产页改名或改成花呗。
 
 ## 注意
 
-- 导入前备份：~/Library/Application Support/Tidemark Backups/before-import-20261115/（Mac 与 iPhone 的数据库、当天 JSON 备份）。
-- 导出给 iCost 时：退款按净额，地址/优惠/手续费/标签和「不计入」都不导出（模板没有这些列，iCost 自己的导出也不带）；投资记录和余额调整不导出。
-- 构建测试通过后直接更新文档、合并进 main 并 push，不用再问。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。
-- 调试：TIDEMARK_PERF / TIDEMARK_PERF_ENTRY（录入页逐键测帧+截图，不保存）/ TIDEMARK_SHOTS / TIDEMARK_IMPORT_TEST（devicectl -e），仅 Debug 构建。
+- 余额对齐前备份：~/Library/Application Support/Tidemark Backups/before-balances-20261118/（Mac 数据库）；导入前备份在 before-import-20261115/。
+- 账户图标没加模型字段（加字段要部署 CloudKit 结构），改类型或名称即可换图标。
+- 调试：TIDEMARK_ACCOUNT_SEED（Mac，JSON 按名称设余额/类型/卡号/归档，余额只扣已导入的 iCost 账单）、TIDEMARK_SHOTS（+TIDEMARK_SHOTS_AMOUNTS 显示金额，含详情页截图）、TIDEMARK_PERF*、TIDEMARK_IMPORT_TEST，仅 Debug。
+- 构建测试通过后直接更新文档、合并进 main 并 push。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。

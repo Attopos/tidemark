@@ -22,8 +22,8 @@ struct PageTitle<Trailing: View>: View {
         HStack(spacing: 10) {
             Text(title)
                 #if os(iOS)
-                .font(.system(size: Self.size, weight: .semibold))
-                .padding(.leading, -TextMetrics.leftBearing(of: title, size: Self.size, weight: .semibold))
+                .font(.system(size: Self.size, weight: .medium))
+                .padding(.leading, -TextMetrics.leftBearing(of: title, size: Self.size, weight: .medium))
                 #else
                 .font(DS.title(30))
                 #endif
@@ -34,8 +34,8 @@ struct PageTitle<Trailing: View>: View {
             trailing
         }
         #if os(iOS)
-        .frame(height: TextMetrics.lineHeight(size: Self.size, weight: .semibold))
-        .padding(.top, DS.phoneTopMargin - TextMetrics.capInset(size: Self.size, weight: .semibold))
+        .frame(height: TextMetrics.lineHeight(size: Self.size, weight: .medium))
+        .padding(.top, DS.phoneTopMargin - TextMetrics.capInset(size: Self.size, weight: .medium))
         #endif
     }
 }
@@ -99,7 +99,7 @@ struct RoundIcon: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.4, weight: .semibold))
+            .font(.system(size: size * 0.4, weight: .medium))
             .foregroundStyle(active ? DS.ink : DS.textPrimary)
             .frame(width: size, height: size)
             .background(active ? DS.accent : DS.tile)
