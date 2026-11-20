@@ -107,11 +107,27 @@ final class PerfProbe: NSObject {
 
     /// TIDEMARK_PERF_ENTRY=1: opens quick entry, taps categories and keys
     /// (never saves) and logs each tap's worst frame to perf-entry.log.
-    func runEntry(app: AppState) async {
+    var probeContext: ModelContext?
+
+    func runEntry(app: AppState, context: ModelContext? = nil) async {
+        probeContext = context
         try? await Task.sleep(for: .seconds(6))
+        if let tabs = ProcessInfo.processInfo.environment["TIDEMARK_PERF_TABS"] {
+            let all: [AppSection] = [.accounts, .portfolio, .analysis, .settings]
+            for section in all where tabs == "1" || tabs.contains(section.rawValue) {
+                app.section = section
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
         app.section = .ledger
         try? await Task.sleep(for: .seconds(1))
         var lines = ["perf-entry \(Date())"]
+        if let context {
+            let leftover = (try? context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { $0.note == "perf-probe" }))) ?? []
+            leftover.forEach(context.delete)
+            if !leftover.isEmpty { try? context.save() }
+            lines.append("leftover probe records removed: \(leftover.count)")
+        }
         let open = await measure { NotificationCenter.default.post(name: Self.openEntry, object: nil) }
         lines.append(String(format: "open: worst %.0f ms, stalled %.0f ms", open.worst, open.stalled))
         let keys = ["cat:0", "1", "2", ".", "5", "+×", "3", "cat:1", "cat:2", "8", "⌫", "−÷", "4", "cat:3", "9", "9",
@@ -123,6 +139,29 @@ final class PerfProbe: NSObject {
             lines.append(String(format: "%@: worst %.0f ms", key, r.worst))
         }
         lines.append(String(format: "taps: mean worst %.0f ms, max %.0f ms", sum / Double(keys.count), worstKey))
+        PerfLog.lines.removeAll()
+        let post: (String) -> Void = { NotificationCenter.default.post(name: Self.entryKey, object: $0) }
+        post("cat:0"); post("⌫"); post("⌫"); post("⌫"); post("⌫"); post("⌫"); post("⌫"); post("1")
+        try? await Task.sleep(for: .milliseconds(300))
+        let againAnim = await measure(wait: 450) { post("save") }
+        let again = await measure(wait: 2600) {}
+        lines.append(String(format: "save (again): during badge %.0f ms; after: worst %.0f ms, stalled %.0f ms", againAnim.worst, again.worst, again.stalled))
+        for key in ["2", "3", ".", "5"] {
+            let r = await measure(wait: 200) { post(key) }
+            lines.append(String(format: "after-save %@: worst %.0f ms", key, r.worst))
+        }
+        let doneAnim = await measure(wait: 380) { post("done") }
+        let done = await measure(wait: 3000) {}
+        lines.append(String(format: "save (done+dismiss): during dismiss %.0f ms; after: worst %.0f ms, stalled %.0f ms", doneAnim.worst, done.worst, done.stalled))
+        lines.append(contentsOf: PerfLog.lines.map { "  " + $0 })
+        if let context = probeContext {
+            let probe = (try? context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { $0.note == "perf-probe" }))) ?? []
+            probe.forEach(context.delete)
+            try? context.save()
+            lines.append("deleted \(probe.count) probe records")
+        }
+        try? await Task.sleep(for: .milliseconds(800))
+        post("noop")
         for key in ["cat:0", "sub:0", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫", "⌫"] {
             NotificationCenter.default.post(name: Self.entryKey, object: key)
             try? await Task.sleep(for: .milliseconds(150))

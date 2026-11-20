@@ -105,8 +105,18 @@ struct EntryStats {
     var lastAccount: [TransactionKind: UUID] = [:]
     var lastTransferTarget: UUID?
 
-    @MainActor
-    static func load(_ context: ModelContext) -> EntryStats {
+    /// The last result, so the sheet opens with its grid already filled.
+    @MainActor static var latest: EntryStats?
+
+    /// Counted on a background context; opening the sheet waited ~200 ms
+    /// for this on the main thread.
+    static func refresh(_ container: ModelContainer) async -> EntryStats {
+        let stats = await Task.detached(priority: .userInitiated) { load(ModelContext(container)) }.value
+        await MainActor.run { latest = stats }
+        return stats
+    }
+
+    nonisolated static func load(_ context: ModelContext) -> EntryStats {
         var descriptor = FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date, order: .reverse)])
         descriptor.fetchLimit = 3000
         descriptor.propertiesToFetch = [\.kindRaw, \.category, \.subcategory, \.date]
@@ -202,7 +212,7 @@ struct QuickEntryView: View {
                         .padding(.horizontal, Self.margin)
                 }
                 EntryPad(input: input, kind: kind, currency: account?.currencyCode ?? "CNY",
-                         date: date, onMore: openMore, onSave: save)
+                         date: date, savedCount: savedCount, onMore: openMore, onSave: save)
                     .padding(.horizontal, Self.margin)
             }
             .padding(.top, 6)
@@ -220,7 +230,7 @@ struct QuickEntryView: View {
             accountID = stats.lastAccount[kind] ?? accounts.first?.id
             if kind == .transfer && transferAccountID == nil { transferAccountID = stats.lastTransferTarget }
         }
-        .sheet(item: $moreDraft, onDismiss: { stats = EntryStats.load(context) }) {
+        .sheet(item: $moreDraft, onDismiss: load) {
             TransactionEditor(transaction: nil, draft: $0.draft)
         }
         #if os(iOS)
@@ -240,14 +250,28 @@ struct QuickEntryView: View {
             guard let key = note.object as? String, key != "noop" else { return }
             if key.hasPrefix("cat:"), let i = Int(key.dropFirst(4)), i < names.count { pick(names[i]) }
             else if key == "sub:0", let first = subs(category).first { subcategory = first }
+            else if key == "save" || key == "done" { input.note = "perf-probe"; save(closing: key == "done") }
             else { input.press(key) }
         }
         #endif
     }
 
     private func load() {
-        stats = EntryStats.load(context)
-        if accountID == nil { accountID = stats.lastAccount[kind] ?? accounts.first?.id }
+        #if os(iOS)
+        keyTapFeedback.prepare()
+        savedFeedback.prepare()
+        #endif
+        if let latest = EntryStats.latest { use(latest) }
+        let container = context.container
+        Task { @MainActor in
+            let fresh = await EntryStats.refresh(container)
+            withAnimation(.easeOut(duration: 0.18)) { use(fresh) }
+        }
+    }
+
+    private func use(_ fresh: EntryStats) {
+        stats = fresh
+        if accountID == nil { accountID = fresh.lastAccount[kind] ?? accounts.first?.id }
     }
 
     // MARK: Top bar
@@ -519,28 +543,38 @@ struct QuickEntryView: View {
         } else if category.isEmpty {
             return
         }
-        let record = Transaction(date: date, kind: kind, amount: amount,
-                                 currencyCode: account?.currencyCode ?? "CNY",
-                                 category: kind == .transfer ? "Transfer" : category,
-                                 subcategory: kind == .transfer ? "" : subcategory,
-                                 note: input.note.trimmingCharacters(in: .whitespaces),
-                                 account: account,
-                                 transferAccount: kind == .transfer ? accounts.first { $0.id == transferAccountID } : nil)
-        if kind == .expense && claim { record.claimStatus = .pending }
-        if kind != .transfer && excluded { record.excludeFromStats = true }
-        context.insert(record)
-        try? context.save()
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
+        let values = (date: date, kind: kind, account: account, category: category, subcategory: subcategory,
+                      note: input.note.trimmingCharacters(in: .whitespaces), claim: claim, excluded: excluded,
+                      target: accounts.first { $0.id == transferAccountID })
+        let context = context
+        // Stored once the sheet or the "recorded" badge has finished moving:
+        // the save redraws the ledger behind, which would stutter the motion.
+        let commit = {
+            let record = Transaction(date: values.date, kind: values.kind, amount: amount,
+                                     currencyCode: values.account?.currencyCode ?? "CNY",
+                                     category: values.kind == .transfer ? "Transfer" : values.category,
+                                     subcategory: values.kind == .transfer ? "" : values.subcategory,
+                                     note: values.note,
+                                     account: values.account,
+                                     transferAccount: values.kind == .transfer ? values.target : nil)
+            if values.kind == .expense && values.claim { record.claimStatus = .pending }
+            if values.kind != .transfer && values.excluded { record.excludeFromStats = true }
+            context.insert(record)
+            PerfLog.time("entry.save") { try? context.save() }
+        }
         if closing {
+            #if os(iOS)
+            savedFeedback.notificationOccurred(.success)
+            #endif
             dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: commit)
         } else {
             savedCount += 1
-            input.expression = ""
+            withAnimation(.snappy(duration: 0.22)) { input.expression = "" }
             input.note = ""
             claim = false
             excluded = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: commit)
         }
     }
 }
@@ -676,9 +710,12 @@ private struct EntryPad: View {
     let kind: TransactionKind
     let currency: String
     let date: Date
+    let savedCount: Int
     let onMore: () -> Void
     let onSave: (_ closing: Bool) -> Void
     @FocusState private var padFocused: Bool
+    @State private var toast = false
+    @State private var bump = false
 
     private static let rows = [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
                                ["7", "8", "9", "again"], [".", "0", "⌫", "done"]]
@@ -686,7 +723,29 @@ private struct EntryPad: View {
     var body: some View {
         VStack(spacing: 8) {
             card
+                .scaleEffect(bump ? 0.97 : 1)
+                .overlay(alignment: .top) {
+                    if toast {
+                        Label(trf("%d recorded", savedCount), systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(DS.ink)
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .background(Capsule().fill(DS.accent))
+                            .offset(y: -16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.8)))
+                    }
+                }
                 .padding(.bottom, 4)
+                .onChange(of: savedCount) { _, _ in
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) { bump = true; toast = true }
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(140))
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { bump = false }
+                        try? await Task.sleep(for: .milliseconds(1000))
+                        withAnimation(.easeOut(duration: 0.25)) { toast = false }
+                    }
+                }
             VStack(spacing: 7) {
                 ForEach(Self.rows, id: \.self) { row in
                     HStack(spacing: 7) {
@@ -722,6 +781,8 @@ private struct EntryPad: View {
                 Text(Fmt.money(input.amount ?? 0, currency))
                     .font(DS.money(34))
                     .foregroundStyle(amountColor)
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.22), value: input.expression)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .layoutPriority(1)
@@ -770,14 +831,14 @@ private struct EntryPad: View {
     private func key(_ key: String) -> some View {
         let isDone = key == "done"
         let isAgain = key == "again"
-        return Button {
+        return PadKey(fill: isDone ? DS.accent : DS.bgElevated, height: keyHeight, firesOnTouchDown: !isDone && !isAgain) {
             if isDone { onSave(true) }
             else if isAgain { onSave(false) }
             else { input.press(key) }
         } label: {
             Group {
                 switch key {
-                case "⌫": Image(systemName: "delete.left.fill").font(.system(size: 22).monospacedDigit())
+                case "⌫": Image(systemName: "delete.left.fill").font(.system(size: 22))
                 case "+×": Text("+ ×")
                 case "−÷": Text("− ÷")
                 case "again": Text(tr("Again"))
@@ -785,16 +846,10 @@ private struct EntryPad: View {
                 default: Text(key)
                 }
             }
-            .font(.system(size: isDone || isAgain ? 18 : 25, weight: isDone || isAgain ? .semibold : .regular).monospacedDigit()
+            .font(.system(size: isDone || isAgain ? 18 : 25, weight: isDone || isAgain ? .semibold : .regular)
                 .monospacedDigit())
             .foregroundStyle(isDone ? DS.ink : DS.textPrimary)
-            .frame(maxWidth: .infinity)
-            .frame(height: keyHeight)
-            .background(isDone ? DS.accent : DS.bgElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     private var keyHeight: CGFloat {
@@ -805,3 +860,54 @@ private struct EntryPad: View {
         #endif
     }
 }
+
+/// A keypad key that types on touch-down (a Button waits for the finger to
+/// lift, which reads as lag when typing fast) and dips while held.
+private struct PadKey<Label: View>: View {
+    let fill: Color
+    let height: CGFloat
+    let firesOnTouchDown: Bool
+    let action: () -> Void
+    @ViewBuilder let label: () -> Label
+    @State private var pressed = false
+    @State private var cancelled = false
+
+    var body: some View {
+        label()
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .background(fill.opacity(pressed ? 0.7 : 1))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .scaleEffect(pressed ? 0.95 : 1)
+            .animation(.spring(response: 0.18, dampingFraction: 0.7), value: pressed)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !pressed && !cancelled {
+                            pressed = true
+                            if firesOnTouchDown { fire() }
+                        }
+                        let inside = abs(value.translation.width) < 40 && abs(value.translation.height) < 40
+                        if !inside && pressed && !firesOnTouchDown { pressed = false; cancelled = true }
+                    }
+                    .onEnded { _ in
+                        if pressed && !firesOnTouchDown { fire() }
+                        pressed = false
+                        cancelled = false
+                    }
+            )
+    }
+
+    private func fire() {
+        #if os(iOS)
+        keyTapFeedback.impactOccurred(intensity: 0.6)
+        #endif
+        action()
+    }
+}
+
+#if os(iOS)
+@MainActor private let keyTapFeedback = UIImpactFeedbackGenerator(style: .soft)
+@MainActor private let savedFeedback = UINotificationFeedbackGenerator()
+#endif

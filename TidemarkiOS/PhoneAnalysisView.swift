@@ -10,9 +10,11 @@ import Charts
 
 struct PhoneAnalysisView: View {
     @Environment(AppState.self) private var app
-    @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
-    @Query private var accounts: [Account]
-    @Query private var rates: [CurrencyRate]
+    @Environment(\.modelContext) private var context
+    @State private var feeds = LedgerFeeds()
+    private var transactions: [Transaction] { feeds.records.rows(context) }
+    private var accounts: [Account] { feeds.accounts.rows(context) }
+    private var rates: [CurrencyRate] { feeds.rates.rows(context) }
 
     @State private var editingRange = false
     @State private var records: PhoneRecordsSelection?
@@ -25,17 +27,23 @@ struct PhoneAnalysisView: View {
         app.cashPeriod.unit == .all ? allPeriod : app.cashPeriod
     }
 
-    var body: some View {
+    var body: some View { page.ledgerFeeds(feeds, app: app, section: .analysis) }
+
+    @ViewBuilder private var page: some View {
         @Bindable var app = app
         let period = self.period
-        let snapshot = LedgerSnapshot(transactions: transactions, accounts: accounts, rates: rates,
-                                      code: app.baseCurrency)
+        let (snapshot, summary, buckets, trend, transfers) = feeds.derived([AnyHashable(period), AnyHashable(app.baseCurrency)]) {
+            let snapshot = PerfLog.time("analysis.snapshot") {
+                LedgerSnapshot(transactions: transactions, accounts: accounts, rates: rates, code: app.baseCurrency)
+            }
+            return (snapshot,
+                    CashflowAnalytics.summary(snapshot.entries, in: period),
+                    CashflowAnalytics.buckets(snapshot.entries, in: period),
+                    AccountLedger.trend(accounts: snapshot.ledgerAccounts, movements: snapshot.movements,
+                                        period: period, converter: snapshot.converter),
+                    CashflowAnalytics.transfers(snapshot.entries, in: period))
+        }
         let code = snapshot.code
-        let summary = CashflowAnalytics.summary(snapshot.entries, in: period)
-        let buckets = CashflowAnalytics.buckets(snapshot.entries, in: period)
-        let trend = AccountLedger.trend(accounts: snapshot.ledgerAccounts, movements: snapshot.movements,
-                                        period: period, converter: snapshot.converter)
-        let transfers = CashflowAnalytics.transfers(snapshot.entries, in: period)
 
         ScrollView {
                 VStack(spacing: 14) {

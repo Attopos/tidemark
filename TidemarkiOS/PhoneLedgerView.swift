@@ -9,9 +9,24 @@ import PhotosUI
 // and one large button in the thumb's corner that opens a new record. The
 // calendar and the search field are a tap away rather than always on screen.
 
+/// Reads only the shown period's records: refetching and reading all of them
+/// after every save cost ~150 ms on the phone.
 struct PhoneLedgerView: View {
     @Environment(AppState.self) private var app
-    @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
+
+    var body: some View { PhoneLedgerPage(period: app.cashPeriod) }
+}
+
+private struct PhoneLedgerPage: View {
+    @Environment(AppState.self) private var app
+    @Query private var transactions: [Transaction]
+    @State private var allRecords: [Transaction] = []
+
+    init(period: CashPeriod) {
+        let start = period.start, limit = period.limit
+        _transactions = Query(filter: #Predicate<Transaction> { $0.date >= start && $0.date < limit },
+                              sort: \.date, order: .reverse, animation: .snappy)
+    }
     @Query private var rates: [CurrencyRate]
 
     @State private var showsCalendar = false
@@ -19,7 +34,6 @@ struct PhoneLedgerView: View {
     @State private var selectedDay: Date?
     @State private var search = ""
     @State private var editing: Transaction?
-    @State private var creating = false
     @State private var receiptItem: PhotosPickerItem?
     @State private var pendingReceipt: PendingReceipt?
     @State private var readingReceipt = false
@@ -44,25 +58,27 @@ struct PhoneLedgerView: View {
         let code = app.baseCurrency
         let converter = CurrencyConverter(rates: rates, base: code)
         let period = app.cashPeriod
-        let entries = transactions.map { $0.cashEntry(using: converter) }
+        let inPeriod = transactions.filter { period.contains($0.date) }
+        let entries = inPeriod.map { $0.cashEntry(using: converter) }
+        let baseByID = Dictionary(zip(inPeriod.map(\.id), entries.map(\.base)), uniquingKeysWith: { a, _ in a })
         let summary = CashflowAnalytics.summary(entries, in: period)
         let query = search.trimmingCharacters(in: .whitespaces).lowercased()
         let calendar = Calendar.current
 
         // Search looks through everything; otherwise the month, or one day of it.
         let shown: [Transaction] = {
-            if !query.isEmpty { return transactions.filter { matches($0, query) } }
+            if !query.isEmpty { return allRecords.filter { matches($0, query) } }
             if showsCalendar, let day = selectedDay {
                 return transactions.filter { calendar.isDate($0.date, inSameDayAs: day) }
             }
-            return transactions.filter { period.contains($0.date) }
+            return inPeriod
         }()
         let groups: [DayGroup] = Dictionary(grouping: shown) { calendar.startOfDay(for: $0.date) }
             .map { day, records in
                 var expense: Decimal = 0
                 var income: Decimal = 0
                 for record in records where !record.excludeFromStats {
-                    let base = record.cashEntry(using: converter).base
+                    let base = baseByID[record.id] ?? record.cashEntry(using: converter).base
                     if record.kind == .expense { expense += base }
                     if record.kind == .income { income += base }
                 }
@@ -84,7 +100,8 @@ struct PhoneLedgerView: View {
                         }
                     }
                     if groups.isEmpty {
-                        Text(transactions.isEmpty ? tr("No records yet") : tr("No records"))
+                        Text(((try? context.fetchCount(FetchDescriptor<Transaction>())) ?? 0) == 0
+                             ? tr("No records yet") : tr("No records"))
                             .font(DS.body)
                             .foregroundStyle(DS.textTertiary)
                             .frame(maxWidth: .infinity, minHeight: 160)
@@ -97,7 +114,7 @@ struct PhoneLedgerView: View {
                 .padding(.top, PageTitle<EmptyView>.pageTop)
                 .padding(.bottom, 110) // room for the add button
             }
-            addButton
+            AddRecordButton()
         }
         .background(DS.page)
         .sheet(item: $editing) { RecordDetailView(transaction: $0) }
@@ -112,13 +129,8 @@ struct PhoneLedgerView: View {
                 pendingReceipt = PendingReceipt(draft: await ReceiptImport.draft(from: image, context: context))
             }
         }
-        .sheet(isPresented: $creating) {
-            QuickEntryView()
-                .presentationDetents([.large])
-        }
         .onChange(of: app.cashPeriod) { _, _ in selectedDay = nil }
         #if DEBUG
-        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openEntry)) { _ in creating = true }
         .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openDetail)) { _ in
             editing = transactions.first { !$0.address.isEmpty } ?? transactions.first
         }
@@ -139,6 +151,9 @@ struct PhoneLedgerView: View {
                 RoundIconButton(symbol: "magnifyingglass", active: showsSearch) {
                     showsSearch.toggle()
                     if !showsSearch { search = "" }
+                    allRecords = showsSearch
+                        ? (try? context.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date, order: .reverse)]))) ?? []
+                        : []
                 }
             }
             HStack(spacing: 8) {
@@ -274,9 +289,14 @@ struct PhoneLedgerView: View {
         context.delete(record)
         try? context.save()
     }
+}
 
-    /// The one thing this page is for.
-    private var addButton: some View {
+/// The add button owns the entry sheet, so opening and closing it does not
+/// redraw the whole ledger (that cost a ~100 ms frame mid-dismiss).
+private struct AddRecordButton: View {
+    @State private var creating = false
+
+    var body: some View {
         Button { creating = true } label: {
             Image(systemName: "plus")
                 .font(.system(size: 28, weight: .medium).monospacedDigit())
@@ -291,5 +311,12 @@ struct PhoneLedgerView: View {
         .padding(.trailing, DS.phoneMargin)
         .padding(.bottom, 18)
         .accessibilityLabel(tr("Add record"))
+        .sheet(isPresented: $creating) {
+            QuickEntryView()
+                .presentationDetents([.large])
+        }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openEntry)) { _ in creating = true }
+        #endif
     }
 }
