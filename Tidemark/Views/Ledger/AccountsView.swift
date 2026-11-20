@@ -1,18 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Accounts — where the cash is
-//
-// Laid out like a bookkeeping app's asset page: net assets on top (what you
-// hold minus what you owe), money lent out and borrowed beside it, then the
-// accounts in groups — funds, credit cards, prepaid cards, money owed to you,
-// money you owe — each with its own total and collapsible. A row shows the
-// account's description, card number and type; a credit card shows what is
-// owed, the credit left and the days to its statement. Balances are the
-// opening balance plus every record that touched the account; Reconcile sets
-// them to what the bank shows. Investment and crypto accounts live on the
-// Portfolio page, not here.
-
 struct AccountsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
@@ -27,7 +15,6 @@ struct AccountsView: View {
     @State private var editingRecord: Transaction?
     @State private var showArchived = false
     @State private var reconciling = false
-    /// Groups folded shut (remembered).
     @AppStorage("collapsedAccountGroups") private var collapsedRaw = ""
 
     private var collapsed: Set<String> { Set(collapsedRaw.split(separator: ",").map(String.init)) }
@@ -87,7 +74,6 @@ struct AccountsView: View {
         }
         .sheet(item: $editingRecord) { RecordDetailView(transaction: $0) }
         #if os(iOS)
-        // On the phone an account opens as its own sheet.
         .sheet(item: Binding(get: { snapshot.accounts.first { $0.id == selectedID } },
                              set: { selectedID = $0?.id })) { account in
             ScrollView { accountDetail(account, snapshot: snapshot).padding(16) }
@@ -96,8 +82,6 @@ struct AccountsView: View {
         }
         #endif
     }
-
-    // MARK: Header
 
     private var header: some View {
         @Bindable var app = app
@@ -119,8 +103,6 @@ struct AccountsView: View {
         }
         .padding(.bottom, 4)
     }
-
-    // MARK: Summary
 
     private func summary(_ snapshot: LedgerSnapshot) -> some View {
         @Bindable var app = app
@@ -173,8 +155,6 @@ struct AccountsView: View {
         .background(DS.panel)
         .clipShape(RoundedRectangle(cornerRadius: DS.tileRadius, style: .continuous))
     }
-
-    // MARK: Groups
 
     private func baseValue(_ account: Account, _ snapshot: LedgerSnapshot) -> Decimal {
         snapshot.converter.toBase(snapshot.balances[account.id] ?? 0, account.currencyCode)
@@ -298,8 +278,6 @@ struct AccountsView: View {
         }
     }
 
-    // MARK: Detail
-
     @ViewBuilder
     private func detail(snapshot: LedgerSnapshot) -> some View {
         if let account = snapshot.accounts.first(where: { $0.id == selectedID }) {
@@ -331,7 +309,6 @@ struct AccountsView: View {
     }
 }
 
-/// Round account badge: the first letter on the group's color.
 struct AccountIcon: View {
     let account: Account
     var size: CGFloat = 36
@@ -359,13 +336,6 @@ struct AccountIcon: View {
         }
     }
 }
-
-// MARK: - Reconcile
-//
-// All accounts in one table: type the balance each one really has today and
-// tick the ones that no longer exist. Used once after importing records from
-// another app (an export carries the records but not the balances), and
-// whenever the ledger has drifted from the bank.
 
 struct ReconcileSheet: View {
     @Environment(\.modelContext) private var context
@@ -398,8 +368,6 @@ struct ReconcileSheet: View {
                 .foregroundStyle(DS.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView {
-                // Name on its own line, so long account names are never cut
-                // to make room for the figures (the sheet is narrow on a phone).
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(accounts) { account in
                         VStack(alignment: .leading, spacing: 6) {

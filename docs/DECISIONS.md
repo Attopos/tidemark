@@ -90,3 +90,7 @@
 ## 2026-11-20 全站字号统一
 
 - 用户嫌资产、投资页字偏大：抽出 TS 字号/间距表和共用卡片（PhoneCard 等从分析页移到 DesignSystem），各页改用同一组 token，不再各写数字。AccountsView 和 ExposureCard 是 Mac 共用的，所以 TS 在 Mac 上整体放大 1.08 倍，避免 Mac 变得太小。
+
+## 2026-11-20 删除全部代码注释
+
+- 用户要求代码里不留注释：脚本按 Swift 词法（跳过字符串、插值、raw string）删掉 64 个 Swift 文件里的 1212 处 // 和 /* */（含 MARK），顺带合并多余空行。build.sh 的用法说明（# 注释）保留，gitignore 的 ZZLocal 测试未动。

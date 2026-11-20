@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Analysis — the period in numbers
-//
-// The same period as the Ledger page, laid out for reading rather than
-// entering: income and expense figures, the trend of cash net assets, money
-// moved between own accounts, a per-day (or per-month) summary table, the
-// bar statistics and the category breakdown.
-
 struct AnalysisView: View {
     @Environment(AppState.self) private var app
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
@@ -120,8 +113,6 @@ struct AnalysisView: View {
         }
     }
 }
-
-// MARK: - Summary table
 
 struct SummaryTable: View {
     let buckets: [CashBucket]

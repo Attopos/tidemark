@@ -1,14 +1,6 @@
 import Foundation
 import CoreGraphics
 
-// MARK: - Screenshot platforms
-//
-// One OCR pipeline, several layouts. Each platform decides where its holdings
-// land (standing account, currency, data source). Values are stored in the
-// currency the screenshot shows; the app converts to the base currency (RMB)
-// at display time with the dated rate for the valuation day, so history stays
-// correct when the exchange rate moves.
-
 enum ScreenshotPlatform: String, CaseIterable {
     case alipay
     case binance
@@ -34,7 +26,6 @@ enum ScreenshotPlatform: String, CaseIterable {
         }
     }
 
-    /// Currency the screenshot's values are quoted in.
     var currencyCode: String {
         switch self {
         case .alipay: return "CNY"
@@ -50,10 +41,7 @@ enum ScreenshotPlatform: String, CaseIterable {
     }
 }
 
-// MARK: - Platform detection
-
 enum ScreenshotParser {
-    /// Parse with every layout and keep the one that explains the screenshot.
     static func parse(lines: [RecognizedLine]) -> ScreenshotParseOutput {
         let binance = BinanceScreenshotParser.parse(lines: lines)
         let alipay = AlipayScreenshotParser.parse(lines: lines)
@@ -66,28 +54,7 @@ enum ScreenshotParser {
     }
 }
 
-// MARK: - Binance asset list
-//
-// Layout (web "My Assets → Asset View", and the app's asset list):
-//
-//   [icon] BTC        0.0100000000     $50,000.00        - $100.00
-//          Bitcoin    $500.00          $60,000.00 (cost)
-//
-// An asset starts at a row holding a short ticker on the left and a bare
-// quantity (no currency sign) to its right. The rows below it, up to the next
-// asset, carry the full name, the USD value under the quantity, the cost price
-// under the price, and the floating PNL (signed) on the right.
-//
-// Quantity × price is cross-checked against the shown value; when they agree
-// the row is trusted, when they don't the quantity's decimal point (often
-// dropped by Vision on tiny amounts: "0.0200000000" → "00200000000") is
-// repaired from the same digits if exactly that makes them agree, and the row
-// is flagged for review. Stablecoins are cash, not positions: they are parsed
-// but excluded by default.
-
 enum BinanceScreenshotParser {
-
-    /// Stablecoins held as cash; shown in review but not imported by default.
     static let cashTickers: Set<String> = ["USDT", "USDC"]
 
     static let markers = ["est. total value", "my assets", "asset view", "account view",
@@ -100,31 +67,25 @@ enum BinanceScreenshotParser {
         }
     }
 
-    // MARK: Line classification
-
     private static func normalized(_ text: String) -> String {
         AlipayScreenshotParser.normalize(text)
     }
 
-    /// Line carries a dollar amount ("$500.00", "- $100.00", "≈ $10.00").
     static func isDollar(_ text: String) -> Bool {
         normalized(text).contains("$")
     }
 
-    /// Signed dollar amount: the floating PNL column.
     static func isSignedDollar(_ text: String) -> Bool {
         let t = normalized(text).replacingOccurrences(of: "−", with: "-")
         guard t.contains("$") else { return false }
         return t.range(of: #"^[-+]\s*\$"#, options: .regularExpression) != nil
     }
 
-    /// A bare quantity: digits, separators, nothing else.
     static func isBareQuantity(_ text: String) -> Bool {
         let t = normalized(text).replacingOccurrences(of: " ", with: "")
         return t.range(of: #"^\d[\d,]*(\.\d+)?$"#, options: .regularExpression) != nil
     }
 
-    /// Ticker/name text with icon glyphs and OCR punctuation removed.
     static func cleanLabel(_ text: String) -> String {
         let kept = normalized(text).unicodeScalars.filter { scalar in
             (scalar.isASCII && (CharacterSet.alphanumerics.contains(scalar) || " &.-,'".unicodeScalars.contains(scalar)))
@@ -149,12 +110,9 @@ enum BinanceScreenshotParser {
     }
 
     private static func dollarValue(_ line: RecognizedLine) -> Decimal? {
-        // "≈ $10.00" — drop the approx sign before reading the number.
         let t = normalized(line.text).replacingOccurrences(of: "≈", with: "").replacingOccurrences(of: "~", with: "")
         return AlipayScreenshotParser.extractNumber(t)?.value
     }
-
-    // MARK: Parse
 
     struct Anchor {
         let rowIndex: Int
@@ -184,7 +142,6 @@ enum BinanceScreenshotParser {
             let block = anchorRow + below
             let qtyLine = anchor.quantityLine
 
-            // A real asset row always shows a dollar figure somewhere.
             guard block.contains(where: { isDollar($0.text) }) else { continue }
 
             let price = anchorRow
@@ -196,7 +153,7 @@ enum BinanceScreenshotParser {
             let value = below
                 .filter { isDollar($0.text) && !isSignedDollar($0.text)
                           && Swift.abs($0.box.maxX - qtyLine.box.maxX) < 0.06 }
-                .max { $0.box.midY < $1.box.midY }   // nearest under the quantity
+                .max { $0.box.midY < $1.box.midY }
             let cost = below
                 .filter { line in
                     isDollar(line.text) && !isSignedDollar(line.text) && line.id != value?.id
@@ -213,7 +170,6 @@ enum BinanceScreenshotParser {
             let priceValue = price.flatMap(dollarValue)
             let marketValue = value.flatMap(dollarValue)
 
-            // Quantity, with the decimal-point repair cross-checked against value.
             var quantity = AlipayScreenshotParser.extractNumber(qtyLine.text)?.value
             var consistent = false
             var repaired = false
@@ -260,15 +216,12 @@ enum BinanceScreenshotParser {
         return ScreenshotParseOutput(drafts: drafts, accountTotal: nil, lines: lines, platform: .binance)
     }
 
-    /// q × p reproduces the displayed (cent-rounded) value.
     static func agrees(_ computed: Decimal, _ shown: Decimal) -> Bool {
         let diff = Swift.abs(NSDecimalNumber(decimal: computed - shown).doubleValue)
         let tolerance = max(0.011, Swift.abs(NSDecimalNumber(decimal: shown).doubleValue) * 0.01)
         return diff <= tolerance
     }
 
-    /// Re-place the decimal point in the recognized digits so that
-    /// quantity × price matches the shown value. Only a unique fit is accepted.
     static func repairDecimal(_ text: String, price: Decimal, value: Decimal) -> Decimal? {
         let digits = normalized(text).filter(\.isNumber)
         guard digits.count >= 2, price > 0 else { return nil }
@@ -282,7 +235,6 @@ enum BinanceScreenshotParser {
         return fits.count == 1 ? fits[0] : nil
     }
 
-    /// Tokenized stocks/ETFs (QQQ, SPY…) are equity; everything else is crypto.
     static func assetClass(name: String, code: String) -> AssetClass {
         if cashTickers.contains(code.uppercased()) { return .cash }
         let n = name.lowercased()

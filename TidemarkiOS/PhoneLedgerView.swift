@@ -1,15 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Ledger (iPhone)
-//
-// The phone is where records are entered, so this page is built around that:
-// the month's totals on top, then every record of the month grouped by day,
-// and one large button in the thumb's corner that opens a new record. The
-// month switcher sits in the title row; the calendar is a tap away.
-
-/// Reads only the shown period's records: refetching and reading all of them
-/// after every save cost ~150 ms on the phone.
 struct PhoneLedgerView: View {
     @Environment(AppState.self) private var app
 
@@ -95,7 +86,7 @@ private struct PhoneLedgerPage: View {
                 }
                 .padding(.horizontal, DS.phoneMargin)
                 .padding(.top, PageTitle<EmptyView>.pageTop)
-                .padding(.bottom, 110) // room for the add button
+                .padding(.bottom, 110)
             }
             AddRecordButton()
         }
@@ -108,8 +99,6 @@ private struct PhoneLedgerPage: View {
         }
         #endif
     }
-
-    // MARK: Pieces
 
     private var header: some View {
         @Bindable var app = app
@@ -203,8 +192,6 @@ private struct PhoneLedgerPage: View {
     }
 }
 
-/// The add button owns the entry sheet, so opening and closing it does not
-/// redraw the whole ledger (that cost a ~100 ms frame mid-dismiss).
 private struct AddRecordButton: View {
     @State private var creating = false
 

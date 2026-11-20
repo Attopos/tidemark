@@ -1,34 +1,16 @@
 import Foundation
 import SwiftData
 
-// MARK: - Cash-flow analytics
-//
-// Pure calculations over ledger records, independent of SwiftData and of the
-// views, so every figure on the Ledger, Accounts and Analysis pages can be
-// unit-tested.
-//
-// Conventions:
-//  * Income and expense are the only kinds that count as cash flow. Moving
-//    money between own accounts (transfer, repayment, lending) never does.
-//  * An expense counts net of its refund.
-//  * Every amount is converted to the display currency at the rate of the
-//    record's own date, so a past month does not change when rates move.
-//  * Averages divide by the days (or months) that have already started, so
-//    the current period is not diluted by its future days.
-
-/// One ledger record, reduced to what statistics need.
 struct CashEntry: Identifiable, Equatable {
     let id: UUID
     let date: Date
     let kind: TransactionKind
     let category: String
     let subcategory: String
-    /// Net amount in the display currency, always positive.
     let base: Decimal
     var refund: Decimal = 0
     var discount: Decimal = 0
     var fee: Decimal = 0
-    /// Reimbursable spending not yet paid back / what was paid back.
     var claimPending: Decimal = 0
     var claimed: Decimal = 0
     var excluded = false
@@ -38,11 +20,9 @@ struct CashPeriod: Equatable, Hashable {
     enum Unit: String, CaseIterable { case week, month, year, all, range }
 
     let unit: Unit
-    /// First instant of the period.
     let start: Date
     let limit: Date
 
-    /// The week, month or year containing `date` (`.all` and `.range` fall back to its month).
     init(unit: Unit, containing date: Date, calendar: Calendar = .current) {
         self.unit = unit
         let component: Calendar.Component
@@ -56,7 +36,6 @@ struct CashPeriod: Equatable, Hashable {
         limit = interval?.end ?? date
     }
 
-    /// Whole days from `from` through `to`.
     init(from: Date, through to: Date, calendar: Calendar = .current) {
         unit = .range
         let first = calendar.startOfDay(for: min(from, to))
@@ -71,7 +50,6 @@ struct CashPeriod: Equatable, Hashable {
         self.limit = limit
     }
 
-    /// Every month from the earliest date through the current month (or the latest date, if later).
     static func all(spanning dates: [Date], now: Date = Date(), calendar: Calendar = .current) -> CashPeriod {
         let first = min(dates.min() ?? now, now)
         let last = max(dates.max() ?? now, now)
@@ -80,15 +58,12 @@ struct CashPeriod: Equatable, Hashable {
         return CashPeriod(unit: .all, start: start, limit: limit)
     }
 
-    /// First instant after the period.
     func end(_ calendar: Calendar = .current) -> Date { limit }
 
-    /// Days in the period.
     func dayCount(_ calendar: Calendar = .current) -> Int {
         max(1, calendar.dateComponents([.day], from: start, to: limit).day ?? 1)
     }
 
-    /// What one bucket of the charts and summary table covers.
     var bucketComponent: Calendar.Component {
         switch unit {
         case .week, .month: return .day
@@ -116,7 +91,6 @@ struct CashPeriod: Equatable, Hashable {
         }
     }
 
-    /// The period just before, for comparisons; nil when there is none.
     func previous(_ calendar: Calendar = .current) -> CashPeriod? {
         isShiftable ? shifted(by: -1, calendar: calendar) : nil
     }
@@ -125,7 +99,6 @@ struct CashPeriod: Equatable, Hashable {
         date >= start && date < limit
     }
 
-    /// Starts of the buckets a chart shows: days, or months (the first may begin before `start`).
     func bucketStarts(_ calendar: Calendar = .current) -> [Date] {
         let step = bucketComponent
         var starts: [Date] = []
@@ -148,7 +121,6 @@ struct CashSummary: Equatable {
     var claimPending: Decimal = 0
     var claimed: Decimal = 0
     var count = 0
-    /// Buckets (days or months) that have started.
     var elapsedBuckets = 0
 
     var balance: Decimal { income - expense }
@@ -168,10 +140,8 @@ struct CashBucket: Identifiable, Equatable {
 struct CategoryStat: Identifiable, Equatable {
     let name: String
     let amount: Decimal
-    /// Fraction of the period total, 0…1.
     let share: Double
     let count: Int
-    /// Change against the previous period (positive = more than before).
     let change: Decimal
     var id: String { name }
 }
@@ -179,7 +149,6 @@ struct CategoryStat: Identifiable, Equatable {
 enum CategoryLevel: String, CaseIterable { case first, second }
 
 enum CashflowAnalytics {
-
     static func summary(_ entries: [CashEntry], in period: CashPeriod,
                         now: Date = Date(), calendar: Calendar = .current) -> CashSummary {
         var summary = CashSummary()
@@ -203,7 +172,6 @@ enum CashflowAnalytics {
         return summary
     }
 
-    /// One bucket per day (month view) or month (year view), empty ones included.
     static func buckets(_ entries: [CashEntry], in period: CashPeriod,
                         calendar: Calendar = .current) -> [CashBucket] {
         let starts = period.bucketStarts(calendar)
@@ -220,9 +188,6 @@ enum CashflowAnalytics {
         return buckets
     }
 
-    /// Categories of one kind in a period, largest first, with the change
-    /// against the previous period. Level two falls back to the first-level
-    /// name for records that have no second level.
     static func categories(_ entries: [CashEntry], kind: TransactionKind, level: CategoryLevel,
                            in period: CashPeriod, calendar: Calendar = .current) -> [CategoryStat] {
         func name(_ entry: CashEntry) -> String {
@@ -250,8 +215,6 @@ enum CashflowAnalytics {
         .sorted { $0.amount == $1.amount ? $0.name < $1.name : $0.amount > $1.amount }
     }
 
-    /// Money moved between own accounts in a period, by the record's label
-    /// ("Transfer", "Repayment", "Lend"…).
     static func transfers(_ entries: [CashEntry], in period: CashPeriod,
                           calendar: Calendar = .current) -> [(label: String, amount: Decimal)] {
         var totals: [String: Decimal] = [:]
@@ -263,17 +226,9 @@ enum CashflowAnalytics {
     }
 }
 
-// MARK: - Account balances
-//
-// A cash account's balance is its opening balance plus every record that
-// touched it. A record in another currency is converted to the account's
-// currency at the record's date; a transfer with an explicit arrival amount
-// uses that amount instead.
-
 struct AccountMovement: Equatable {
     let account: UUID
     let date: Date
-    /// Signed, in the account's own currency.
     let delta: Decimal
 }
 
@@ -302,7 +257,6 @@ enum AccountLedger {
         return amount * source / target
     }
 
-    /// What one record does to the accounts it names.
     static func movements(kind: TransactionKind, amount: Decimal, refund: Decimal, currency: String,
                           date: Date, source: (id: UUID, currency: String)?,
                           destination: (id: UUID, currency: String)?, arrival: Decimal?,
@@ -331,7 +285,6 @@ enum AccountLedger {
         return result
     }
 
-    /// Balance of every account at the end of `date`, in its own currency.
     static func balances(accounts: [LedgerAccount], movements: [AccountMovement],
                          at date: Date = .distantFuture) -> [UUID: Decimal] {
         var balances = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0.opening) })
@@ -341,8 +294,6 @@ enum AccountLedger {
         return balances
     }
 
-    /// Assets and debts in the display currency. A liability account's
-    /// negative balance is debt; a positive balance anywhere is an asset.
     static func netAssets(accounts: [LedgerAccount], balances: [UUID: Decimal],
                           converter: CurrencyConverter, at date: Date = Date()) -> (assets: Decimal, debts: Decimal) {
         var assets: Decimal = 0
@@ -354,7 +305,6 @@ enum AccountLedger {
         return (assets, debts)
     }
 
-    /// Net assets at the end of each bucket that has started.
     static func trend(accounts: [LedgerAccount], movements: [AccountMovement], period: CashPeriod,
                       converter: CurrencyConverter, now: Date = Date(),
                       calendar: Calendar = .current) -> [NetAssetPoint] {
@@ -375,8 +325,6 @@ enum AccountLedger {
         return points
     }
 }
-
-// MARK: - Store adapters
 
 extension Transaction {
     func cashEntry(using converter: CurrencyConverter) -> CashEntry {
@@ -401,7 +349,6 @@ extension Transaction {
 extension Transaction {
     var canBeExcluded: Bool { kind == .expense || kind == .income }
 
-    /// "Exclude from expense" / "Count in income"…, for the record menus.
     var excludeActionTitle: String {
         switch (kind, excludeFromStats) {
         case (.income, false): return tr("Exclude from income")
@@ -411,7 +358,6 @@ extension Transaction {
         }
     }
 
-    /// Statistics skip the record; account balances still move.
     func toggleExcluded(in context: ModelContext) {
         excludeFromStats.toggle()
         updatedAt = Date()
@@ -420,7 +366,6 @@ extension Transaction {
 }
 
 extension Account {
-    /// Holdings-driven accounts are valued by the portfolio, not the ledger.
     var isLedgerAccount: Bool { kind != .investment && kind != .crypto }
 
     var ledgerAccount: LedgerAccount {

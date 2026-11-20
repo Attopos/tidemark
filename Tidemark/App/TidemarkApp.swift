@@ -7,8 +7,6 @@ struct TidemarkApp: App {
     @NSApplicationDelegateAdaptor(SyncPushDelegate.self) private var pushDelegate
     private let container: ModelContainer
     private let storageError: String?
-    /// Nil when the store could not be opened: an empty in-memory store must
-    /// never be compared with the server.
     private let sync: CloudSync?
 
     init() {
@@ -17,7 +15,6 @@ struct TidemarkApp: App {
             storageError = nil
             sync = CloudSync(container: container)
         } catch {
-            // Never lose the session: fall back to memory and tell the user.
             container = (try? TidemarkSchema.makeContainer(inMemory: true))
                 ?? { fatalError("SwiftData container could not be created: \(error)") }()
             sync = nil
@@ -47,13 +44,10 @@ struct TidemarkApp: App {
     }
 }
 
-// MARK: - Menu commands & keyboard shortcuts
-
 struct AppCommands: Commands {
     let app: AppState
 
     var body: some Commands {
-        // Settings are a page of the main window, not a separate one.
         CommandGroup(replacing: .appSettings) {
             Button(tr("Settings…")) { app.section = .settings }
                 .keyboardShortcut(",", modifiers: .command)

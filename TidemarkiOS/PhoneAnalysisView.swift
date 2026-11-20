@@ -2,12 +2,6 @@ import SwiftUI
 import SwiftData
 import Charts
 
-// MARK: - Analysis (iPhone)
-//
-// One column of stacked cards under a full-width period switcher: totals,
-// the daily (or monthly) statistics, categories, the net assets trend and
-// the summary table.
-
 struct PhoneAnalysisView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
@@ -130,8 +124,6 @@ struct PhoneAnalysisView: View {
     }
 }
 
-// MARK: - Period switcher
-
 struct PhonePeriodSwitcher: View {
     let selected: CashPeriod.Unit
     let select: (CashPeriod.Unit) -> Void
@@ -180,7 +172,6 @@ struct PhoneFocusChip: View {
 }
 
 enum PhoneChartAxis {
-    /// First, middle and last bucket.
     static func ticks(_ starts: [Date]) -> [Date] {
         guard let first = starts.first, let last = starts.last else { return [] }
         return Array(Set([first, starts[(starts.count - 1) / 2], last])).sorted()
@@ -207,8 +198,6 @@ enum PhoneChartAxis {
         return formatter.string(from: date)
     }
 }
-
-// MARK: - Expense & income
 
 struct PhoneOverviewCard: View {
     let summary: CashSummary
@@ -279,8 +268,6 @@ struct PhoneOverviewCard: View {
     }
 }
 
-// MARK: - Statistics
-
 struct PhoneStatisticsCard: View {
     let buckets: [CashBucket]
     let summary: CashSummary
@@ -325,7 +312,6 @@ struct PhoneStatisticsCard: View {
         }
     }
 
-    /// The picked bucket, else the largest one so far.
     private var focus: CashBucket? {
         if let selected {
             return buckets.first { Calendar.current.isDate($0.start, equalTo: selected, toGranularity: unit) }
@@ -412,7 +398,6 @@ struct PhoneStatisticsCard: View {
 }
 
 extension View {
-    /// Dashed grid per bucket, three date labels, compact amounts on the left.
     func phoneChartAxes(starts: [Date], period: CashPeriod, code: String) -> some View {
         chartXAxis {
             AxisMarks(values: starts) { _ in
@@ -444,8 +429,6 @@ extension View {
         }
     }
 }
-
-// MARK: - Categories
 
 struct PhoneCategoriesCard: View {
     let entries: [CashEntry]
@@ -620,7 +603,6 @@ struct PhoneCategoriesCard: View {
     }
 }
 
-/// Ring chart with each slice's share and name pulled out on a leader line.
 struct PhoneCalloutDonut: View {
     struct Slice: Identifiable {
         let id: String
@@ -775,8 +757,6 @@ private struct DonutSlice: Shape {
     }
 }
 
-// MARK: - Net assets trend
-
 struct PhoneNetTrendCard: View {
     enum Series: String, CaseIterable { case net, assets, debts }
 
@@ -855,8 +835,6 @@ struct PhoneNetTrendCard: View {
     }
 }
 
-// MARK: - Summary table
-
 struct PhoneSummaryCard: View {
     let buckets: [CashBucket]
     let summary: CashSummary
@@ -920,8 +898,6 @@ struct PhoneSummaryCard: View {
         .minimumScaleFactor(0.7)
     }
 }
-
-// MARK: - Sheets
 
 struct PhoneRangeSheet: View {
     @Environment(\.dismiss) private var dismiss

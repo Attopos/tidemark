@@ -1,12 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Record editor
-//
-// One sheet for adding and editing a record. Categories are free text with a
-// menu of the ones already in use for that kind, so the list grows with the
-// ledger instead of being configured up front.
-
 struct TransactionEditor: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -35,7 +29,6 @@ struct TransactionEditor: View {
     @State private var savedTemplate = false
     @FocusState private var amountFocused: Bool
 
-    /// - Parameter draft: values read from a receipt screenshot, for a new record.
     init(transaction: Transaction?, defaultDate: Date? = nil, draft: ReceiptDraft? = nil) {
         self.transaction = transaction
         let text: (Decimal) -> String = { $0 == 0 ? "" : NSDecimalNumber(decimal: $0).stringValue }
@@ -47,7 +40,6 @@ struct TransactionEditor: View {
         _accountID = State(initialValue: transaction?.account?.id)
         _transferAccountID = State(initialValue: transaction?.transferAccount?.id)
         _arrivalText = State(initialValue: transaction?.transferAmount.map(text) ?? "")
-        // A new record on a past day keeps the current time of day.
         var initialDate = Date()
         if let defaultDate, !Calendar.current.isDateInToday(defaultDate) {
             let time = Calendar.current.dateComponents([.hour, .minute], from: Date())
@@ -72,7 +64,6 @@ struct TransactionEditor: View {
         }
     }
 
-    /// Fill the form from a template (the date stays as it is).
     private func apply(_ preset: RecordPreset) {
         let text: (Decimal) -> String = { $0 == 0 ? "" : NSDecimalNumber(decimal: $0).stringValue }
         kind = preset.kind
@@ -122,7 +113,6 @@ struct TransactionEditor: View {
         return accountID != nil || transferAccountID != nil
     }
 
-    /// Names already used for this kind, most used first.
     private func suggestions(_ keyPath: KeyPath<Transaction, String>, within parent: String? = nil) -> [String] {
         var counts: [String: Int] = [:]
         for item in transactions where item.kind == kind {
@@ -246,7 +236,6 @@ struct TransactionEditor: View {
             }
         }
         .editorSheet(width: 460)
-        // A new record starts at the amount, keypad up.
         .onAppear { if transaction == nil { amountFocused = true } }
     }
 
@@ -318,11 +307,9 @@ struct TransactionEditor: View {
             target.refundAmount = kind == .expense ? min(Self.decimal(refundText) ?? 0, amount) : 0
             target.excludeFromStats = excluded
             target.claimStatus = kind == .expense ? claim : .none
-            // Claimed with no amount typed: all of it came back.
             target.claimAmount = target.claimStatus == .claimed
                 ? min(Self.decimal(claimText) ?? (amount - target.refundAmount), amount - target.refundAmount) : 0
         } else {
-            // Keep an imported label ("Lend", "Recharge"…) unless the kind changed.
             if transaction?.kind != kind || target.category.isEmpty {
                 target.category = kind == .liabilityPayment ? "Repayment" : "Transfer"
             }

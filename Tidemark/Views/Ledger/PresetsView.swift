@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Templates, recurring records and instalments
-//
-// One list of saved records in three groups. A template only fills the
-// record editor; a recurring record adds itself on every due date; an
-// instalment plan does the same a fixed number of times (a purchase split
-// into monthly payments, or a loan), then stops.
-
 enum PresetType: String, CaseIterable, Identifiable {
     case template, recurring, instalment
     var id: String { rawValue }
@@ -150,8 +143,6 @@ struct PresetsView: View {
         }
     }
 }
-
-// MARK: - Preset editor
 
 struct PresetEditor: View {
     @Environment(\.modelContext) private var context

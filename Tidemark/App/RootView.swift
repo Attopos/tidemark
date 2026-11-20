@@ -3,8 +3,6 @@ import SwiftData
 import UniformTypeIdentifiers
 import Combine
 
-// MARK: - Root window: a page rail and the selected page
-
 struct RootView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
@@ -65,15 +63,12 @@ struct RootView: View {
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
         .onAppear { app.applyAppearance() }
-        // Switching to another app locks the portfolio again.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             app.lockPortfolio()
         }
-        // Recurring records and instalments due since last time.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             PresetScheduler.run(in: context)
         }
-        // Every saved change refreshes today's backup (see BackupService).
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)
             .debounce(for: .seconds(2), scheduler: RunLoop.main)) { _ in
             app.backUp(context)
@@ -82,8 +77,6 @@ struct RootView: View {
             CurrencyService.ensureSeeds(in: context)
             PresetScheduler.run(in: context)
             app.backUp(context)
-            // Daily rate: check hourly while the app is open; only fetches
-            // when today's rate is missing, so it's one request per day.
             while !Task.isCancelled {
                 await CurrencyService.refreshUSDIfStale(in: context)
                 try? await Task.sleep(for: .seconds(3600))
@@ -107,7 +100,6 @@ struct RootView: View {
                         if url.pathExtension.lowercased() == "xlsx" {
                             app.importLedgerExport(url: url, into: context)
                         } else if app.section != .portfolio {
-                            // On the cash pages a screenshot is a receipt.
                             app.importReceipt(url: url, context: context)
                         } else {
                             app.routeImport(url: url)
@@ -120,9 +112,6 @@ struct RootView: View {
     }
 }
 
-// MARK: - Section rail
-
-/// Narrow icon rail on the left edge: one button per page, settings included.
 private struct SectionRail: View {
     @Binding var selection: AppSection
     @Environment(AppState.self) private var app
@@ -131,7 +120,6 @@ private struct SectionRail: View {
         VStack(spacing: 6) {
             ForEach([AppSection.ledger, .accounts, .analysis]) { button($0) }
             Spacer()
-            // The portfolio is its own, locked block, apart from day-to-day cash.
             Divider().frame(width: 44).padding(.vertical, 6)
             button(.portfolio, badge: app.portfolioLockEnabled ? (app.portfolioUnlocked ? "lock.open.fill" : "lock.fill") : nil)
             button(.settings)
@@ -171,7 +159,6 @@ private struct SectionRail: View {
     }
 }
 
-/// Shown in place of the portfolio until the system password check passes.
 private struct PortfolioLock: View {
     @Environment(AppState.self) private var app
 
@@ -199,7 +186,6 @@ private struct PortfolioLock: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.page)
-        // Ask straight away; the button is there after a cancel.
         .task { await app.unlockPortfolio() }
     }
 }

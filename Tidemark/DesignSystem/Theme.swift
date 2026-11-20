@@ -5,8 +5,6 @@ import AppKit
 import UIKit
 #endif
 
-// MARK: - Color hex helpers
-
 extension Color {
     init(hex: UInt32) {
         self.init(
@@ -18,7 +16,6 @@ extension Color {
 }
 
 extension Color {
-    /// One color per appearance, resolved live (light and dark mode).
     init(light: UInt32, dark: UInt32) {
         #if canImport(AppKit)
         self.init(nsColor: NSColor(name: nil) { appearance in
@@ -54,48 +51,26 @@ extension NSColor {
 }
 #endif
 
-// MARK: - Design tokens
-//
-// The visual identity: almost-black surfaces, neon lime as the *interaction*
-// color (never a universal "gain" color), warm-white figures, and a reserved
-// semantic set for financial meaning. Categorical chart hues are a separate,
-// CVD-validated ramp (validated in OKLab against the dark surfaces) assigned
-// in fixed order and never cycled.
-
 enum DS {
-    // Surfaces
-    // Every surface, ink and line token has a light and a dark value. Brand
-    // fills (lime, the violets, the pastel cards) stay the same in both and
-    // always carry dark ink; colors used as *text* get a deeper light-mode
-    // shade so they keep contrast on white.
     static let bgPrimary    = Color(light: 0xF2F2EE, dark: 0x111111)
     static let bgSecondary  = Color(light: 0xFFFFFF, dark: 0x1D1D1F)
     static let bgElevated   = Color(light: 0xFFFFFF, dark: 0x27282A)
 
-    // Brand / interaction
     static let accent       = Color(hex: 0xC7FF3D)
     static let accentDark   = Color(light: 0xE8F7C4, dark: 0x29351B)
-    /// The lime as text or a thin mark (deep olive on white).
     static let accentText   = Color(light: 0x5E7D10, dark: 0xC7FF3D)
 
-    // Ink
     static let textPrimary  = Color(light: 0x141414, dark: 0xF5F3EE)
     static let textSecondary = Color(light: 0x5C5D62, dark: 0x999A9F)
     static let textTertiary = Color(light: 0x86878C, dark: 0x6B6C70)
 
-    // Lines
     static let border       = Color(light: 0xDCDCD6, dark: 0x303134)
 
-    // Financial semantics — polarity & status only, never series identity
-    // Two-hue palette: only violet and lime exist in the UI.
-    static let finBlue      = Color(light: 0x6E4FD8, dark: 0xA98BFA)   // neutral financial data (violet)
-    static let positive     = Color(light: 0x5E7D10, dark: 0xD5F56B)   // gains (lime)
-    static let negative     = Color(light: 0x6E4FD8, dark: 0xCDBDFD)   // losses (soft violet)
-    static let warning      = Color(light: 0x6E4FD8, dark: 0xCDBDFD)   // needs attention / stale (soft violet)
+    static let finBlue      = Color(light: 0x6E4FD8, dark: 0xA98BFA)
+    static let positive     = Color(light: 0x5E7D10, dark: 0xD5F56B)
+    static let negative     = Color(light: 0x6E4FD8, dark: 0xCDBDFD)
+    static let warning      = Color(light: 0x6E4FD8, dark: 0xCDBDFD)
 
-    /// Categorical identity ramp for charts (allocation, categories).
-    /// Fixed assignment order; index ≥ count folds into `categoricalOther`.
-    /// Validated: OKLCH L 0.48–0.67, C ≥ 0.10, CVD ΔE pass vs dark surface.
     static let categorical: [Color] = [
         Color(hex: 0xA98BFA), Color(hex: 0xD5F56B), Color(hex: 0x7E5FE6),
         Color(hex: 0x9CB84A), Color(hex: 0xCDBDFD), Color(hex: 0xE9FAB0), Color(hex: 0x5E43B8),
@@ -106,7 +81,6 @@ enum DS {
         index >= 0 && index < categorical.count ? categorical[index] : categoricalOther
     }
 
-    // The signature lime hero card gradient (dark ink on top of it)
     static let heroGradient = LinearGradient(
         colors: [Color(hex: 0xDCFF7A), Color(hex: 0xC7FF3D), Color(hex: 0xA8E42E)],
         startPoint: .topLeading,
@@ -115,21 +89,16 @@ enum DS {
     static let heroInk = Color(hex: 0x15190A)
     static let heroInkSecondary = Color(hex: 0x15190A).opacity(0.62)
 
-    // Geometry
     static let cardRadius: CGFloat = 16
     static let smallRadius: CGFloat = 10
     static let pagePadding: CGFloat = 28
     static let cardPadding: CGFloat = 18
     static let gridGap: CGFloat = 14
 
-    // MARK: Typography
-
-    /// Oversized editorial page heading ("Portfolio overview")
     static func editorial(_ size: CGFloat = 38) -> Font {
         .system(size: size, weight: .medium).monospacedDigit()
     }
     static let sectionTitle = Font.system(size: 17, weight: .regular).monospacedDigit()
-    /// Small uppercase section label
     static let label = Font.system(size: 13, weight: .regular).monospacedDigit()
     static let body = Font.system(size: 15).monospacedDigit()
     static let caption = Font.system(size: 13.5).monospacedDigit()
@@ -143,8 +112,6 @@ enum DS {
     static let moneySmall = money(15)
     static let moneyTable = money(15)
 }
-
-// MARK: - Shared style modifiers
 
 struct CardBackground: ViewModifier {
     var elevated: Bool = false
@@ -164,11 +131,6 @@ extension View {
         modifier(CardBackground(elevated: elevated))
     }
 }
-
-// MARK: - Formatters
-//
-// All money is stored as Decimal. Formatting goes through one place so
-// currency symbols, tabular layout and privacy masking stay consistent.
 
 enum Fmt {
     static let currencySymbols: [String: String] = [
@@ -211,8 +173,6 @@ enum Fmt {
         return f
     }()
 
-    /// "¥12,345.67", "-$1,200.00", "+€35.00"
-    /// Amounts hidden behind the eye toggle (kept in step by the app state).
     nonisolated(unsafe) static var amountsHidden = false
 
     static func money(_ amount: Decimal, _ code: String, showSign: Bool = false, wholeDigits: Bool = false) -> String {
@@ -224,7 +184,6 @@ enum Fmt {
         return "\(sign)\(symbol(for: code))\(digits)"
     }
 
-    /// Compact axis/summary form: "¥12.5k", "¥1.24M"
     static func moneyCompact(_ amount: Decimal, _ code: String) -> String {
         if amountsHidden { return privacyMask }
         let value = (amount as NSDecimalNumber).doubleValue
@@ -247,7 +206,6 @@ enum Fmt {
         quantityFormatter.string(from: NSDecimalNumber(decimal: value)) ?? "\(value)"
     }
 
-    /// "+12.4%" / "-3.2%"
     static func percent(_ fraction: Double, decimals: Int = 1, showSign: Bool = true) -> String {
         let sign = fraction < 0 ? "-" : (showSign && fraction > 0 ? "+" : "")
         return "\(sign)\(String(format: "%.\(decimals)f", Swift.abs(fraction) * 100))%"
@@ -285,7 +243,6 @@ enum Fmt {
         return f.localizedString(for: date, relativeTo: Date())
     }
 
-    /// The mask used when privacy mode hides sensitive values.
     static let privacyMask = "•••••"
 }
 
@@ -294,7 +251,6 @@ enum Fmt {
 extension Decimal {
     var doubleValue: Double { (self as NSDecimalNumber).doubleValue }
     var isPositive: Bool { self > 0 }
-    /// Rounded to `scale` decimal places, bankers-safe plain rounding.
     func rounded(_ scale: Int) -> Decimal {
         var value = self
         var result = Decimal()

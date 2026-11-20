@@ -2,28 +2,14 @@ import SwiftUI
 import SwiftData
 import Charts
 
-// MARK: - Portfolio — the app's single screen
-//
-// A total-value hero, an allocation donut by risk exposure, and a holdings
-// table grouped two levels deep: exposure (US equity, crypto, gold…), then
-// the individual holdings. Each holding keeps its own currency (a Binance
-// coin in USD, an Alipay fund in CNY); totals, shares and the donut convert
-// everything to the chosen display currency (CNY or USD) with the dated rate
-// of today. Values come from the latest valuation snapshot — nothing is
-// projected or fabricated; the numbers themselves are computed by
-// PortfolioValuation. Right-click: exposure override, manual balance
-// correction, mark as sold (history kept), delete.
-
 struct PortfolioView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
-    /// Every holding, sold ones included: history needs them.
     @Query private var allHoldings: [Holding]
     private var holdings: [Holding] { allHoldings.filter(\.isActive) }
     @Query private var rates: [CurrencyRate]
 
     @State private var editingHolding: Holding?
-    /// Holding whose name is being edited inline.
     @State private var renamingID: UUID?
     @State private var pendingDelete: Holding?
     @State private var deleteConfirmPresented = false
@@ -92,8 +78,6 @@ struct PortfolioView: View {
         }
     }
 
-    // MARK: Header
-
     private func header(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 10) {
@@ -157,7 +141,6 @@ struct PortfolioView: View {
                 .frame(maxWidth: 420)
             importButton
                 .padding(.top, 4)
-            // A new device starts empty: the backup is in iCloud Drive › Tidemark.
             #if os(macOS)
             Button(tr("Restore from backup…")) { app.restoreBackup(context) }
                 .buttonStyle(GhostButtonStyle())
@@ -166,11 +149,6 @@ struct PortfolioView: View {
         .frame(maxWidth: .infinity, minHeight: 320)
         .padding(32)
     }
-
-    // MARK: Overview
-    //
-    // A total card with the allocation as one segmented bar (colors = risk
-    // family, see RiskFamily), then one solid card per exposure.
 
     private func overview(compact: Bool, jump: @escaping (String) -> Void) -> some View {
         VStack(spacing: 14) {
@@ -308,16 +286,8 @@ struct PortfolioView: View {
         }
     }
 
-    // MARK: Holdings
-    //
-    // One block per exposure (color square, name, total, share bar), rows
-    // inside it. The value column is always the display currency so it lines
-    // up; a holding recorded in another currency shows its own amount under
-    // it. Freshness lives in the row's subtitle instead of its own column.
-
     private let valueWidth: CGFloat = 150
     private let shareWidth: CGFloat = 146
-
 
     private func holdingsCard(compact: Bool) -> some View {
         Panel(title: tr("Holdings"), icon: "list.bullet") {
@@ -346,7 +316,6 @@ struct PortfolioView: View {
         }
     }
 
-    /// Empty or the recognized name again → back to the recognized name.
     private func rename(_ row: Row, to newName: String) {
         guard let asset = row.holding.asset else { return }
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -419,8 +388,6 @@ struct PortfolioView: View {
                             .foregroundStyle(DS.textPrimary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    // No group totals here: this is the detail list; totals
-                    // live in the overview cards above.
                     }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 11)
@@ -431,8 +398,6 @@ struct PortfolioView: View {
                     HoldingLine(row: row,
                                 share: total > 0 && row.nativeValue != nil ? (row.baseValue / total).doubleValue : nil,
                                 color: group.exposure.markColor,
-                                // Bars compare holdings within their exposure: the
-                                // largest in the group fills the bar.
                                 scale: groupRowMax,
                                 baseCurrency: baseCurrency,
                                 valueWidth: valueWidth,
@@ -451,16 +416,11 @@ struct PortfolioView: View {
         }
     }
 
-    /// Bar length proportional to share / scale (the group's largest share);
-    /// at least 1pt so a nonzero share is still visible.
     static func barLength(share: Double, scale: Double, width: CGFloat) -> CGFloat {
         guard share > 0, scale > 0 else { return 0 }
         return max(1, width * CGFloat(min(share / scale, 1)))
     }
 
-    /// "29.7%" with a bar. The bar is scaled to `scale` (the largest share
-    /// among its peers), so the biggest holding fills it and the rest are
-    /// visibly proportional — raw shares of ~30% max would all look tiny.
     private struct ShareCell: View {
         let share: Double?
         let color: Color
@@ -472,9 +432,6 @@ struct PortfolioView: View {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
                 if let share {
-                    // Square-ended bars: rounded caps eat visible length on
-                    // short bars (a 16pt capsule reads well under 1/4 of 64pt).
-                    // No minimum length, so 0.1% and 0.2% stay distinguishable.
                     RoundedRectangle(cornerRadius: 1.5).fill(DS.panel)
                         .frame(width: barWidth, height: 6)
                         .overlay(alignment: .leading) {
@@ -599,8 +556,6 @@ struct PortfolioView: View {
     }
 }
 
-// MARK: - Manual balance correction
-
 struct BalanceSheet: View {
     let holding: Holding
     @Environment(\.dismiss) private var dismiss
@@ -674,11 +629,6 @@ struct BalanceSheet: View {
     }
 }
 
-// MARK: - History
-//
-// Total value on every day something was valued. Points are the recorded
-// days; the line between them only joins them.
-
 private struct HistoryPanel: View {
     let points: [PortfolioValuation.HistoryPoint]
     let currency: String
@@ -747,8 +697,6 @@ struct PortfolioHistoryChart: View {
     }
 }
 
-// MARK: - Shared figures (Mac and iPhone)
-
 struct PortfolioRow: Identifiable {
     let id: UUID
     let holding: Holding
@@ -773,9 +721,6 @@ struct PortfolioExposureGroup: Identifiable {
     var baseValue: Decimal { rows.filter { $0.nativeValue != nil }.reduce(0) { $0 + $1.baseValue } }
 }
 
-/// Everything the portfolio pages show, computed once from the store. Values
-/// come from the latest valuation snapshot at today's rate; sold holdings
-/// count in the history until they were sold.
 struct PortfolioSummary {
     let valuation: PortfolioValuation
     let history: [PortfolioValuation.HistoryPoint]
@@ -827,7 +772,6 @@ struct PortfolioSummary {
 
     func share(_ value: Decimal) -> Double { total > 0 ? (value / total).doubleValue : 0 }
 
-    /// "18% of value is older than 7 days": the total mixes valuation dates.
     var staleNote: String? {
         let share = valuation.freshness().staleShare
         guard share >= 0.005 else { return nil }

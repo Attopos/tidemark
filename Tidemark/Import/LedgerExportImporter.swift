@@ -2,34 +2,9 @@ import Foundation
 import SwiftData
 import CryptoKit
 
-// MARK: - Bookkeeping export importer
-//
-// Reads the spreadsheet a bookkeeping app exports (one row per record:
-// date, type, amount, two category levels, source and destination account,
-// remark, currency, ledger, address, refund, discount, fee) and writes
-// it into the ledger. Columns are found by header name, so their order and
-// any extra columns do not matter.
-//
-// Rules:
-//  * Amounts are stored as positive magnitudes in the row's own currency;
-//    the direction comes from the type.
-//  * Every type that is not income or expense moves money between two
-//    accounts and stays out of income/expense statistics. Its original type
-//    name is kept as the category ("Transfer", "Repayment", "Lend"…).
-//  * Accounts are matched by name and created when missing.
-//  * Each row gets a fingerprint of its content, so importing the same file
-//    again (or a longer export later) adds only what is new. A row that is
-//    new but has the same second and type as an imported record the file no
-//    longer contains is that record edited in the other app: it is updated in
-//    place. Records missing from the file are counted, never deleted.
-//  * Reads both iCost's export (21 columns, English or Chinese) and iCost's
-//    import template (日期/类型/金额/…), which is what Tidemark exports.
-//  * The original row is kept verbatim in `rawPayload`.
-
 struct LedgerExportRow: Equatable {
     var date: Date
     var type: LedgerExportType
-    /// Original type text, kept as the category of transfer-like rows.
     var typeLabel: String
     var amount: Decimal
     var category: String
@@ -43,7 +18,6 @@ struct LedgerExportRow: Equatable {
     var refund: Decimal
     var discount: Decimal
     var fee: Decimal
-    /// Header → cell, for `rawPayload`.
     var raw: [String: String]
 }
 
@@ -59,7 +33,6 @@ enum LedgerExportType: Equatable {
         }
     }
 
-    /// "支出" → "Expense", "借出" → "Lend": one spelling per type.
     static func canonical(_ text: String) -> String {
         switch text.trimmingCharacters(in: .whitespaces).lowercased() {
         case "expense", "支出": return "Expense"
@@ -103,7 +76,6 @@ enum LedgerExportError: LocalizedError {
 enum LedgerExportImporter {
     struct Parsed {
         var rows: [LedgerExportRow] = []
-        /// 1-based sheet rows that could not be read, with the reason.
         var rejected: [(line: Int, reason: String)] = []
     }
 
@@ -112,9 +84,7 @@ enum LedgerExportImporter {
         var skipped = 0
         var rejected = 0
         var accountsCreated = 0
-        /// Imported records edited in the other app since, updated in place.
         var updated = 0
-        /// Imported records in the file's date range that the file no longer has.
         var notInFile = 0
     }
 
@@ -164,8 +134,6 @@ enum LedgerExportImporter {
         return Decimal(string: cleaned, locale: Locale(identifier: "en_US_POSIX"))
     }
 
-    // MARK: Sheet rows → records
-
     static func parse(rows sheet: [[String]], timeZone: TimeZone = .current) throws -> Parsed {
         guard let header = sheet.first else { throw LedgerExportError.empty }
         let names = header.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
@@ -201,7 +169,6 @@ enum LedgerExportImporter {
             }
             typeText = LedgerExportType.canonical(typeText)
             var category = cell(.category).trimmingCharacters(in: .whitespaces)
-            // The import template has only 转账; the kind of transfer travels as its category.
             let named = LedgerExportType.canonical(category)
             if typeText == "Transfer", named != "Transfer",
                let specific = LedgerExportType.parse(category), specific != .expense, specific != .income {
@@ -239,10 +206,6 @@ enum LedgerExportImporter {
         return parsed
     }
 
-    // MARK: Fingerprints
-
-    /// Content hash per row; identical rows get "#2", "#3"… so two real
-    /// purchases with the same second, amount and remark both survive.
     static func fingerprints(for rows: [LedgerExportRow]) -> [String] {
         var seen: [String: Int] = [:]
         return rows.map { row in
@@ -256,15 +219,12 @@ enum LedgerExportImporter {
         }
     }
 
-    // MARK: Records → store
-
     private enum Step {
         case skip
         case insert
         case update(Transaction)
     }
 
-    /// What importing would do, row by row, without touching the store.
     @MainActor
     private static func plan(_ rows: [LedgerExportRow], fingerprints prints: [String],
                              existing: [Transaction]) -> (steps: [Step], notInFile: Int) {
@@ -299,7 +259,6 @@ enum LedgerExportImporter {
         return (steps, missing)
     }
 
-    /// Counts for a confirmation step: what `commit` would add, update and skip.
     @MainActor
     static func preview(_ parsed: Parsed, in context: ModelContext) throws -> Stats {
         let existing = try context.fetch(FetchDescriptor<Transaction>())
@@ -332,7 +291,6 @@ enum LedgerExportImporter {
         for account in try context.fetch(FetchDescriptor<Account>()) where accounts[account.name] == nil {
             accounts[account.name] = account
         }
-        // An account's currency is the one most of its own records use.
         var currencyVotes: [String: [String: Int]] = [:]
         var receivables: Set<String> = []
         for row in rows {

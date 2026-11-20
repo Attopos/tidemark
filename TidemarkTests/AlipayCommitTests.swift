@@ -2,13 +2,8 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// The one invariant the app now lives on: saving an OCR result creates a
-// holding when the asset is new, and updates the balance in place when it
-// already exists — never a duplicate.
-
 @MainActor
 final class AlipayCommitTests: XCTestCase {
-
     private func makeContext() throws -> ModelContext {
         let container = try TidemarkSchema.makeContainer(inMemory: true)
         return ModelContext(container)
@@ -41,13 +36,11 @@ final class AlipayCommitTests: XCTestCase {
     func testCommitUpdatesMatchedHoldingInsteadOfDuplicating() throws {
         let context = try makeContext()
 
-        // First screenshot: creates the entry.
         let first = ScreenshotImportSession(images: [])
         first.valuationDate = Date(timeIntervalSinceNow: -3 * 86_400)
         first.holdings = [editable(name: "易方达蓝筹精选混合", code: "005827", value: "10000")]
         first.commit(into: context)
 
-        // Second screenshot days later: same fund recognized again.
         let existing = try context.fetch(FetchDescriptor<Holding>())
         XCTAssertEqual(existing.count, 1)
         let draft = HoldingDraft(name: "易方达蓝筹精选混合", code: "005827", nameConfidence: 1,

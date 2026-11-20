@@ -3,23 +3,12 @@ import AppKit
 import SwiftData
 @testable import Tidemark
 
-// End-to-end test on two REAL Alipay holdings screenshots (bundled fixtures):
-// live Vision OCR → layout parse → cross-screenshot merge → commit → re-import.
-// Three funds appear in BOTH screenshots and one (CAC40) is cut off in the
-// first, so the fixtures exercise exactly the dedup paths the app lives on.
-
 @MainActor
 final class AlipayLiveScreenshotTests: XCTestCase {
-
-    // Expected values come from a local, git-ignored fixture next to the
-    // screenshots (`alipay-fixture-expected.json`), because they are real
-    // holdings. Format:
-    // {"total": "1000.00",
-    //  "funds": [{"name": "…", "value": "600.00", "profit": "12.34"}, …]}
     private struct Expected: Decodable {
-        let name: String         // exact cleaned fund name
-        let value: Decimal       // 金额
-        let profit: Decimal      // 持有收益
+        let name: String
+        let value: Decimal
+        let profit: Decimal
 
         private enum CodingKeys: String, CodingKey { case name, value, profit }
         init(from decoder: Decoder) throws {
@@ -77,7 +66,6 @@ final class AlipayLiveScreenshotTests: XCTestCase {
         let container = try TidemarkSchema.makeContainer(inMemory: true)
         let context = ModelContext(container)
 
-        // ── Pass 1: recognize, merge across screenshots, review ──────────
         let first = ScreenshotImportSession(images: images)
         await first.run(existingHoldings: [])
         guard case .review = first.phase else {
@@ -90,7 +78,6 @@ final class AlipayLiveScreenshotTests: XCTestCase {
         }
         print("TIDEMARK-REPORT accountTotal=[\(first.accountTotalText)]")
 
-        // Cross-screenshot merge: the 3 funds visible in both images appear once.
         XCTAssertEqual(first.holdings.count, expected.count,
                        "expected \(expected.count) unique funds after merging both screenshots")
 
@@ -103,7 +90,6 @@ final class AlipayLiveScreenshotTests: XCTestCase {
             XCTAssertNil(draft.matchedHoldingID, "\(want.name) must be new on an empty store")
         }
 
-        // ── Commit pass 1 ────────────────────────────────────────────────
         first.commit(into: context)
         guard case .done = first.phase else {
             return XCTFail("commit 1 failed: \(first.phase)")
@@ -117,7 +103,6 @@ final class AlipayLiveScreenshotTests: XCTestCase {
         let total1 = snapshotsAfter1.reduce(Decimal(0)) { $0 + $1.marketValue }
         XCTAssertEqual(total1, expectedTotal, "sum of saved balances")
 
-        // ── Pass 2: identical screenshots again → update, never duplicate ─
         let second = ScreenshotImportSession(images: images)
         await second.run(existingHoldings: holdingsAfter1)
         guard case .review = second.phase else {

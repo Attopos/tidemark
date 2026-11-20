@@ -56,8 +56,6 @@ struct PhonePortfolioView: View {
         }
     }
 
-    // MARK: Locked
-
     private var title: some View {
         PageTitle(title: tr("Portfolio")) {
             if !app.portfolioLockEnabled || app.portfolioUnlocked {
@@ -96,8 +94,6 @@ struct PhonePortfolioView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { await app.unlockPortfolio() }
     }
-
-    // MARK: Content
 
     private var content: some View {
         let summary = PortfolioSummary(allHoldings: allHoldings, rates: rates, baseCurrency: app.baseCurrency)

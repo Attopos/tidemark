@@ -5,14 +5,6 @@ import UniformTypeIdentifiers
 import PhotosUI
 #endif
 
-// MARK: - Quick entry
-//
-// The way to add a record on both iPhone and Mac, laid out like iCost's: kind
-// switch with the account on top, a grid of the categories actually used
-// (second level opens under its row), quick chips, the amount card and a
-// calculator keypad. Typing lives in EntryInput so a key press redraws only
-// the pad; category counts are read once per sitting, not on every render.
-
 @Observable
 final class EntryInput {
     var expression = ""
@@ -23,7 +15,6 @@ final class EntryInput {
     var hasOperator: Bool { expression.contains { Self.operators.contains($0) } }
     var amount: Decimal? { Self.evaluate(expression) }
 
-    /// × and ÷ before + and −; nil unless the result is above zero.
     static func evaluate(_ expression: String) -> Decimal? {
         let posix = Locale(identifier: "en_US_POSIX")
         var terms: [Decimal] = []
@@ -98,18 +89,14 @@ final class EntryInput {
     }
 }
 
-/// Categories in use, most used first, and the last account per kind.
 struct EntryStats {
     var categories: [TransactionKind: [String]] = [:]
     var subcategories: [TransactionKind: [String: [String]]] = [:]
     var lastAccount: [TransactionKind: UUID] = [:]
     var lastTransferTarget: UUID?
 
-    /// The last result, so the sheet opens with its grid already filled.
     @MainActor static var latest: EntryStats?
 
-    /// Counted on a background context; opening the sheet waited ~200 ms
-    /// for this on the main thread.
     static func refresh(_ container: ModelContainer) async -> EntryStats {
         let stats = await Task.detached(priority: .userInitiated) { load(ModelContext(container)) }.value
         await MainActor.run { latest = stats }
@@ -194,10 +181,7 @@ struct QuickEntryView: View {
     private var names: [String] { stats.categories[kind] ?? [] }
     private func subs(_ parent: String) -> [String] { stats.subcategories[kind]?[parent] ?? [] }
 
-    /// iCost's entry page sits 10pt from the edges, not the app's usual 25.
     private static let margin: CGFloat = 10
-
-    // MARK: Body
 
     var body: some View {
         VStack(spacing: 0) {
@@ -290,8 +274,6 @@ struct QuickEntryView: View {
         if accountID == nil { accountID = fresh.lastAccount[kind] ?? accounts.first?.id }
     }
 
-    // MARK: Top bar
-
     private var topBar: some View {
         HStack(spacing: 0) {
             Button { dismiss() } label: {
@@ -344,8 +326,6 @@ struct QuickEntryView: View {
         .overlay(Capsule().strokeBorder(DS.border, lineWidth: 1))
         .fixedSize()
     }
-
-    // MARK: Categories
 
     private func pick(_ name: String) {
         if category == name { category = ""; subcategory = "" }
@@ -427,8 +407,6 @@ struct QuickEntryView: View {
         }
         .buttonStyle(.plain)
     }
-
-    // MARK: Chips
 
     private var chips: some View {
         HStack(spacing: 6) {
@@ -519,7 +497,6 @@ struct QuickEntryView: View {
     }
     #endif
 
-    /// Fill from a receipt screenshot.
     private func apply(_ draft: ReceiptDraft) {
         let name = draft.category ?? ""
         if draft.kind != kind && Self.kinds.contains(draft.kind) {
@@ -542,9 +519,6 @@ struct QuickEntryView: View {
             category: category.isEmpty ? nil : category, subcategory: subcategory.isEmpty ? nil : subcategory))
     }
 
-    // MARK: Save
-
-    /// Done saves and closes; Record saves and clears for the next one.
     private func save(closing: Bool) {
         if input.hasOperator {
             input.set(amount: input.amount)
@@ -560,8 +534,6 @@ struct QuickEntryView: View {
                       note: input.note.trimmingCharacters(in: .whitespaces), claim: claim, excluded: excluded,
                       target: accounts.first { $0.id == transferAccountID })
         let context = context
-        // Stored once the sheet or the "recorded" badge has finished moving:
-        // the save redraws the ledger behind, which would stutter the motion.
         let commit = {
             let record = Transaction(date: values.date, kind: values.kind, amount: amount,
                                      currencyCode: values.account?.currencyCode ?? "CNY",
@@ -592,9 +564,6 @@ struct QuickEntryView: View {
     }
 }
 
-// MARK: - Pieces
-
-/// Line glyphs for the entry grid, like iCost's; the emoji stays in the label.
 enum EntryGlyph {
     private static let table: [(words: [String], symbol: String)] = [
         (["subway", "metro", "地铁"], "tram"),
@@ -717,7 +686,6 @@ private struct EntryChip<Icon: View>: View {
     }
 }
 
-/// Amount card and keypad. Reads EntryInput, so only this redraws on a key.
 private struct EntryPad: View {
     @Bindable var input: EntryInput
     let kind: TransactionKind
@@ -874,8 +842,6 @@ private struct EntryPad: View {
     }
 }
 
-/// A keypad key that types on touch-down (a Button waits for the finger to
-/// lift, which reads as lag when typing fast) and dips while held.
 private struct PadKey<Label: View>: View {
     let fill: Color
     let height: CGFloat

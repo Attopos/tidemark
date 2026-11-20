@@ -2,10 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// The bookkeeping export must come across completely and exactly once:
-// every row a record, amounts in their own currency, transfers between the
-// right accounts, and a second import of the same file adding nothing.
-
 @MainActor
 final class LedgerExportTests: XCTestCase {
     private let utc = TimeZone(identifier: "UTC")!
@@ -132,9 +128,6 @@ final class LedgerExportTests: XCTestCase {
         XCTAssertEqual(stats.skipped, 6)
     }
 
-    // MARK: Workbook reader
-
-    /// Stored (uncompressed) zip; the reader does not verify checksums.
     private func zip(_ files: [(String, String)]) -> Data {
         func u16(_ value: Int) -> Data { Data([UInt8(value & 0xFF), UInt8(value >> 8 & 0xFF)]) }
         func u32(_ value: Int) -> Data { u16(value & 0xFFFF) + u16(value >> 16 & 0xFFFF) }

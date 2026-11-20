@@ -59,8 +59,6 @@ struct PhoneSettingsView: View {
     }
 }
 
-// MARK: - Building blocks
-
 struct SetupPage<Content: View>: View {
     let title: String
     var showsBack = true
@@ -219,8 +217,6 @@ struct SetupChoices<Option: Hashable>: View {
     }
 }
 
-// MARK: - Protection
-
 struct ProtectionView: View {
     @Environment(AppLock.self) private var lock
     @Environment(AppState.self) private var app
@@ -254,8 +250,6 @@ struct ProtectionView: View {
         }
     }
 }
-
-// MARK: - Backup
 
 struct BackupSettingsView: View {
     @Environment(AppState.self) private var app
@@ -305,8 +299,6 @@ struct BackupSettingsView: View {
     }
 }
 
-// MARK: - iCloud
-
 struct CloudSyncSettingsView: View {
     @Environment(CloudSync.self) private var sync: CloudSync?
     let storageError: String?
@@ -348,8 +340,6 @@ struct CloudSyncSettingsView: View {
     }
 }
 
-// MARK: - Import
-
 struct ImportDataView: View {
     @State private var picking = false
     @State private var reviewing: ImportFile?
@@ -389,8 +379,6 @@ struct ImportFile: Identifiable {
     let url: URL
 }
 
-/// Shows what an import will do (added, updated, already there) and imports
-/// on confirmation. Opened from Import Data and when a file is shared to the app.
 struct LedgerImportReview: View {
     let url: URL
     @Environment(\.modelContext) private var context
@@ -400,7 +388,6 @@ struct LedgerImportReview: View {
     @State private var result: LedgerExportImporter.Stats?
     @State private var error: String?
 
-    /// Reads the workbook while the file is accessible (Files, iCloud Drive, AirDrop, share sheet).
     static func read(_ url: URL) throws -> LedgerExportImporter.Parsed {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -513,8 +500,6 @@ struct LedgerImportReview: View {
     }
 }
 
-// MARK: - Export
-
 struct ExportDataView: View {
     @Environment(AppState.self) private var app
     @Query private var transactions: [Transaction]
@@ -578,8 +563,6 @@ struct ExportDataView: View {
         }
     }
 }
-
-// MARK: - Appearance, currency, language
 
 struct AppearanceSettingsView: View {
     @Environment(AppState.self) private var app

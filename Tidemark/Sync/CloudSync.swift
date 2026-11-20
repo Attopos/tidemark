@@ -8,30 +8,6 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - iCloud sync
-//
-// Ledger records, cash accounts, record presets and the portfolio (assets,
-// holdings, valuations) are kept in step between devices through
-// the user's private iCloud database, in one record zone.
-//
-// One sync cycle is: make sure the zone exists, send what changed here, fetch
-// what changed elsewhere (by change token, so only the difference travels).
-//
-// How it stays fast and honest:
-//  * Every save of the store is followed by a scan that compares each row's
-//    digest with what the server is known to hold (see SyncPlanner); what
-//    differs is sent at once.
-//  * The other device learns of it by a silent push when the server grants a
-//    push subscription, and otherwise by a short poll while the app is in
-//    front. The transport is plain CloudKit operations rather than
-//    CKSyncEngine: the engine insists on creating its own subscription first
-//    and fails the whole cycle when the server refuses it, which the China
-//    iCloud gateway did (HTTP 500 on the subscription alone, records fine).
-//  * Two edits of the same row: the later `updatedAt` wins.
-//  * Nothing is ever deleted here because the store looks empty: a sweep that
-//    would remove most known records is refused (a failed store open must
-//    not wipe the server).
-
 @MainActor
 @Observable
 final class CloudSync {
@@ -40,7 +16,6 @@ final class CloudSync {
     private static let zoneID = CKRecordZone.ID(zoneName: "Ledger", ownerName: CKCurrentUserDefaultName)
     private static let batchSize = 200
 
-    /// The running instance, for the app delegates that receive pushes.
     private(set) static weak var current: CloudSync?
 
     enum Phase: Equatable {
@@ -51,18 +26,12 @@ final class CloudSync {
     }
 
     private(set) var phase: Phase = .idle
-    /// Last time anything was sent or received.
     private(set) var lastActivity: Date?
     private(set) var sentCount = 0
     private(set) var receivedCount = 0
-    /// Whether the push subscription is known to exist on the server.
     private(set) var pushReady = UserDefaults.standard.bool(forKey: "syncPushReady")
-    /// The server refused portfolio records (its schema does not have them
-    /// yet); ledger sync goes on, portfolio sync waits for the next launch.
     private(set) var portfolioBlocked = false
 
-    /// Whether this build may talk to iCloud at all. An unsigned or ad-hoc
-    /// build has no iCloud entitlement, and touching CloudKit would crash it.
     static var isEntitled: Bool {
         #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil) else { return false }
@@ -74,27 +43,20 @@ final class CloudSync {
     }
 
     private struct StateFile: Codable {
-        /// Server change token of the zone, archived.
         var token: Data?
         var zoneReady = false
         var records: [String: SyncEntry] = [:]
-        /// Records that name an account which has not arrived yet.
         var orphans: [String: SyncFields] = [:]
-        /// Account ids that lost an identity merge → the id that survived.
         var aliases: [String: String] = [:]
-        /// Record names to delete on the server.
         var pendingDeletes: [String] = []
         var environment: String?
     }
 
-    /// Every build talks to the Production database, so TestFlight and local builds share data.
     private static let environment = "production"
-
 
     private let context: ModelContext
     private var database: CKDatabase?
     private var state = StateFile()
-    /// Rows to send, and the digest each had when it was queued.
     private var queued: [String: String] = [:]
     private var scanTask: Task<Void, Never>?
     private var syncing = false
@@ -114,11 +76,8 @@ final class CloudSync {
         self.context = container.mainContext
     }
 
-    // MARK: Lifecycle
-
     func start() {
         guard database == nil else { return }
-        // The unit-test host is the real app on the real store; it must not sync.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
             phase = .off("Running under tests.")
             return
@@ -163,11 +122,6 @@ final class CloudSync {
         observers.append(NotificationCenter.default.addObserver(forName: active, object: nil, queue: .main) {
             [weak self] _ in Task { @MainActor in self?.fetchNow() }
         })
-        // While the app is in front, ask for changes every 2 seconds: a fetch
-        // with a change token is one small request, and silent pushes are
-        // delivered late or not at all (measured: none arrived on the phone,
-        // records showed up only on the next poll). Pushes still wake the app
-        // in the background.
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
@@ -184,9 +138,6 @@ final class CloudSync {
         runProbeIfAsked()
     }
 
-    /// Writes one record of each type with every field filled, then removes
-    /// them, so the Development schema has all fields before it is deployed
-    /// to Production (TIDEMARK_SYNC_SCHEMA=1).
     private func seedSchema(_ database: CKDatabase) async {
         let account = Account(name: "schema", kind: .liability, currencyCode: "CNY")
         account.cardNumber = "0000"; account.typeLabel = "t"; account.groupRaw = "credit"
@@ -231,7 +182,6 @@ final class CloudSync {
         }
     }
 
-    /// Step-by-step check of what the server accepts (TIDEMARK_SYNC_DIAG=1).
     private func diagnose(_ database: CKDatabase) async {
         func step(_ name: String, _ work: () async throws -> String) async {
             do { log("diag \(name): ok \(try await work())") }
@@ -275,8 +225,6 @@ final class CloudSync {
         #endif
     }
 
-    /// Ask the server to push when the zone changes. Failing is not fatal:
-    /// polling covers it, and the next launch tries again.
     private func ensureSubscription(in database: CKDatabase) {
         guard !pushReady else { return }
         Task {
@@ -300,7 +248,6 @@ final class CloudSync {
         fetchNow()
     }
 
-    /// Run a sync cycle now (or right after the one in flight).
     func fetchNow() {
         guard database != nil else { return }
         if syncing { again = true; return }
@@ -322,7 +269,6 @@ final class CloudSync {
             if !state.zoneReady {
                 let result = try await database.modifyRecordZones(
                     saving: [CKRecordZone(zoneID: Self.zoneID)], deleting: [])
-                // The call succeeds even when the one zone in it was refused.
                 for outcome in result.saveResults.values { _ = try outcome.get() }
                 state.zoneReady = true
                 persist()
@@ -333,7 +279,6 @@ final class CloudSync {
             if case .off = phase { return }
             if phase != .idle { phase = .idle }
         } catch let error as CKError where error.code == .zoneNotFound || error.code == .userDeletedZone {
-            // The zone went away (or never existed here): start over from local data.
             log("zone missing on the server; creating it and uploading again")
             state.zoneReady = false
             state.token = nil
@@ -350,10 +295,6 @@ final class CloudSync {
         }
     }
 
-    // MARK: Local changes → server
-
-    /// Inserted and updated rows of a save; nil when something was deleted
-    /// or the save does not say, which needs a full scan.
     nonisolated private static func changedIdentifiers(_ note: Notification) -> [PersistentIdentifier]? {
         let info = note.userInfo ?? [:]
         let deleted = info[ModelContext.NotificationKey.deletedIdentifiers.rawValue] as? [PersistentIdentifier] ?? []
@@ -371,7 +312,6 @@ final class CloudSync {
         if let changed { pendingChanges.formUnion(changed) } else { pendingFullScan = true }
         scanTask?.cancel()
         scanTask = Task { [weak self] in
-            // Coalesce a burst of saves (an import) into one scan.
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled, let self else { return }
             let full = self.pendingFullScan || self.pendingChanges.count > 300
@@ -383,8 +323,6 @@ final class CloudSync {
         }
     }
 
-    /// Queue just the rows a save touched (a full scan reads and digests the
-    /// whole store, ~150 ms on the phone, after every record).
     private func scan(only changes: Set<PersistentIdentifier>) {
         guard database != nil else { return }
         var saves: [String] = []
@@ -467,7 +405,6 @@ final class CloudSync {
 
     private func recordID(_ name: String) -> CKRecord.ID { CKRecord.ID(recordName: name, zoneID: Self.zoneID) }
 
-    /// Compare the store with what the server holds and queue the difference.
     private func scan() {
         guard database != nil else { return }
         let index = loadIndex()
@@ -497,12 +434,9 @@ final class CloudSync {
         if plan.refusedDeletes {
             log("refused to delete most of the server's records; the local store looks incomplete")
         }
-        // A queued row that no longer exists is no longer queued.
         for name in queued.keys where local[name] == nil { queued[name] = nil }
         guard !plan.saves.isEmpty || !plan.deletes.isEmpty else { return }
 
-        // A row that changed without anyone stamping it gets stamped now, so
-        // "later edit wins" has something to compare.
         var stamped = false
         let now = Date()
         for name in plan.saves {
@@ -571,7 +505,6 @@ final class CloudSync {
                 switch outcome {
                 case .success(let record):
                     state.records[name] = SyncEntry(digest: sentDigest[name] ?? "", system: Self.systemFields(of: record))
-                    // Edited again while in flight: stays queued with its new digest.
                     if queued[name] == sentDigest[name] { queued[name] = nil }
                     saved += 1
                 case .failure(let error):
@@ -595,7 +528,6 @@ final class CloudSync {
                             .flatMap { SyncCodec.date(Self.fields(from: $0)["updatedAt"]) } ?? .distantPast
                         let theirs = SyncCodec.date(Self.fields(from: server)["updatedAt"]) ?? .distantPast
                         if mine > theirs {
-                            // Ours is the later edit: send it again on top of the server's version.
                             state.records[name] = SyncEntry(digest: SyncCodec.digest(Self.fields(from: server)),
                                                             system: Self.systemFields(of: server))
                             again = true
@@ -634,7 +566,6 @@ final class CloudSync {
             lastActivity = Date()
         }
         log("sent \(saved) saves, \(deleted) deletes" + (failed > 0 ? ", \(failed) to settle" : ""))
-        // Latency check: the edit time travels in the record.
     }
 
     private func pull(from database: CKDatabase) async throws {
@@ -651,8 +582,6 @@ final class CloudSync {
             let archived = try? NSKeyedArchiver.archivedData(withRootObject: changes.changeToken,
                                                              requiringSecureCoding: true)
             more = changes.moreComing
-            // The 2-second poll mostly comes back empty; rewriting the whole
-            // state file then stalled the main thread every time.
             guard archived != state.token || !modifications.isEmpty || !deletions.isEmpty else { continue }
             state.token = archived
             persist()
@@ -673,7 +602,6 @@ final class CloudSync {
             }
         }
         guard let key = SyncKey(name: name), let fields else {
-            // Deleted since it was queued.
             return nil
         }
         let record = state.records[name]?.system.flatMap(Self.record(fromSystemFields:))
@@ -683,10 +611,7 @@ final class CloudSync {
         return record
     }
 
-    // MARK: Server → local
-
     private func applyFetched(modifications fetched: [CKRecord], deletions: [String]) {
-        // What we sent comes back in the next fetch; skip what is already here.
         let modifications = fetched.filter { record in
             let name = record.recordID.recordName
             guard let entry = state.records[name],
@@ -712,7 +637,6 @@ final class CloudSync {
             return accounts
         }
 
-        // Accounts first: records point at them.
         for record in modifications {
             guard let key = SyncKey(name: record.recordID.recordName), key.kind == .account else { continue }
             let fields = Self.fields(from: record)
@@ -720,7 +644,6 @@ final class CloudSync {
             if let existing = index.accounts[key.id] {
                 account = existing
             } else if let twin = index.accounts.values.first(where: { $0.name == fields["name"] }) {
-                // The same account created separately on two devices.
                 if SyncPlanner.survivor(twin.id, key.id) == key.id {
                     let old = SyncKey(.account, twin.id).name
                     state.aliases[twin.id.uuidString] = key.id.uuidString
@@ -752,7 +675,6 @@ final class CloudSync {
             if let existing = index.transactions[key.id] {
                 transaction = existing
             } else if let print = fields["fingerprint"], let twin = byFingerprint[print] {
-                // The same export imported separately on two devices.
                 if SyncPlanner.survivor(twin.id, key.id) == key.id {
                     let old = SyncKey(.transaction, twin.id).name
                     index.transactions[twin.id] = nil
@@ -881,7 +803,6 @@ final class CloudSync {
                 lags.append(String(format: "%@ %.0f ms after its edit", key.name, now.timeIntervalSince(updated) * 1000))
             }
         }
-        // Records that were waiting for an account that has now arrived.
         for kind in [SyncKind.transaction, .holding, .valuation] {
             for (name, fields) in state.orphans {
                 guard let key = SyncKey(name: name), key.kind == kind else { continue }
@@ -920,8 +841,6 @@ final class CloudSync {
             + (lags.isEmpty ? "" : " [" + lags.joined(separator: "; ") + "]"))
     }
 
-    // MARK: Record plumbing
-
     private static func fields(from record: CKRecord) -> SyncFields {
         var fields: SyncFields = [:]
         for key in record.allKeys() {
@@ -943,11 +862,8 @@ final class CloudSync {
         return CKRecord(coder: coder)
     }
 
-    // MARK: State, log, errors
-
     private let writer = StateWriter()
 
-    /// Encodes and writes off the main thread; the file is megabytes.
     private func persist() {
         let snapshot = state
         writer.write(to: Self.stateURL) { try? JSONEncoder().encode(snapshot) }
@@ -955,7 +871,6 @@ final class CloudSync {
 
     private func note(_ error: Error, doing what: String) {
         let message = "\(what) failed: \(error.localizedDescription)"
-        // The server's own explanation, when it gives one.
         let info = (error as NSError).userInfo
         let detail = ["ServerErrorDescription", "NSUnderlyingError", "CKErrorDescription", "NSDebugDescription"]
             .compactMap { key in info[key].map { "\(key)=\(String(describing: $0).prefix(400))" } }
@@ -975,7 +890,6 @@ final class CloudSync {
         return formatter
     }()
 
-    /// Timestamped line to the console and to sync.log (kept under 512 KB).
     private func log(_ message: String) {
         let line = "\(Self.stamp.string(from: Date())) \(message)\n"
         print("[sync] \(line)", terminator: "")
@@ -991,12 +905,6 @@ final class CloudSync {
             try? Data(line.utf8).write(to: url)
         }
     }
-
-    // MARK: Connectivity probe
-    //
-    // Launching with TIDEMARK_SYNC_PROBE=add writes one marked record so the
-    // round trip to another device can be timed from the two logs;
-    // TIDEMARK_SYNC_PROBE=clear removes every marked record again.
 
     static let probeCategory = "sync-probe"
 
@@ -1019,10 +927,6 @@ final class CloudSync {
     }
 }
 
-// MARK: - Push delivery
-//
-// A silent push from the subscription means "the zone changed": fetch now.
-
 #if canImport(UIKit)
 final class SyncPushDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
@@ -1039,7 +943,6 @@ final class SyncPushDelegate: NSObject, NSApplicationDelegate {
 }
 #endif
 
-/// Serial background writes of the sync state; a burst keeps only the latest.
 private final class StateWriter: @unchecked Sendable {
     private let queue = DispatchQueue(label: "com.shizhengcao.Tidemark.sync-state", qos: .utility)
     private let lock = NSLock()

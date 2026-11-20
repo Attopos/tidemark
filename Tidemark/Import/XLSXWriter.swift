@@ -1,11 +1,6 @@
 import Foundation
 import Compression
 
-// MARK: - Minimal .xlsx writer
-//
-// One worksheet: text cells as shared strings (index 0 is the empty string),
-// chosen columns as numbers.
-
 struct ZipWriter {
     private var body = Data()
     private var directory = Data()

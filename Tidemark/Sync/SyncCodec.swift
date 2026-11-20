@@ -2,15 +2,6 @@ import Foundation
 import SwiftData
 import CryptoKit
 
-// MARK: - Sync codec
-//
-// What travels between devices: each account and each ledger record as a flat
-// dictionary of strings (amounts as decimal strings, dates as seconds since
-// 1970, references as ids). The same dictionary is the record's content on
-// the server and the input of the digest that tells whether a local row has
-// changed since it was last sent. `updatedAt` travels but is left out of the
-// digest: it says when a row changed, not what it holds.
-
 enum SyncKind: String {
     case account = "A"
     case transaction = "T"
@@ -33,7 +24,6 @@ enum SyncKind: String {
     var isPortfolio: Bool { self == .asset || self == .holding || self == .valuation }
 }
 
-/// "A:<uuid>" or "T:<uuid>" — also the record name on the server.
 struct SyncKey: Hashable {
     let kind: SyncKind
     let id: UUID
@@ -64,8 +54,6 @@ enum SyncCodec {
     static func string(_ date: Date) -> String { String(format: "%.3f", date.timeIntervalSince1970) }
     static func date(_ text: String?) -> Date? { text.flatMap(Double.init).map(Date.init(timeIntervalSince1970:)) }
     static func string(_ flag: Bool) -> String { flag ? "1" : "0" }
-
-    // MARK: Account
 
     static func fields(of account: Account) -> SyncFields {
         ["name": account.name,
@@ -105,8 +93,6 @@ enum SyncCodec {
         account.repaymentDay = fields["repaymentDay"].flatMap { Int($0) }
     }
 
-    // MARK: Ledger record
-
     static func fields(of transaction: Transaction) -> SyncFields {
         var fields: SyncFields = [
             "date": string(transaction.date),
@@ -139,8 +125,6 @@ enum SyncCodec {
         return fields
     }
 
-    /// Returns false when the record names an account that is not here yet;
-    /// everything else is still applied, and the caller retries later.
     @discardableResult
     static func apply(_ fields: SyncFields, to transaction: Transaction, accounts: [UUID: Account]) -> Bool {
         transaction.date = date(fields["date"]) ?? transaction.date
@@ -179,8 +163,6 @@ enum SyncCodec {
         return complete
     }
 
-    // MARK: Preset
-
     static func fields(of preset: RecordPreset) -> SyncFields {
         var fields: SyncFields = [
             "name": preset.name,
@@ -216,7 +198,6 @@ enum SyncCodec {
         preset.tags = fields["tags"] ?? ""
         preset.scheduleRaw = fields["schedule"] ?? ""
         preset.startDate = date(fields["start"]) ?? preset.startDate
-        // Never go back: an occurrence written on either device stays written.
         preset.generatedThrough = max(preset.generatedThrough, Int(fields["through"] ?? "") ?? -1)
         preset.isActive = fields["active"] != "0"
         preset.createdAt = date(fields["createdAt"]) ?? preset.createdAt
@@ -226,13 +207,6 @@ enum SyncCodec {
         preset.endDate = date(fields["end"])
         preset.occurrenceLimit = fields["limit"].flatMap { Int($0) }
     }
-
-    // MARK: Portfolio
-    //
-    // Holdings live in investment accounts (Alipay, Binance), which are not
-    // ledger accounts and do not travel as Account records; a holding carries
-    // its account's name, kind and currency and the other side finds or
-    // creates that account.
 
     private static func optional(_ value: Decimal?) -> String { value.map(string) ?? "" }
     private static func optionalDecimal(_ text: String?) -> Decimal? {
@@ -280,7 +254,6 @@ enum SyncCodec {
         return fields
     }
 
-    /// Returns false when the holding's asset is not here yet.
     @discardableResult
     static func apply(_ fields: SyncFields, to holding: Holding, assets: [UUID: Asset],
                       account: (SyncFields) -> Account?) -> Bool {
@@ -316,7 +289,6 @@ enum SyncCodec {
         return fields
     }
 
-    /// Returns false when the valuation's holding is not here yet.
     @discardableResult
     static func apply(_ fields: SyncFields, to snapshot: HoldingSnapshot, holdings: [UUID: Holding]) -> Bool {
         snapshot.date = date(fields["date"]) ?? snapshot.date
@@ -335,8 +307,6 @@ enum SyncCodec {
         return true
     }
 
-    // MARK: Digest
-
     static func digest(_ fields: SyncFields) -> String {
         var hasher = SHA256()
         for key in fields.keys.sorted() where key != "updatedAt" {
@@ -349,31 +319,18 @@ enum SyncCodec {
     }
 }
 
-// MARK: - Change detection
-//
-// The store is compared with what the server is known to hold. This does not
-// depend on every code path remembering to flag its edits: an import, a
-// restore or an editor all end up as "the digest differs".
-
 struct SyncEntry: Codable, Equatable {
-    /// Digest of the content the server holds.
     var digest: String
-    /// Server bookkeeping of the record (its change tag), archived.
     var system: Data?
 }
 
 struct SyncPlan: Equatable {
     var saves: [String] = []
     var deletes: [String] = []
-    /// A deletion sweep this large looks like a lost store, not a clean-up.
     var refusedDeletes = false
 }
 
 enum SyncPlanner {
-    /// - Parameters:
-    ///   - local: digest of every row in the store, by record name.
-    ///   - synced: what the server is known to hold.
-    ///   - queued: digests already handed to the engine and not yet confirmed.
     static func plan(local: [String: String], synced: [String: SyncEntry], queued: [String: String]) -> SyncPlan {
         var plan = SyncPlan()
         for (name, digest) in local where synced[name]?.digest != digest && queued[name] != digest {
@@ -390,9 +347,6 @@ enum SyncPlanner {
         return plan
     }
 
-    /// Two rows that are the same thing under different ids (the same export
-    /// imported on two devices): every device keeps the smaller id, so they
-    /// converge without talking to each other.
     static func survivor(_ a: UUID, _ b: UUID) -> UUID {
         a.uuidString < b.uuidString ? a : b
     }

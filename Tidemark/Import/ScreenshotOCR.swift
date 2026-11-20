@@ -3,19 +3,9 @@ import Vision
 import SwiftData
 import Observation
 
-// MARK: - Holdings screenshot OCR (Alipay funds, Binance assets)
-//
-// Pipeline: image → Vision text recognition (zh-Hans + en) → platform layout
-// parser (Alipay fund cards or Binance asset rows, chosen per screenshot; see
-// BinanceScreenshotParser.swift) → editable review drafts → explicit
-// user confirmation → holdings + dated valuation snapshots. Uncertain fields
-// are flagged, never silently written. If a screenshot only shows a value, we
-// store a dated valuation — units/cost are never invented.
-
 struct RecognizedLine: Identifiable {
     let id = UUID()
     let text: String
-    /// Vision-normalized bounding box (origin bottom-left, 0…1).
     let box: CGRect
     let confidence: Double
 }
@@ -33,8 +23,6 @@ enum OCRError: LocalizedError {
         }
     }
 }
-
-// MARK: Vision wrapper
 
 enum ScreenshotOCRService {
     static func recognize(image: PlatformImage) async throws -> [RecognizedLine] {
@@ -75,8 +63,6 @@ enum ScreenshotOCRService {
     }
 }
 
-// MARK: Parsed structures
-
 struct OCRField {
     var value: Decimal
     var confidence: Double
@@ -91,15 +77,13 @@ struct HoldingDraft: Identifiable {
     var nameConfidence: Double
     var marketValue: OCRField?
     var profit: OCRField?
-    var returnRatePercent: OCRField?   // e.g. 12.4 means +12.4%
+    var returnRatePercent: OCRField?
     var dayProfit: OCRField?
     var quantity: OCRField?
     var unitNAV: OCRField?
     var costBasis: OCRField?
-    /// Union of contributing boxes (Vision coordinates) for the overlay.
     var box: CGRect
     var platform: ScreenshotPlatform = .alipay
-    /// Stablecoin cash (USDT/USDC): parsed, but not imported unless opted in.
     var excludedAsCash = false
 
     var hasAnyValue: Bool {
@@ -119,10 +103,7 @@ struct ScreenshotParseOutput {
     var platform: ScreenshotPlatform = .alipay
 }
 
-// MARK: Layout parser (pure — unit-testable without Vision)
-
 enum AlipayScreenshotParser {
-
     enum FieldKind {
         case marketValue, profit, returnRate, dayProfit, dayReturnRate, quantity, nav, cost, accountTotal
     }
@@ -148,10 +129,6 @@ enum AlipayScreenshotParser {
                                "筛选", "搜索", "全部", "买入", "卖出", "定投", "明细", "交易", "组合", "自选",
                                "基金名称", "最近", "更多", "我的", "账户", "待确认", "资产分析", "安全保障"]
 
-    /// Alipay renders category pills ("基金", "定投", "黄金") right after the
-    /// fund name; Vision often merges them into the name observation. Strip
-    /// them only when they follow a space, an ASCII letter/digit, or a closing
-    /// paren — never when they end a CJK name ("天弘余额宝货币").
     static let nameBadgeSuffixes = ["定投", "基金", "黄金", "理财", "债券", "货币"]
 
     static func stripBadgeSuffixes(_ name: String) -> String {
@@ -186,12 +163,8 @@ enum AlipayScreenshotParser {
         text.unicodeScalars.filter { (0x4E00...0x9FFF).contains($0.value) }.count
     }
 
-    /// Extract the first number from text: (value, isPercent, hadSign).
     static func extractNumber(_ text: String) -> (value: Decimal, isPercent: Bool)? {
         var normalized = normalize(text).replacingOccurrences(of: "−", with: "-")
-        // Vision sometimes reads a thousands comma as a period ("18.432.75").
-        // A period followed by exactly 3 digits and then another separator+digit
-        // can only be a thousands separator, never a decimal point.
         if let dotGroup = try? NSRegularExpression(pattern: #"(\d{1,3})\.(\d{3})(?=[.,]\d)"#) {
             var previous = ""
             while previous != normalized {
@@ -200,8 +173,6 @@ enum AlipayScreenshotParser {
                 normalized = dotGroup.stringByReplacingMatches(in: normalized, range: range, withTemplate: "$1,$2")
             }
         }
-        // Comma-grouped form must contain at least one comma group, otherwise
-        // the plain form takes the whole digit run ("5200" must not parse as 520).
         guard let regex = try? NSRegularExpression(pattern: #"[-+]?\s?[¥￥$]?\s?\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|[-+]?\s?[¥￥$]?\s?\d+(?:\.\d+)?%?"#) else { return nil }
         let range = NSRange(normalized.startIndex..., in: normalized)
         guard let match = regex.firstMatch(in: normalized, range: range),
@@ -222,7 +193,6 @@ enum AlipayScreenshotParser {
         return nil
     }
 
-    /// Six-digit fund code not embedded in a longer digit run.
     static func extractFundCode(_ text: String) -> String? {
         let normalized = normalize(text)
         guard let regex = try? NSRegularExpression(pattern: #"(?<!\d)\d{6}(?!\d)"#) else { return nil }
@@ -235,16 +205,14 @@ enum AlipayScreenshotParser {
     static func looksLikeFundName(_ text: String) -> Bool {
         let t = normalize(text)
         guard cjkCount(t) >= 4 else { return false }
-        // Reject pure UI chrome.
         let stripped = t.replacingOccurrences(of: "[0-9.,%+\\-¥￥\\s]", with: "", options: .regularExpression)
         if uiNoiseWords.contains(stripped) { return false }
         if matchLabel(t) != nil && !fundTypeHints.contains(where: { t.contains($0) }) { return false }
         return fundTypeHints.contains { t.contains($0) }
     }
 
-    /// Group observations into visual rows (top to bottom).
     static func groupRows(_ lines: [RecognizedLine]) -> [[RecognizedLine]] {
-        let sorted = lines.sorted { $0.box.midY > $1.box.midY }  // Vision origin is bottom-left
+        let sorted = lines.sorted { $0.box.midY > $1.box.midY }
         var rows: [[RecognizedLine]] = []
         for line in sorted {
             if var last = rows.last, let anchor = last.first {
@@ -294,7 +262,6 @@ enum AlipayScreenshotParser {
         }
 
         for (rowIndex, row) in rows.enumerated() {
-            // New fund card?
             if let nameLine = row.first(where: { looksLikeFundName($0.text) }) {
                 flush()
                 var cleanName = normalize(nameLine.text)
@@ -313,7 +280,6 @@ enum AlipayScreenshotParser {
                 let labelKind = matchLabel(text)
                 let number = extractNumber(text)
 
-                // Account-level total.
                 if labelKind == .accountTotal {
                     if let number, !number.isPercent, number.value > 0 {
                         accountTotal = field(from: line, value: number.value)
@@ -332,20 +298,16 @@ enum AlipayScreenshotParser {
                 if draft.code == nil, let code = extractFundCode(text), cjkCount(text) <= 2 {
                     draft.code = code
                 }
-                // A line whose digits are exactly a 6-digit fund code is an
-                // identifier ("005827" under the name), never a value.
                 if let code = extractFundCode(text),
                    text.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression) == code {
                     continue
                 }
 
                 if let labelKind {
-                    // Value in the same observation ("持有金额 1,234.56")…
                     if let number {
                         let value = labelKind == .returnRate || number.isPercent ? number.value : number.value
                         assign(resolved(labelKind, isPercent: number.isPercent), field(from: line, value: value), to: &draft)
                     }
-                    // …or in a neighbor (right on the same row, else below by column).
                     else if let valueLine = valueNear(line: line, inRow: row,
                                                      nextRow: rowIndex + 1 < rows.count ? rows[rowIndex + 1] : []),
                             let v = extractNumber(valueLine.text) {
@@ -353,7 +315,6 @@ enum AlipayScreenshotParser {
                         draft.box = draft.box.union(valueLine.box)
                     }
                 } else if let number, matchLabel(text) == nil, !looksLikeFundName(text) {
-                    // Unlabeled numbers: classify heuristically (flagged for review).
                     if number.isPercent {
                         if draft.returnRatePercent == nil {
                             draft.returnRatePercent = field(from: line, value: number.value, extraUncertain: true)
@@ -373,13 +334,10 @@ enum AlipayScreenshotParser {
     }
 
     private static func resolved(_ kind: FieldKind, isPercent: Bool) -> FieldKind {
-        // A percent value under a "收益" label is really the rate.
         if kind == .profit && isPercent { return .returnRate }
         return kind
     }
 
-    /// Value observation for a label: nearest number to the right on the same
-    /// row, else the number in the next row with the largest x-overlap.
     private static func valueNear(line: RecognizedLine, inRow row: [RecognizedLine],
                                   nextRow: [RecognizedLine]) -> RecognizedLine? {
         let rightward = row
@@ -398,8 +356,6 @@ enum AlipayScreenshotParser {
         return below.first?.0
     }
 }
-
-// MARK: - Review session
 
 @MainActor
 @Observable
@@ -425,33 +381,24 @@ final class ScreenshotImportSession {
         var costBasis: String
         var flaggedFields: Set<String>
         var sourceBox: CGRect
-        /// Existing holding this draft matched (by code, then name); nil = new.
         var matchedHoldingID: UUID?
         var matchedLabel: String?
         var platform: ScreenshotPlatform = .alipay
-        /// Why this row is unchecked by default (e.g. stablecoin cash).
         var excludedReason: String?
-        /// A holding with a similar, not identical, name. Offered in review,
-        /// never applied on its own: "…联接" and "…联接C" are different funds.
         var suggestedHoldingID: UUID?
         var suggestedLabel: String?
-        /// The matched holding was marked as sold earlier; saving reopens it.
         var reopens = false
 
         var currencySymbol: String { Fmt.symbol(for: platform.currencyCode) }
     }
 
-    /// A holding of the imported account that no screenshot shows.
     struct MissingHolding: Identifiable {
-        /// The existing holding's id.
         let id: UUID
         let label: String
         let lastValue: String
-        /// Mark it as sold on the valuation date when saving.
         var close: Bool
     }
 
-    /// The account total a screenshot shows against the rows read from it.
     struct Checksum {
         let rowsSum: Decimal
         let total: Decimal
@@ -464,7 +411,6 @@ final class ScreenshotImportSession {
     var holdings: [EditableHolding] = []
     var accountTotalText: String = ""
     var accountTotalCurrency = "CNY"
-    /// The detected account total and the platform it belongs to.
     var accountTotal: Decimal?
     var accountTotalPlatform: ScreenshotPlatform?
     var missing: [MissingHolding] = []
@@ -477,8 +423,6 @@ final class ScreenshotImportSession {
         self.images = images
     }
 
-    /// Rows of the platform that showed a total, summed and compared with it.
-    /// A mismatch nearly always means a row was cut off or misread.
     var checksum: Checksum? {
         guard let total = accountTotal, let platform = accountTotalPlatform else { return nil }
         let sum = holdings
@@ -488,20 +432,15 @@ final class ScreenshotImportSession {
         return Checksum(rowsSum: sum, total: total, matches: Self.totalsAgree(sum, total))
     }
 
-    /// Equal within rounding: one unit, or 0.1% of the total if larger.
     static func totalsAgree(_ rows: Decimal, _ total: Decimal) -> Bool {
         let tolerance = max(Decimal(1), Swift.abs(total) / 1000)
         return Swift.abs(rows - total) <= tolerance
     }
 
-    /// Ids of existing holdings the included rows will update.
     var matchedHoldingIDs: Set<UUID> {
         Set(holdings.filter(\.include).compactMap(\.matchedHoldingID))
     }
 
-    /// Active holdings in the imported platforms' accounts that no row
-    /// matched. Pre-ticked only for the platform whose total was verified
-    /// against the rows: then the screenshots provably show the whole account.
     static func missingHoldings(existing: [Holding], imported: [EditableHolding],
                                 verifiedPlatform: ScreenshotPlatform?) -> [MissingHolding] {
         let platforms = Set(imported.map(\.platform))
@@ -552,7 +491,6 @@ final class ScreenshotImportSession {
         }
         self.lines = collectedLines
 
-        // Merge duplicates across screenshots (same code or normalized name).
         var merged: [HoldingDraft] = []
         for draft in allDrafts {
             if let index = merged.firstIndex(where: { existing in
@@ -584,7 +522,6 @@ final class ScreenshotImportSession {
             }
             let match = Self.match(draft: draft, in: existingHoldings)
             let suggestion = match == nil ? Self.suggest(draft: draft, in: existingHoldings) : nil
-            // Crypto quantities and prices need far more than 4 decimals.
             let fine = draft.platform == .binance ? 10 : 4
             return EditableHolding(
                 include: !draft.excludedAsCash,
@@ -621,16 +558,12 @@ final class ScreenshotImportSession {
         name.replacingOccurrences(of: "[\\s()（）\\-·]", with: "", options: .regularExpression).lowercased()
     }
 
-    /// Holdings a draft may refer to: same currency only (a USD "BTC" row
-    /// must not update a CNY fund), active ones first so a sold duplicate
-    /// never wins over the live holding.
     private static func candidates(for draft: HoldingDraft, in holdings: [Holding]) -> [Holding] {
         holdings
             .filter { ($0.asset?.currencyCode ?? "CNY").uppercased() == draft.platform.currencyCode }
             .sorted { $0.isActive && !$1.isActive }
     }
 
-    /// Certain match: same code, or the same name after normalization.
     static func match(draft: HoldingDraft, in holdings: [Holding]) -> Holding? {
         let holdings = candidates(for: draft, in: holdings)
         if let code = draft.code, !code.isEmpty {
@@ -641,8 +574,6 @@ final class ScreenshotImportSession {
         return holdings.first(where: { normalizeName($0.asset?.name ?? "") == target })
     }
 
-    /// Possible match: one name contains the other. Share classes differ by
-    /// one trailing letter, so this is only ever a suggestion for review.
     static func suggest(draft: HoldingDraft, in holdings: [Holding]) -> Holding? {
         let target = normalizeName(draft.name)
         guard !target.isEmpty else { return nil }
@@ -653,8 +584,6 @@ final class ScreenshotImportSession {
             return candidate.contains(target) || target.contains(candidate)
         }
     }
-
-    // MARK: Commit
 
     struct CommitStats {
         var created = 0
@@ -689,9 +618,6 @@ final class ScreenshotImportSession {
         var stats = CommitStats()
         let calendar = Calendar.current
 
-        // New holdings land in one standing account per platform ("Alipay
-        // Funds" in CNY, "Binance" in USD); matched holdings keep whichever
-        // account they already live in.
         let allAccounts = try context.fetch(FetchDescriptor<Account>())
         var accounts: [ScreenshotPlatform: Account] = [:]
         func destinationAccount(_ platform: ScreenshotPlatform) -> Account {
@@ -709,7 +635,6 @@ final class ScreenshotImportSession {
             return account
         }
 
-        // One import record per platform touched by this save.
         var records: [ScreenshotPlatform: (record: ImportRecord, stats: CommitStats)] = [:]
         func record(_ platform: ScreenshotPlatform) -> ImportRecord {
             if let existing = records[platform] { return existing.record }
@@ -746,11 +671,10 @@ final class ScreenshotImportSession {
             let importRecord = record(platform)
             var local = records[platform]!.stats
 
-            // Find or create the holding.
             let holding: Holding
             if let id = edited.matchedHoldingID, let matched = allHoldings.first(where: { $0.id == id }) {
                 holding = matched
-                matched.isActive = true   // sold earlier, bought again
+                matched.isActive = true
                 local.updated += 1
             } else {
                 let sameCurrency = allAssets.filter { $0.currencyCode.uppercased() == currency }
@@ -780,12 +704,10 @@ final class ScreenshotImportSession {
                 }
             }
 
-            // Update current holding facts (only with reviewed, present values).
             if let quantity { holding.quantity = quantity }
             if let cost { holding.costBasis = cost }
             holding.lastUpdated = Date()
 
-            // Same holding + same day → update in place; history is preserved otherwise.
             if let sameDay = holding.snapshots.first(where: { calendar.isDate($0.date, inSameDayAs: valuationDate) }) {
                 sameDay.marketValue = effectiveValue
                 if let quantity { sameDay.quantity = quantity }
@@ -807,7 +729,6 @@ final class ScreenshotImportSession {
                 local.snapshots += 1
             }
 
-            // NAV / price becomes a price point for history.
             if let nav, let asset = holding.asset {
                 let hasSameDay = asset.prices.contains { calendar.isDate($0.date, inSameDayAs: valuationDate) }
                 if !hasSameDay {
@@ -844,8 +765,6 @@ final class ScreenshotImportSession {
             state.updatedAt = Date()
         }
 
-        // Holdings the user confirmed are gone: a zero valuation on this
-        // date, history kept. Skipped if a row ended up updating the holding.
         let updatedIDs = matchedHoldingIDs
         for item in missing where item.close && !updatedIDs.contains(item.id) {
             guard let holding = allHoldings.first(where: { $0.id == item.id }) else { continue }

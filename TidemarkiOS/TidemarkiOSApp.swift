@@ -9,8 +9,6 @@ struct TidemarkiOSApp: App {
     @UIApplicationDelegateAdaptor(SyncPushDelegate.self) private var pushDelegate
     private let container: ModelContainer
     private let storageError: String?
-    /// Nil when the store could not be opened: an empty in-memory store must
-    /// never be compared with the server.
     private let sync: CloudSync?
 
     init() {
@@ -94,7 +92,6 @@ struct PhoneRootView: View {
             .debounce(for: .seconds(2), scheduler: RunLoop.main)) { _ in
             app.backUp(context)
         }
-        // Recurring records and instalments due since last time.
         .onChange(of: scenePhase) { _, phase in
             lock.sceneChanged(to: phase)
             if phase == .background { app.lockPortfolio() }
@@ -118,9 +115,6 @@ struct PhoneRootView: View {
     }
 }
 
-/// A tab whose page is not rebuilt when the tab bar's selection changes: the
-/// pages read their own data, and rebuilding one re-runs its @Query and every
-/// figure computed from it.
 struct StableTab<Content: View>: View, Equatable {
     @ViewBuilder let content: () -> Content
 

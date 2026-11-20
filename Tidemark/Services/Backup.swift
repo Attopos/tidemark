@@ -1,18 +1,6 @@
 import Foundation
 import SwiftData
 
-// MARK: - Backup & restore
-//
-// The store lives in the app's sandbox container on one Mac. A backup is a
-// plain JSON file of everything the board is built from (accounts that hold
-// something, assets, holdings, every dated valuation, prices, fetched rates,
-// settings), written to iCloud Drive › Tidemark so it follows the user to
-// another device. The format is independent of SwiftData: ids and raw
-// strings, amounts as decimal strings (JSON numbers would round them).
-//
-// Restoring merges by id: records in the backup are added or updated,
-// nothing is ever deleted. Restoring twice changes nothing.
-
 struct BackupFile: Codable {
     static let formatID = "tidemark.backup"
     static let currentVersion = 1
@@ -27,10 +15,7 @@ struct BackupFile: Codable {
     var snapshots: [SnapshotRecord]
     var prices: [PriceRecord]
     var rates: [RateRecord]
-    /// Ledger records. Optional so backups made before the ledger still load.
     var transactions: [TransactionRecord]? = nil
-    /// Templates, recurring records and instalment plans, in the same flat
-    /// field form they sync in.
     var presets: [PresetRecord]? = nil
 
     struct PresetRecord: Codable {
@@ -41,7 +26,6 @@ struct BackupFile: Codable {
     struct Settings: Codable {
         var baseCurrency: String?
         var language: String?
-        /// Target allocation, a removed feature; still read from old backups.
         var targets: [String: Double]? = nil
     }
 
@@ -56,7 +40,6 @@ struct BackupFile: Codable {
         var isArchived: Bool
         var createdAt: Date
         var openingBalance: String? = nil
-        /// Cash-side details, in their sync form.
         var details: [String: String]? = nil
     }
 
@@ -164,8 +147,6 @@ enum BackupService {
         var updated = 0
     }
 
-    // MARK: Decimal <-> string
-
     private static let posix = Locale(identifier: "en_US_POSIX")
 
     static func string(_ value: Decimal) -> String {
@@ -175,8 +156,6 @@ enum BackupService {
     static func decimal(_ text: String) -> Decimal {
         Decimal(string: text, locale: posix) ?? 0
     }
-
-    // MARK: Store -> backup
 
     static func details(of account: Account) -> [String: String] {
         SyncCodec.fields(of: account).filter {
@@ -191,7 +170,6 @@ enum BackupService {
 
         let transactions = try context.fetch(FetchDescriptor<Transaction>())
 
-        // Accounts that hold something, plus every cash-side ledger account.
         var accounts: [UUID: Account] = [:]
         for holding in holdings {
             if let account = holding.account { accounts[account.id] = account }
@@ -241,7 +219,6 @@ enum BackupService {
                                            source: $0.sourceRaw)
                 }
             }.sorted { $0.date < $1.date },
-            // Seed rates are rebuilt by the app; only real ones are history.
             rates: rates.filter { !$0.isSeeded }.sorted { $0.date < $1.date }.map {
                 .init(id: $0.id, code: $0.code, rate: string($0.rate), date: $0.date, source: $0.sourceRaw)
             },
@@ -280,8 +257,6 @@ enum BackupService {
         guard header.version <= BackupFile.currentVersion else { throw BackupError.newerVersion(header.version) }
         return try decoder.decode(BackupFile.self, from: data)
     }
-
-    // MARK: Backup -> store (merge by id, never delete)
 
     @discardableResult
     static func restore(_ backup: BackupFile, into context: ModelContext) throws -> RestoreStats {
@@ -440,8 +415,6 @@ enum BackupService {
             rate.isSeeded = false
         }
 
-        // Ledger records: matched by id, then by fingerprint (the same export
-        // imported on two devices yields the same fingerprints).
         var transactions: [UUID: Transaction] = [:]
         var byFingerprint: [String: Transaction] = [:]
         for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
@@ -508,10 +481,7 @@ enum BackupService {
         return stats
     }
 
-    // MARK: Files
-
     #if os(macOS)
-    /// The user's real home; inside the sandbox NSHomeDirectory() is the container.
     private static var realHome: URL {
         if let entry = getpwuid(getuid()), let dir = entry.pointee.pw_dir {
             return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
@@ -519,13 +489,10 @@ enum BackupService {
         return FileManager.default.homeDirectoryForCurrentUser
     }
 
-    /// iCloud Drive › Tidemark. The sandbox is allowed exactly this folder
-    /// (see Tidemark.entitlements); it only exists when iCloud Drive is on.
     static var automaticFolder: URL {
         realHome.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Tidemark", isDirectory: true)
     }
     #else
-    /// On My iPhone › Tidemark › Backups (shown in the Files app).
     static var automaticFolder: URL {
         URL.documentsDirectory.appendingPathComponent("Backups", isDirectory: true)
     }
@@ -541,8 +508,6 @@ enum BackupService {
         return "\(filePrefix)\(formatter.string(from: date)).json"
     }
 
-    /// One file per day (a later backup the same day replaces it); the
-    /// oldest files beyond `keepFiles` are removed.
     @discardableResult
     static func writeBackup(_ backup: BackupFile, to folder: URL) throws -> URL {
         let files = FileManager.default
@@ -554,7 +519,6 @@ enum BackupService {
         return url
     }
 
-    /// Backup files in a folder, newest first (the name carries the date).
     static func backupFiles(in folder: URL) -> [URL] {
         let all = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         return all

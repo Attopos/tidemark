@@ -4,8 +4,6 @@ import QuartzCore
 import UIKit
 import SwiftData
 
-/// TIDEMARK_PERF=1: switches tabs by itself and logs the longest main-thread
-/// stall after each switch to Application Support/perf.log.
 @MainActor
 final class PerfProbe: NSObject {
     static var isOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_PERF"] != nil }
@@ -19,9 +17,6 @@ final class PerfProbe: NSObject {
     static let openField = Notification.Name("probe.openField")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
-    /// TIDEMARK_IMPORT_TEST=1: reads Documents/import-test.xlsx the way Import
-    /// Data does, imports it into an empty in-memory store, previews it against
-    /// the real store (read-only), and writes the counts to import-test.txt.
     func importTest(store: ModelContext) async {
         var lines: [String] = []
         let url = URL.documentsDirectory.appending(path: "import-test.xlsx")
@@ -40,7 +35,6 @@ final class PerfProbe: NSObject {
                                                   atomically: true, encoding: .utf8)
     }
 
-    /// TIDEMARK_SHOTS=1: one PNG per tab (amounts hidden) in Application Support.
     func shoot(app: AppState) async {
         try? await Task.sleep(for: .seconds(5))
         let hidden = app.amountsHidden
@@ -122,8 +116,6 @@ final class PerfProbe: NSObject {
         return (worst * 1000, stalled * 1000, firstFrame * 1000)
     }
 
-    /// TIDEMARK_PERF_ENTRY=1: opens quick entry, taps categories and keys
-    /// (never saves) and logs each tap's worst frame to perf-entry.log.
     var probeContext: ModelContext?
 
     func runEntry(app: AppState, context: ModelContext? = nil) async {

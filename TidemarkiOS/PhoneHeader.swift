@@ -1,8 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Title row of an iPhone page, in place of the system navigation bar so its
-/// title and buttons line up with the page margin.
 struct PhoneHeader<Leading: View, Trailing: View>: View {
     let title: String
     @ViewBuilder var leading: Leading
@@ -64,7 +62,6 @@ struct PhoneBackButton: View {
 }
 
 extension View {
-    /// Hides the system bar and pins `header` above the content.
     func phoneHeader<Header: View>(background: Color = DS.page, @ViewBuilder _ header: () -> Header) -> some View {
         let header = header()
         return self
@@ -75,7 +72,6 @@ extension View {
     }
 }
 
-/// Swipe-back keeps working with the system bar hidden.
 extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     override open func viewDidLoad() {
         super.viewDidLoad()

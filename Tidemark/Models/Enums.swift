@@ -1,15 +1,13 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Account kinds
-
 enum AccountKind: String, Codable, CaseIterable, Identifiable {
     case cash
-    case payment       // wallets, bank cards, e-pay balances
+    case payment
     case investment
     case crypto
-    case other         // receivables, deposits, misc assets
-    case liability     // credit cards, loans, BNPL
+    case other
+    case liability
 
     var id: String { rawValue }
 
@@ -36,7 +34,6 @@ enum AccountKind: String, Codable, CaseIterable, Identifiable {
     }
 
     var isAsset: Bool { self != .liability }
-    /// Counts toward liquid runway
     var isLiquid: Bool { self == .cash || self == .payment }
 
     var sortRank: Int {
@@ -50,7 +47,6 @@ enum AccountKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Guess an account kind from an imported account name (iCost has no kind column).
     static func guess(fromName name: String) -> AccountKind {
         let n = name.lowercased()
         if n.isEmpty { return .cash }
@@ -68,8 +64,6 @@ enum AccountKind: String, Codable, CaseIterable, Identifiable {
         return .payment
     }
 }
-
-// MARK: - Asset classes
 
 enum AssetClass: String, Codable, CaseIterable, Identifiable {
     case cash
@@ -94,7 +88,6 @@ enum AssetClass: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Fixed categorical color assignment (never cycled)
     var colorIndex: Int {
         switch self {
         case .cash: return 0
@@ -103,14 +96,13 @@ enum AssetClass: String, Codable, CaseIterable, Identifiable {
         case .equity: return 3
         case .mixedFund: return 4
         case .crypto: return 1
-        case .other: return 7 // folds to "other" gray
+        case .other: return 7
         }
     }
     var color: Color { DS.categoryColor(colorIndex) }
 
     var isLiquid: Bool { self == .cash || self == .moneyMarket }
 
-    /// Guess the class of a Chinese mutual fund from its name.
     static func guessFund(name: String) -> AssetClass {
         if name.contains("货币") || name.contains("现金") { return .moneyMarket }
         if name.contains("债") { return .bond }
@@ -120,8 +112,6 @@ enum AssetClass: String, Codable, CaseIterable, Identifiable {
         return .mixedFund
     }
 }
-
-// MARK: - Transaction kinds
 
 enum TransactionKind: String, Codable, CaseIterable, Identifiable {
     case income
@@ -158,7 +148,6 @@ enum TransactionKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Counts in income/expense cash-flow statistics.
     var isConsumptionFlow: Bool { self == .income || self == .expense }
 
     var color: Color {
@@ -172,8 +161,6 @@ enum TransactionKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 }
-
-// MARK: - Data sources
 
 enum DataSource: String, Codable, CaseIterable, Identifiable {
     case manual
@@ -207,8 +194,6 @@ enum DataSource: String, Codable, CaseIterable, Identifiable {
         }
     }
 }
-
-// MARK: - Recurrence
 
 enum Frequency: String, Codable, CaseIterable, Identifiable {
     case weekly
@@ -258,8 +243,6 @@ enum Frequency: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Time ranges
-
 enum TimeRange: String, CaseIterable, Identifiable {
     case m1 = "1M"
     case m3 = "3M"
@@ -270,7 +253,6 @@ enum TimeRange: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String { rawValue }
 
-    /// Start date for the range; `.all` returns nil (use earliest data).
     func start(from now: Date = Date(), calendar: Calendar = .current) -> Date? {
         switch self {
         case .m1: return calendar.date(byAdding: .month, value: -1, to: now)
@@ -281,8 +263,6 @@ enum TimeRange: String, CaseIterable, Identifiable {
         }
     }
 }
-
-// MARK: - Import status
 
 enum ImportStatus: String, Codable {
     case success
@@ -298,8 +278,6 @@ enum ImportStatus: String, Codable {
     }
 }
 
-// MARK: - Calendar helpers
-
 extension Calendar {
     func startOfMonth(for date: Date) -> Date {
         self.date(from: dateComponents([.year, .month], from: date)) ?? date
@@ -312,14 +290,6 @@ extension Calendar {
         dateComponents([.month], from: startOfMonth(for: a), to: startOfMonth(for: b)).month ?? 0
     }
 }
-
-// MARK: - Risk exposure
-//
-// What a holding is actually exposed to, independent of the wrapper: a CNY
-// QDII fund tracking the S&P 500 and a tokenized SPY on Binance are both US
-// equity; a gold ETF feeder fund is gold, not equity. This is the first level
-// of the portfolio view; holdings are the second. Guessed from name/ticker,
-// overridable per asset.
 
 enum Exposure: String, CaseIterable, Identifiable {
     case usEquity
@@ -346,8 +316,6 @@ enum Exposure: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Color = risk family (violet risk assets, lime hedges & cash), shade =
-    /// which one inside it. Fixed, never by rank.
     var color: Color {
         switch self {
         case .usEquity: return DS.violet
@@ -393,7 +361,6 @@ enum Exposure: String, CaseIterable, Identifiable {
 }
 
 extension Asset {
-    /// Override when set, otherwise the guess.
     var exposure: Exposure {
         get {
             if let raw = exposureRaw, let chosen = Exposure(rawValue: raw) { return chosen }
@@ -403,7 +370,6 @@ extension Asset {
     }
 }
 
-/// What a color means across the app.
 enum RiskFamily: CaseIterable {
     case risk, hedge, other
 
@@ -425,8 +391,6 @@ enum RiskFamily: CaseIterable {
 }
 
 extension Exposure {
-    /// Thin marks (share bars, legend squares): the card color in dark mode,
-    /// one step deeper in light mode so pale shades still show on white.
     var markColor: Color {
         switch self {
         case .usEquity: return Color(light: 0x8A6CF0, dark: 0xA98BFA)
@@ -440,17 +404,10 @@ extension Exposure {
         }
     }
 
-    /// Text color that reads on `color`.
     var ink: Color {
         self == .crypto || self == .chinaEquity ? .white : DS.ink
     }
 }
-
-// MARK: - Account groups (cash side)
-//
-// How the Accounts page sorts cash-side accounts, the way bookkeeping apps
-// do: money you hold, credit you use, prepaid cards, money owed to you and
-// money you owe.
 
 enum AccountGroup: String, CaseIterable, Identifiable {
     case fund, credit, recharge, receivable, payable
@@ -477,7 +434,6 @@ enum AccountGroup: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The account kind that carries the money semantics for this group.
     var kind: AccountKind {
         switch self {
         case .fund: return .payment
@@ -510,7 +466,6 @@ extension Account {
         set { groupRaw = newValue.rawValue }
     }
 
-    /// What kind of account this looks like, until the user names it.
     var guessedTypeLabel: String {
         let n = name.lowercased()
         switch group {
@@ -527,7 +482,6 @@ extension Account {
         }
     }
 
-    /// Days until the next statement, for credit cards with a billing day.
     func daysToBilling(from now: Date = Date(), calendar: Calendar = .current) -> Int? {
         guard let day = billingDay, (1...31).contains(day) else { return nil }
         let today = calendar.startOfDay(for: now)

@@ -2,13 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// End-to-end on a REAL bookkeeping export: read the workbook, import it, and
-// compare a month's totals with what the source app itself shows. The export
-// and the expected figures are personal, so both are local, git-ignored
-// fixtures (`ledger-fixture-export.xlsx`, `ledger-fixture-expected.json`):
-// {"rows": 123, "month": "2026-01", "expense": "100.00", "income": "200.00",
-//  "topCategories": [{"name": "…", "amount": "50.00"}]}
-
 @MainActor
 final class LedgerLiveExportTests: XCTestCase {
     private struct Expected: Decodable {

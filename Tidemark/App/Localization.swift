@@ -1,11 +1,5 @@
 import Foundation
 
-// MARK: - Lightweight in-app localization
-//
-// Keys are the English strings themselves; missing keys fall back to English.
-// The language switches live (no relaunch): AppState owns the selection and
-// the root view rebuilds on change.
-
 enum AppLanguage: String, CaseIterable, Identifiable {
     case english = "en"
     case chinese = "zh"
@@ -30,18 +24,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
-/// Translate a UI string. Call sites use the English text as the key.
 func tr(_ key: String) -> String {
     L10n.translate(key)
 }
 
-/// Translate a format string ("Save %d holdings") and apply arguments.
 func trf(_ key: String, _ args: CVarArg...) -> String {
     String(format: L10n.translate(key), arguments: args)
 }
 
 enum L10n {
-    /// Kept in sync by AppState; reads are main-thread (UI only).
     nonisolated(unsafe) static var current: AppLanguage = .english
 
     static func translate(_ key: String) -> String {
@@ -52,19 +43,14 @@ enum L10n {
         }
     }
 
-    // MARK: 中文
-
     static let zh: [String: String] = [
-        // Chrome & commands
         "Portfolio": "投资组合", "Settings": "设置",
         "Import Holdings Screenshot…": "导入持仓截图…",
         "Import screenshot": "导入截图",
         "Drop screenshots to import": "拖放截图以导入",
 
-        // Common verbs
         "Cancel": "取消", "Save": "保存", "Done": "完成", "Close": "关闭", "Delete": "删除",
 
-        // Portfolio
         "TOTAL VALUE": "持仓总值", "As of": "截至", "%d assets": "%d 项资产",
         "Allocation": "配置", "Holdings": "持仓", "Total": "合计", "Others": "其他",
         "Value": "市值", "Share": "占比", "Updated": "更新于", "Never updated": "从未更新",
@@ -75,7 +61,6 @@ enum L10n {
         "No holdings yet": "暂无持仓",
         "Import an Alipay screenshot to get started.": "导入一张支付宝持仓截图即可开始。",
 
-        // Alipay OCR flow
         "Import Alipay holdings — screenshot OCR": "导入支付宝持仓——截图 OCR",
         "Drop Alipay holding screenshots here": "把支付宝持仓截图拖到这里",
         "Import holdings — screenshot OCR": "导入持仓——截图 OCR",
@@ -101,7 +86,6 @@ enum L10n {
         "Account total detected:": "识别到账户总额:",
         "Low-confidence fields (amber) — verify against the screenshot before saving.": "存在低置信度字段(黄色)——保存前请对照截图核对。",
 
-        // Enum display names (data model)
         "Cash": "现金", "Payment": "支付", "Investment": "投资", "Crypto": "加密货币",
         "Other assets": "其他资产", "Money market": "货币基金", "Bonds": "债券",
         "Equity": "股票", "Mixed funds": "混合基金", "Other": "其他",
@@ -111,7 +95,6 @@ enum L10n {
         "Weekly": "每周", "Monthly": "每月", "Quarterly": "每季", "Every 6 months": "每半年", "Yearly": "每年",
         "Imported": "已导入", "Partial": "部分", "Failed": "失败",
 
-        // Valuation, history, targets
         "History": "历史", "%d valuation days": "%d 个估值日",
         "Unrealized P/L": "浮动盈亏", "covers %@ of value": "覆盖 %@ 的市值",
         "Profit reported by each source on its latest valuation; cost is value minus profit.": "各来源在最新估值上报告的收益；成本按市值减收益计算。",
@@ -128,17 +111,14 @@ enum L10n {
         "Similar name, not identical. Click to update that holding instead of adding a new one.": "名称相近但不完全相同。点击后更新那只持仓，而不是新增。",
         "Matched an existing holding — this valuation will be added to it": "已匹配到现有持仓，这次估值会记到它名下",
 
-        // Backup
         "Backup": "备份", "Back up now": "立即备份", "Export…": "导出…", "Restore…": "恢复…",
         "Restore from backup…": "从备份恢复…", "Last backup": "上次备份",
         "Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted.": "自动保存到 iCloud 云盘 › Tidemark，每天一个文件：持仓、每一次估值、流水、账户、汇率和设置。恢复是把文件合并进来，不会删除任何数据。",
         "Backup failed: %@": "备份失败：%@", "Restore failed: %@": "恢复失败：%@",
         "Restored: %d added, %d updated": "已恢复：新增 %d 条，更新 %d 条",
 
-        // Settings
         "Language": "语言",
 
-        // Ledger, accounts, analysis
         "Ledger": "账本",
         "Accounts": "账户",
         "Analysis": "分析",
@@ -315,7 +295,6 @@ enum L10n {
         "Image": "图片", "Again": "再记",
         "Add a note": "点击添加备注",
         "Record": "再记一笔",
-        // iPhone analysis
         "Week": "周",
         "All": "全部",
         "Range": "范围",
@@ -335,7 +314,6 @@ enum L10n {
         "Start": "开始",
         "End": "结束",
         "Custom range": "自定义范围",
-        // iPhone settings
         "Protection": "保护", "iCloud Sync": "iCloud 同步", "Import Data": "导入数据", "Export Data": "导出数据",
         "Periodic Records": "周期记账", "Language Settings": "语言设置", "App lock": "应用锁",
         "Ask for %@ or the device passcode when Tidemark opens or comes back, and hide its content in the app switcher.": "打开或回到 Tidemark 时需要%@或设备密码，并在多任务界面隐藏内容。",
@@ -417,19 +395,14 @@ enum L10n {
         "Portfolio sync is waiting for the iCloud schema.": "投资组合同步在等 iCloud 结构部署完成。",
     ]
 
-    // MARK: Español
-
     static let es: [String: String] = [
-        // Chrome & commands
         "Portfolio": "Cartera", "Settings": "Ajustes",
         "Import Holdings Screenshot…": "Importar captura de posiciones…",
         "Import screenshot": "Importar captura",
         "Drop screenshots to import": "Suelta capturas para importar",
 
-        // Common verbs
         "Cancel": "Cancelar", "Save": "Guardar", "Done": "Hecho", "Close": "Cerrar", "Delete": "Eliminar",
 
-        // Portfolio
         "TOTAL VALUE": "VALOR TOTAL", "As of": "Al", "%d assets": "%d activos",
         "Allocation": "Asignación", "Holdings": "Posiciones", "Total": "Total", "Others": "Otros",
         "Value": "Valor", "Share": "Peso", "Updated": "Actualizado", "Never updated": "Nunca actualizado",
@@ -440,7 +413,6 @@ enum L10n {
         "No holdings yet": "Sin posiciones aún",
         "Import an Alipay screenshot to get started.": "Importa una captura de Alipay para empezar.",
 
-        // Alipay OCR flow
         "Import Alipay holdings — screenshot OCR": "Importar fondos de Alipay — OCR",
         "Drop Alipay holding screenshots here": "Suelta capturas de Alipay aquí",
         "Import holdings — screenshot OCR": "Importar posiciones — OCR",
@@ -466,7 +438,6 @@ enum L10n {
         "Account total detected:": "Total de cuenta detectado:",
         "Low-confidence fields (amber) — verify against the screenshot before saving.": "Hay campos de baja confianza (ámbar) — verifica con la captura antes de guardar.",
 
-        // Enum display names (data model)
         "Cash": "Efectivo", "Payment": "Pago", "Investment": "Inversión", "Crypto": "Cripto",
         "Other assets": "Otros activos", "Money market": "Mercado monetario", "Bonds": "Bonos",
         "Equity": "Renta variable", "Mixed funds": "Fondos mixtos", "Other": "Otros",
@@ -476,7 +447,6 @@ enum L10n {
         "Weekly": "Semanal", "Monthly": "Mensual", "Quarterly": "Trimestral", "Every 6 months": "Semestral", "Yearly": "Anual",
         "Imported": "Importado", "Partial": "Parcial", "Failed": "Fallido",
 
-        // Valuation, history, targets
         "History": "Historial", "%d valuation days": "%d días valorados",
         "Unrealized P/L": "P/G no realizada", "covers %@ of value": "cubre el %@ del valor",
         "Profit reported by each source on its latest valuation; cost is value minus profit.": "Ganancia que informa cada fuente en su última valoración; el coste es el valor menos la ganancia.",
@@ -493,17 +463,14 @@ enum L10n {
         "Similar name, not identical. Click to update that holding instead of adding a new one.": "Nombre parecido, no idéntico. Haz clic para actualizar esa posición en vez de crear otra.",
         "Matched an existing holding — this valuation will be added to it": "Coincide con una posición existente: la valoración se añade a ella",
 
-        // Backup
         "Backup": "Copia de seguridad", "Back up now": "Copiar ahora", "Export…": "Exportar…", "Restore…": "Restaurar…",
         "Restore from backup…": "Restaurar desde copia…", "Last backup": "Última copia",
         "Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted.": "Se guarda sola en iCloud Drive › Tidemark, un archivo por día: posiciones, cada valoración, movimientos, cuentas, tipos de cambio y ajustes. Restaurar fusiona el archivo; no se borra nada.",
         "Backup failed: %@": "Falló la copia: %@", "Restore failed: %@": "Falló la restauración: %@",
         "Restored: %d added, %d updated": "Restaurado: %d añadidos, %d actualizados",
 
-        // Settings
         "Language": "Idioma",
 
-        // Ledger, accounts, analysis
         "Ledger": "Libro",
         "Accounts": "Cuentas",
         "Analysis": "Análisis",
@@ -678,7 +645,6 @@ enum L10n {
         "Image": "Imagen", "Again": "Otra",
         "Add a note": "Añadir nota",
         "Record": "Otro",
-        // iPhone analysis
         "Week": "Semana",
         "All": "Todo",
         "Range": "Rango",
@@ -698,7 +664,6 @@ enum L10n {
         "Start": "Inicio",
         "End": "Fin",
         "Custom range": "Rango personalizado",
-        // iPhone settings
         "Protection": "Protección", "iCloud Sync": "Sincronización con iCloud", "Import Data": "Importar datos",
         "Export Data": "Exportar datos", "Periodic Records": "Registros periódicos", "Language Settings": "Idioma",
         "App lock": "Bloqueo de la app",

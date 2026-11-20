@@ -207,7 +207,6 @@ struct RecordDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
     }
 
-    /// Each row edits only its own field; transfers change type in the full editor.
     private func open(_ field: RecordField?) {
         guard let field else { return }
         let isFlow = transaction.kind == .expense || transaction.kind == .income

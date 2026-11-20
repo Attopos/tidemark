@@ -5,12 +5,6 @@ import UniformTypeIdentifiers
 import PhotosUI
 #endif
 
-// MARK: - Holdings screenshot OCR flow (Alipay funds, Binance assets)
-//
-// Drop/pick/paste screenshots → Vision OCR → review every parsed field beside
-// the original image (uncertain values flagged) → explicit confirm → dated
-// valuation snapshots, matched against existing holdings without duplication.
-
 struct ScreenshotImportFlow: View {
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -137,7 +131,6 @@ struct ScreenshotImportFlow: View {
     private func start(_ images: [PlatformImage]) {
         let newSession = ScreenshotImportSession(images: images)
         session = newSession
-        // Sold holdings too: a re-bought fund reopens its old entry.
         let holdings = allHoldings
         Task { await newSession.run(existingHoldings: holdings) }
     }
@@ -240,8 +233,6 @@ private let reviewMargin: CGFloat = 12
 private let reviewMargin: CGFloat = DS.phoneMargin
 #endif
 
-// MARK: - Review stage
-
 private struct OCRReviewStage: View {
     @Bindable var session: ScreenshotImportSession
     let onSave: () -> Void
@@ -302,7 +293,6 @@ private struct OCRReviewStage: View {
     }
 
     private var resultsColumn: some View {
-            // ── Editable results ─────────────────────────────────────────
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
                     DatePicker(tr("Valuation date"), selection: $session.valuationDate, displayedComponents: .date)
@@ -385,8 +375,6 @@ private struct OCRReviewStage: View {
     }
 }
 
-// MARK: - Screenshot pane with Vision-box overlay
-
 private struct ScreenshotPane: View {
     let image: PlatformImage
     let boxes: [CGRect]
@@ -425,12 +413,6 @@ private struct ScreenshotPane: View {
                       width: size.width, height: size.height)
     }
 }
-
-// MARK: - Holdings the screenshots don't show
-//
-// A fund that was sold simply disappears from the next screenshot. Without
-// an explicit answer it would stay on the board at its last value forever,
-// so the review asks: still held (screenshot was partial), or sold?
 
 private struct MissingHoldingsCard: View {
     @Bindable var session: ScreenshotImportSession
@@ -471,8 +453,6 @@ private struct MissingHoldingsCard: View {
         }
     }
 }
-
-// MARK: - Editable draft card
 
 private struct DraftCard: View {
     @Binding var holding: ScreenshotImportSession.EditableHolding

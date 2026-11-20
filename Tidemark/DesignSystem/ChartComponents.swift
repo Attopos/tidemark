@@ -1,12 +1,6 @@
 import SwiftUI
 import Charts
 
-// MARK: - Allocation donut
-//
-// Categorical identity comes from DS.categorical in fixed rank order; anything
-// beyond the ramp folds into a gray "Others" slice. Hover highlights a slice
-// and swaps the center figure; the legend keeps identity from being color-alone.
-
 struct AllocationSlice: Identifiable {
     let label: String
     let value: Decimal

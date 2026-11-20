@@ -2,8 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// Every figure on the cash-flow pages, on hand-checkable numbers.
-
 final class CashflowAnalyticsTests: XCTestCase {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -133,8 +131,6 @@ final class CashflowAnalyticsTests: XCTestCase {
         XCTAssertEqual(transfers.map(\.amount), [500, 200])
     }
 
-    // MARK: Account balances
-
     private var converter: CurrencyConverter {
         CurrencyConverter(rates: [CurrencyRate(code: "USD", rate: 7, date: day(2020, 1, 1)),
                                   CurrencyRate(code: "THB", rate: Decimal(string: "0.2")!, date: day(2020, 1, 1))],
@@ -158,17 +154,14 @@ final class CashflowAnalyticsTests: XCTestCase {
 
     func testCrossCurrencyMovements() {
         let card = UUID(), cash = UUID()
-        // A THB purchase paid from a CNY card.
         let purchase = AccountLedger.movements(kind: .expense, amount: 500, refund: 0, currency: "THB",
                                                date: day(2026, 3, 1), source: (card, "CNY"), destination: nil,
                                                arrival: nil, converter: converter)
         XCTAssertEqual(purchase.map(\.delta), [-100])
-        // CNY changed into USD cash at the dated rate…
         let exchange = AccountLedger.movements(kind: .transfer, amount: 700, refund: 0, currency: "CNY",
                                                date: day(2026, 3, 1), source: (card, "CNY"),
                                                destination: (cash, "USD"), arrival: nil, converter: converter)
         XCTAssertEqual(exchange.map(\.delta), [-700, 100])
-        // …or at the amount that actually arrived.
         let actual = AccountLedger.movements(kind: .transfer, amount: 700, refund: 0, currency: "CNY",
                                              date: day(2026, 3, 1), source: (card, "CNY"),
                                              destination: (cash, "USD"), arrival: 98, converter: converter)
