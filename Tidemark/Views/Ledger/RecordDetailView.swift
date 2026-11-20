@@ -7,12 +7,14 @@ struct RecordDetailView: View {
     @Bindable var transaction: Transaction
 
     @State private var editing = false
+    @State private var editingField: RecordField?
     @State private var confirmingDelete = false
 
     private struct Row: Identifiable {
         let label: String
         let value: String
-        var opensEditor = true
+        var field: RecordField?
+        var opensEditor: Bool { field != nil }
         var id: String { label }
     }
 
@@ -53,42 +55,41 @@ struct RecordDetailView: View {
 
     private var groups: [[Row]] {
         let isFlow = transaction.kind == .expense || transaction.kind == .income
-        var first = [Row(label: tr("Type"), value: typeText)]
+        var first = [Row(label: tr("Type"), value: typeText, field: .type)]
         if let ledger { first.append(Row(label: tr("Ledger"), value: ledger)) }
 
         var second = [
-            Row(label: tr("Date"), value: Fmt.dateTime.string(from: transaction.date)),
-            Row(label: tr("Amount"), value: Fmt.money(transaction.amount, transaction.currencyCode)),
-            Row(label: tr("Currency"), value: currencyText),
+            Row(label: tr("Date"), value: Fmt.dateTime.string(from: transaction.date), field: .date),
+            Row(label: tr("Amount"), value: Fmt.money(transaction.amount, transaction.currencyCode), field: .amount),
+            Row(label: tr("Currency"), value: currencyText, field: .currency),
         ]
         if isFlow {
-            second.append(Row(label: tr("Account"), value: accountText(transaction.account)))
+            second.append(Row(label: tr("Account"), value: accountText(transaction.account), field: .account))
         } else {
-            second.append(Row(label: tr("From account"), value: accountText(transaction.account)))
-            second.append(Row(label: tr("To account"), value: accountText(transaction.transferAccount)))
-            if let arrival = transaction.transferAmount, let target = transaction.transferAccount {
-                second.append(Row(label: tr("Arrived"), value: Fmt.money(arrival, target.currencyCode)))
+            second.append(Row(label: tr("From account"), value: accountText(transaction.account), field: .account))
+            second.append(Row(label: tr("To account"), value: accountText(transaction.transferAccount), field: .toAccount))
+            if let target = transaction.transferAccount {
+                second.append(Row(label: tr("Arrived"), value: transaction.transferAmount.map { Fmt.money($0, target.currencyCode) } ?? none,
+                                  field: .arrived))
             }
         }
 
         let remark = transaction.note.trimmingCharacters(in: .whitespacesAndNewlines)
         let third = [
-            Row(label: tr("Remark"), value: remark.isEmpty ? none : remark),
-            Row(label: tr("Image"), value: none, opensEditor: false),
-            Row(label: tr("Address"), value: transaction.address.isEmpty ? none : transaction.address),
+            Row(label: tr("Remark"), value: remark.isEmpty ? none : remark, field: .remark),
+            Row(label: tr("Image"), value: none),
+            Row(label: tr("Address"), value: transaction.address.isEmpty ? none : transaction.address, field: .address),
         ]
 
         var fourth: [Row] = []
         if transaction.kind == .expense {
-            fourth.append(Row(label: tr("Discount"), value: money(transaction.discountAmount)))
-            if transaction.refundAmount > 0 { fourth.append(Row(label: tr("Refund"), value: money(transaction.refundAmount))) }
-            if transaction.claimStatus != .none {
-                var value = transaction.claimStatus.displayName
-                if transaction.claimStatus == .claimed { value += " · \(money(transaction.claimAmount))" }
-                fourth.append(Row(label: tr("Reimbursement"), value: value))
-            }
+            fourth.append(Row(label: tr("Discount"), value: money(transaction.discountAmount), field: .discount))
+            fourth.append(Row(label: tr("Refund"), value: money(transaction.refundAmount), field: .refund))
+            var value = transaction.claimStatus.displayName
+            if transaction.claimStatus == .claimed { value += " · \(money(transaction.claimAmount))" }
+            fourth.append(Row(label: tr("Reimbursement"), value: value, field: .reimbursement))
         }
-        if transaction.feeAmount > 0 { fourth.append(Row(label: tr("Fee"), value: money(transaction.feeAmount))) }
+        fourth.append(Row(label: tr("Fee"), value: money(transaction.feeAmount), field: .fee))
         return [first, second, third, fourth].filter { !$0.isEmpty }
     }
 
@@ -112,6 +113,18 @@ struct RecordDetailView: View {
         .frame(width: 480, height: 680)
         #endif
         .sheet(isPresented: $editing) { TransactionEditor(transaction: transaction) }
+        .sheet(item: $editingField) { field in
+            RecordFieldEditor(transaction: transaction, field: field)
+                #if os(iOS)
+                .presentationDetents(field.detents)
+                .presentationDragIndicator(.visible)
+                #endif
+        }
+        #if DEBUG && os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openField)) { note in
+            if let raw = note.object as? String, let field = RecordField(rawValue: raw) { open(field) }
+        }
+        #endif
         .confirmationDialog(tr("Delete this record?"), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(tr("Delete"), role: .destructive) {
                 context.delete(transaction)
@@ -183,7 +196,7 @@ struct RecordDetailView: View {
     private func card(_ rows: [Row]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                Button { if row.opensEditor { editing = true } } label: { rowView(row) }
+                Button { open(row.field) } label: { rowView(row) }
                     .buttonStyle(.plain)
                 if index < rows.count - 1 {
                     Divider().overlay(DS.border.opacity(0.5)).padding(.leading, 18)
@@ -192,6 +205,13 @@ struct RecordDetailView: View {
         }
         .background(DS.panel)
         .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
+    }
+
+    /// Each row edits only its own field; transfers change type in the full editor.
+    private func open(_ field: RecordField?) {
+        guard let field else { return }
+        let isFlow = transaction.kind == .expense || transaction.kind == .income
+        if field == .type && !isFlow { editing = true } else { editingField = field }
     }
 
     private func rowView(_ row: Row) -> some View {

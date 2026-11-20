@@ -5,7 +5,7 @@
 ## 现在
 
 日常记账用 Tidemark（从 2026-11-16 起）；iCost 导出（2026-11-15，2658 行）已导入，iPhone 与 Mac 同步一致。 iPhone 账本页顶部只剩标题和右上角的月份切换（‹ 月份 › + 日历），截图导入和搜索已删（截图识别仍在录入页「图片」）；隐藏金额的小眼睛统一放在各页大金额的标签旁（账本「支出」、资产「净资产」、分析和投资卡片标题旁），页面标题栏不再放眼睛。
-点开任一账单进入「账单详情」（照 iCost）：编辑/删除 + 分组卡片（类型、账本、日期、金额、币种、账户、备注、图片、地址、优惠/退款/手续费/报销、不计入开关），iPhone 和 Mac 共用 RecordDetailView。
+点开任一账单进入「账单详情」（照 iCost）：编辑/删除 + 分组卡片（类型、账本、日期、金额、币种、账户、备注、图片、地址、优惠/退款/手续费/报销、不计入开关），iPhone 和 Mac 共用 RecordDetailView。 点哪一行只改那一项（RecordFieldEditor：类型选分类、日期、金额、币种、账户带图标、到账、备注、地址、优惠/退款/手续费、报销），转账的类型和「编辑」按钮仍打开完整编辑器。
 资产页照 iCost 排版：净资产卡、借入/借出、分组「资金账户 (n)」+ 余额；账户图标用开源圆形图标（Resources/AccountIcons，来源和许可证见 SOURCES-account-icons.md）：各大银行徽标、微信/支付宝/Visa 等、各币种现金用圆形国旗，按名称和类型匹配，匹配不到用首字母。
 账户余额已对齐 iCost 截图（2026-11-18）：iCost 导出不带初始余额，所以按「iCost 余额 − 已导入账单」写入各账户的初始余额；iCost 资产页里没有的账户余额置 0 并归档；负债 ¥267.29 记在新建的信用账户「YEB Credit」。Tidemark 里 11-15 之后的新账单照常叠加（YEB 因此比 iCost 少 ¥322.41）。
 新建账户照 iCost 分两步（AccountEditor.swift）：先「选择类型」（45 种，资金/信用/储值/借出/借入分组，带图标），再填分组卡片表单（名称、余额或欠款、币种、卡号、类型、描述、信用卡额度和账单日），名称实时匹配银行图标；编辑用同一张表单。重名不能保存，信用/借入填欠款正数。
@@ -21,5 +21,6 @@
 ## 注意
 
 - 余额对齐前备份：~/Library/Application Support/Tidemark Backups/before-balances-20261118/（Mac 数据库）；导入前备份在 before-import-20261115/。 账户图标没加模型字段（加字段要部署 CloudKit 结构），改类型或名称即可换图标。
-- 调试：TIDEMARK_ACCOUNT_SEED（Mac，JSON 按名称设余额/类型/卡号/归档，余额只扣已导入的 iCost 账单）、TIDEMARK_SHOTS（+TIDEMARK_SHOTS_AMOUNTS 显示金额，含详情页截图）、TIDEMARK_PERF*（PERF_ENTRY 会真的存两条 note=perf-probe 的账单再删掉；PERF_TABS=1 先打开所有标签页）、TIDEMARK_IMPORT_TEST，仅 Debug。
+- 录入页账户用 AccountIcon，点开是带图标的账户列表（AccountPickerSheet）。
+- 调试：TIDEMARK_SHOTS 现在也截详情页的三个单项编辑（+TIDEMARK_SHOTS_ENTRY 截录入页）；TIDEMARK_ACCOUNT_SEED（Mac，JSON 按名称设余额/类型/卡号/归档，余额只扣已导入的 iCost 账单）、TIDEMARK_SHOTS（+TIDEMARK_SHOTS_AMOUNTS 显示金额，含详情页截图）、TIDEMARK_PERF*（PERF_ENTRY 会真的存两条 note=perf-probe 的账单再删掉；PERF_TABS=1 先打开所有标签页）、TIDEMARK_IMPORT_TEST，仅 Debug。
 - 构建测试通过后直接更新文档、合并进 main 并 push。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。
