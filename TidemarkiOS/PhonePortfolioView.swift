@@ -84,7 +84,7 @@ struct PhonePortfolioView: View {
                 .foregroundStyle(DS.textPrimary)
             if let message = app.unlockMessage {
                 Text(message)
-                    .font(DS.caption)
+                    .font(TS.caption)
                     .foregroundStyle(DS.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -102,7 +102,7 @@ struct PhonePortfolioView: View {
     private var content: some View {
         let summary = PortfolioSummary(allHoldings: allHoldings, rates: rates, baseCurrency: app.baseCurrency)
         return ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: TS.cardSpacing) {
                 title
                 if summary.rows.isEmpty {
                     empty
@@ -112,7 +112,7 @@ struct PhonePortfolioView: View {
                     if summary.history.count >= 2 {
                         PhoneCard(title: tr("History"), icon: "chart.xyaxis.line") {
                             Text(trf("%d valuation days", summary.history.count))
-                                .font(DS.caption)
+                                .font(TS.caption)
                                 .foregroundStyle(DS.textSecondary)
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                         } content: {
@@ -158,7 +158,7 @@ struct PhonePortfolioView: View {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(Fmt.money(summary.total, code))
-                        .font(DS.money(34))
+                        .font(TS.hero)
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
@@ -168,10 +168,10 @@ struct PhonePortfolioView: View {
                             Text("· \(tr("As of")) \(Fmt.dateMedium.string(from: asOf))")
                         }
                     }
-                    .font(DS.caption)
+                    .font(TS.caption)
                     .foregroundStyle(DS.textSecondary)
                     if let stale = summary.staleNote {
-                        Text(stale).font(DS.caption).foregroundStyle(DS.warning)
+                        Text(stale).font(TS.caption).foregroundStyle(DS.warning)
                     }
                 }
                 SegmentBar(segments: segments.map {
@@ -184,7 +184,7 @@ struct PhonePortfolioView: View {
                             Text(item.family.displayName).foregroundStyle(DS.textSecondary)
                             Text(Fmt.percent(item.share, showSign: false)).foregroundStyle(DS.textPrimary)
                         }
-                        .font(.system(size: 13).monospacedDigit())
+                        .font(TS.label)
                     }
                 }
                 if let profit = summary.valuation.profit {
@@ -196,22 +196,22 @@ struct PhonePortfolioView: View {
                             Text("(\(Fmt.percent(rate)))").foregroundStyle(color)
                         }
                     }
-                    .font(.system(size: 13).monospacedDigit())
+                    .font(TS.label)
                     if profit.coverage < 0.995 {
                         Text(trf("covers %@ of value", Fmt.percent(profit.coverage, decimals: 0, showSign: false)))
-                            .font(DS.caption)
+                            .font(TS.caption)
                             .foregroundStyle(DS.textTertiary)
                     }
                 }
                 if let rate = summary.rateCaption {
-                    Text(rate).font(DS.caption.monospacedDigit()).foregroundStyle(DS.textTertiary)
+                    Text(rate).font(TS.caption).foregroundStyle(DS.textTertiary)
                 }
             }
         }
     }
 
     private func exposureGrid(_ summary: PortfolioSummary) -> some View {
-        LazyVGrid(columns: PhoneCard<EmptyView, EmptyView>.twoColumns, spacing: 10) {
+        LazyVGrid(columns: PhoneCard<EmptyView, EmptyView>.twoColumns, spacing: TS.gridGap) {
             ForEach(summary.groups.filter { $0.baseValue > 0 }) { group in
                 PortfolioView.ExposureCard(group: group, share: summary.share(group.baseValue),
                                            baseCurrency: app.baseCurrency)
@@ -229,15 +229,15 @@ struct PhonePortfolioView: View {
                                 .fill(group.exposure.markColor)
                                 .frame(width: 12, height: 12)
                             Text(group.exposure.displayName)
-                                .font(.system(size: 15, weight: .regular).monospacedDigit())
+                                .font(TS.title)
                                 .foregroundStyle(DS.textPrimary)
                             Spacer()
                             Text(Fmt.percent(summary.share(group.baseValue), showSign: false))
-                                .font(.system(size: 13).monospacedDigit())
+                                .font(TS.label)
                                 .foregroundStyle(DS.textSecondary)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, TS.rowInsetH - 2)
+                        .padding(.vertical, TS.rowInsetV - 2)
                         ForEach(group.rows) { row in
                             Rectangle().fill(DS.border.opacity(0.6)).frame(height: 0.5).padding(.leading, 54)
                             Menu {
@@ -261,7 +261,7 @@ struct PhonePortfolioView: View {
                       color: color)
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.name)
-                    .font(.system(size: 14.5, weight: .regular).monospacedDigit())
+                    .font(TS.body)
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                 HStack(spacing: 4) {
@@ -271,7 +271,7 @@ struct PhonePortfolioView: View {
                         Text(Fmt.relative(updated)).foregroundStyle(row.isStale ? DS.warning : DS.textTertiary)
                     }
                 }
-                .font(.system(size: 12).monospacedDigit())
+                .font(TS.caption)
                 .foregroundStyle(DS.textTertiary)
             }
             Spacer(minLength: 8)
@@ -282,20 +282,20 @@ struct PhonePortfolioView: View {
                         .minimumScaleFactor(0.75)
                     if row.currency.uppercased() != app.baseCurrency.uppercased() {
                         Text(Fmt.money(native, row.currency) + " " + row.currency.uppercased())
-                            .font(.system(size: 12).monospacedDigit())
+                            .font(TS.caption)
                             .foregroundStyle(DS.textTertiary)
                     } else {
                         Text(Fmt.percent(summary.share(row.baseValue), showSign: false))
-                            .font(.system(size: 12).monospacedDigit())
+                            .font(TS.caption)
                             .foregroundStyle(DS.textTertiary)
                     }
                 } else {
-                    Text(tr("no valuation")).font(DS.caption).foregroundStyle(DS.warning)
+                    Text(tr("no valuation")).font(TS.caption).foregroundStyle(DS.warning)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, TS.rowInsetH - 2)
+        .padding(.vertical, TS.rowInsetV - 2)
         .contentShape(Rectangle())
     }
 
