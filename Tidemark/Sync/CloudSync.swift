@@ -149,8 +149,9 @@ final class CloudSync {
         log("start: \(state.records.count) records known to the server")
 
         observers.append(NotificationCenter.default.addObserver(
-            forName: ModelContext.didSave, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.scheduleScan() }
+            forName: ModelContext.didSave, object: nil, queue: .main) { [weak self] note in
+                let changed = Self.changedIdentifiers(note)
+                Task { @MainActor in self?.scheduleScan(changed) }
             })
         #if canImport(UIKit)
         UIApplication.shared.registerForRemoteNotifications()
@@ -351,15 +352,82 @@ final class CloudSync {
 
     // MARK: Local changes → server
 
-    private func scheduleScan() {
+    /// Inserted and updated rows of a save; nil when something was deleted
+    /// or the save does not say, which needs a full scan.
+    nonisolated private static func changedIdentifiers(_ note: Notification) -> [PersistentIdentifier]? {
+        let info = note.userInfo ?? [:]
+        let deleted = info[ModelContext.NotificationKey.deletedIdentifiers.rawValue] as? [PersistentIdentifier] ?? []
+        guard deleted.isEmpty, info[ModelContext.NotificationKey.invalidatedAllIdentifiers.rawValue] == nil else { return nil }
+        let inserted = info[ModelContext.NotificationKey.insertedIdentifiers.rawValue] as? [PersistentIdentifier]
+        let updated = info[ModelContext.NotificationKey.updatedIdentifiers.rawValue] as? [PersistentIdentifier]
+        guard inserted != nil || updated != nil else { return nil }
+        return (inserted ?? []) + (updated ?? [])
+    }
+
+    private var pendingChanges: Set<PersistentIdentifier> = []
+    private var pendingFullScan = false
+
+    private func scheduleScan(_ changed: [PersistentIdentifier]? = nil) {
+        if let changed { pendingChanges.formUnion(changed) } else { pendingFullScan = true }
         scanTask?.cancel()
         scanTask = Task { [weak self] in
             // Coalesce a burst of saves (an import) into one scan.
             try? await Task.sleep(for: .milliseconds(120))
-            guard !Task.isCancelled else { return }
-            self?.scan()
-            self?.fetchNow()
+            guard !Task.isCancelled, let self else { return }
+            let full = self.pendingFullScan || self.pendingChanges.count > 300
+            let changes = self.pendingChanges
+            self.pendingChanges = []
+            self.pendingFullScan = false
+            if full { self.scan() } else if !changes.isEmpty { self.scan(only: changes) }
+            self.fetchNow()
         }
+    }
+
+    /// Queue just the rows a save touched (a full scan reads and digests the
+    /// whole store, ~150 ms on the phone, after every record).
+    private func scan(only changes: Set<PersistentIdentifier>) {
+        guard database != nil else { return }
+        var saves: [String] = []
+        var stamped = false
+        let now = Date()
+        func consider(_ name: String, _ fields: SyncFields, stamp: () -> Void) {
+            let digest = SyncCodec.digest(fields)
+            guard state.records[name]?.digest != digest, queued[name] != digest else { return }
+            queued[name] = digest
+            saves.append(name)
+            stamp()
+        }
+        for id in changes {
+            switch context.model(for: id) {
+            case let account as Account where account.isLedgerAccount:
+                consider(SyncKey(.account, account.id).name, SyncCodec.fields(of: account)) {
+                    if now.timeIntervalSince(account.updatedAt) > 2 { account.updatedAt = now; stamped = true }
+                }
+            case let transaction as Transaction:
+                consider(SyncKey(.transaction, transaction.id).name, SyncCodec.fields(of: transaction)) {
+                    if now.timeIntervalSince(transaction.updatedAt) > 2 { transaction.updatedAt = now; stamped = true }
+                }
+            case let preset as RecordPreset:
+                consider(SyncKey(.preset, preset.id).name, SyncCodec.fields(of: preset)) {
+                    if now.timeIntervalSince(preset.updatedAt) > 2 { preset.updatedAt = now; stamped = true }
+                }
+            case let asset as Asset:
+                guard !portfolioBlocked else { continue }
+                consider(SyncKey(.asset, asset.id).name, SyncCodec.fields(of: asset)) {}
+            case let holding as Holding:
+                guard !portfolioBlocked else { continue }
+                consider(SyncKey(.holding, holding.id).name, SyncCodec.fields(of: holding)) {}
+            case let valuation as HoldingSnapshot:
+                guard !portfolioBlocked else { continue }
+                consider(SyncKey(.valuation, valuation.id).name, SyncCodec.fields(of: valuation)) {}
+            default:
+                continue
+            }
+        }
+        guard !saves.isEmpty else { return }
+        if stamped { try? context.save() }
+        persist()
+        log("queued \(saves.count) saves")
     }
 
     private struct Index {
@@ -372,7 +440,7 @@ final class CloudSync {
         var allAccounts: [Account] = []
     }
 
-    private func loadIndex() -> Index {
+    private func loadIndex(transactions only: Set<UUID>? = nil) -> Index {
         var index = Index()
         index.allAccounts = (try? context.fetch(FetchDescriptor<Account>())) ?? []
         for account in index.allAccounts where account.isLedgerAccount {
@@ -383,7 +451,12 @@ final class CloudSync {
         for valuation in (try? context.fetch(FetchDescriptor<HoldingSnapshot>())) ?? [] {
             index.valuations[valuation.id] = valuation
         }
-        for transaction in (try? context.fetch(FetchDescriptor<Transaction>())) ?? [] {
+        var records = FetchDescriptor<Transaction>()
+        if let only {
+            let ids = Array(only)
+            records.predicate = #Predicate { ids.contains($0.id) }
+        }
+        for transaction in (try? context.fetch(records)) ?? [] {
             index.transactions[transaction.id] = transaction
         }
         for preset in (try? context.fetch(FetchDescriptor<RecordPreset>())) ?? [] {
@@ -464,7 +537,9 @@ final class CloudSync {
     private func push(to database: CKDatabase) async throws {
         guard !queued.isEmpty || !state.pendingDeletes.isEmpty else { return }
         phase = .syncing
-        let index = loadIndex()
+        let index = loadIndex(transactions: Set(queued.keys.compactMap { name in
+            SyncKey(name: name).flatMap { $0.kind == .transaction ? $0.id : nil }
+        }))
         var saves = queued.keys.sorted()
         var deletes = state.pendingDeletes
         var conflicts: [CKRecord] = []

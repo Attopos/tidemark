@@ -158,7 +158,6 @@ enum BackupError: LocalizedError {
     }
 }
 
-@MainActor
 enum BackupService {
     struct RestoreStats: Equatable {
         var added = 0

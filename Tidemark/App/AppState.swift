@@ -286,20 +286,37 @@ final class AppState {
 
     /// Write today's backup to iCloud Drive › Tidemark. An empty store is
     /// never backed up: on a new device that would shadow the real backup.
+    /// Runs on a background context: exporting every record took ~250 ms
+    /// of main thread after each save.
     @MainActor
     func backUp(_ context: ModelContext) {
-        do {
-            let backup = try BackupService.makeBackup(from: context, settings: backupSettings)
-            guard !backup.holdings.isEmpty || !(backup.transactions ?? []).isEmpty else { return }
-            try BackupService.writeBackup(backup, to: BackupService.automaticFolder)
-            lastBackup = Date()
-            backupMessage = nil
-            backupFailed = false
-        } catch {
-            backupMessage = trf("Backup failed: %@", error.localizedDescription)
-            backupFailed = true
+        let container = context.container
+        let settings = backupSettings
+        let previous = backupTask
+        backupTask = Task.detached(priority: .utility) { [weak self] in
+            await previous?.value
+            let outcome: Result<Bool, Error> = Result {
+                let backup = try BackupService.makeBackup(from: ModelContext(container), settings: settings)
+                guard !backup.holdings.isEmpty || !(backup.transactions ?? []).isEmpty else { return false }
+                _ = try BackupService.writeBackup(backup, to: BackupService.automaticFolder)
+                return true
+            }
+            await MainActor.run {
+                guard let self else { return }
+                switch outcome {
+                case .success(let wrote):
+                    guard wrote else { return }
+                    self.lastBackup = Date()
+                    self.backupMessage = nil
+                    self.backupFailed = false
+                case .failure(let error):
+                    self.backupMessage = trf("Backup failed: %@", error.localizedDescription)
+                    self.backupFailed = true
+                }
+            }
         }
     }
+    @ObservationIgnored private var backupTask: Task<Void, Never>?
 
     /// A backup file in the temporary folder, for the share sheet.
     @MainActor

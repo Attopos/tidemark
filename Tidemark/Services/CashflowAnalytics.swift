@@ -40,7 +40,7 @@ struct CashPeriod: Equatable, Hashable {
     let unit: Unit
     /// First instant of the period.
     let start: Date
-    private let limit: Date
+    let limit: Date
 
     /// The week, month or year containing `date` (`.all` and `.range` fall back to its month).
     init(unit: Unit, containing date: Date, calendar: Calendar = .current) {

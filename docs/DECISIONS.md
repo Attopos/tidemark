@@ -72,3 +72,9 @@
 - 自绘徽章被嫌丑，换成 GitHub 上有许可证的 SVG：circle-flags（MIT）、feathermore/Banklogo（MIT）、payment-webfont-cn 与 simple-icons（CC0），银行只裁出徽标部分转 180px PNG；cellier/bank-icon-cn 更全但没有许可证，没用。余额宝没有开源图标，用支付宝字形配橙色。
 - 用户要「金融终端式」数字：根视图加 .monospacedDigit()，金额字体一律等宽数字，推翻 11-16「大金额用比例数字」。
 - 根视图的 .monospacedDigit() 管不到显式写了 .font(.system(...)) 的文字，所以给所有 .system(size:) 字体都直接加 .monospacedDigit()；DS.money 去掉字重参数，金额只有一种字重；投资组合格子和饼图的「¥32.5k」改成完整金额。
+
+## 2026-11-20 录入卡顿第二轮
+
+- 卡顿主要来自隐藏的标签页：@Query 和模型观察让资产、分析页在每次保存后都重算，打开过所有页面时一次入账卡 4 秒。改用 ModelFeed（隐藏时只记为过期，切回来才重新读）和 LedgerFeeds.derived 缓存派生结果；可见性按 app.section 判断，因为隐藏标签页的 onDisappear 不可靠。
+- 备份改在后台 ModelContext 做；同步按 didSave 的 inserted/updated 标识增量扫描，有删除时才全量扫描。
+- 入账延迟约 0.5 秒写入，等动画结束；代价是这 0.5 秒内强退 App 会丢这一条，可以接受。

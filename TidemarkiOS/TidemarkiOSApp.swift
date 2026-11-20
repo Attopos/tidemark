@@ -108,9 +108,10 @@ struct PhoneRootView: View {
             }
         }
         .task { await lock.unlock() }
+        .task { _ = await EntryStats.refresh(context.container) }
         #if DEBUG
         .task { if PerfProbe.isOn { await PerfProbe().run(app: app) } }
-        .task { if PerfProbe.entryOn { await PerfProbe().runEntry(app: app) } }
+        .task { if PerfProbe.entryOn { await PerfProbe().runEntry(app: app, context: context) } }
         .task { if PerfProbe.shotsOn { await PerfProbe().shoot(app: app) } }
         .task { if PerfProbe.importTestOn { await PerfProbe().importTest(store: context) } }
         #endif

@@ -16,9 +16,10 @@ import SwiftData
 struct AccountsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
-    @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]
-    @Query(sort: \Account.createdAt) private var accounts: [Account]
-    @Query private var rates: [CurrencyRate]
+    @State private var feeds = LedgerFeeds()
+    private var transactions: [Transaction] { feeds.records.rows(context) }
+    private var accounts: [Account] { feeds.accounts.rows(context) }
+    private var rates: [CurrencyRate] { feeds.rates.rows(context) }
 
     @State private var selectedID: UUID?
     @State private var editingAccount: Account?
@@ -37,9 +38,14 @@ struct AccountsView: View {
         collapsedRaw = set.sorted().joined(separator: ",")
     }
 
-    var body: some View {
-        let snapshot = LedgerSnapshot(transactions: transactions, accounts: accounts, rates: rates,
-                                      code: app.baseCurrency)
+    var body: some View { page.ledgerFeeds(feeds, app: app, section: .accounts) }
+
+    @ViewBuilder private var page: some View {
+        let snapshot = feeds.derived(app.baseCurrency) {
+            PerfLog.time("accounts.snapshot") {
+                LedgerSnapshot(transactions: transactions, accounts: accounts, rates: rates, code: app.baseCurrency)
+            }
+        }
         let visible = snapshot.accounts.filter { showArchived || !$0.isArchived }
 
         GeometryReader { geometry in
