@@ -134,17 +134,7 @@ struct AccountsView: View {
         }
         return VStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Text(tr("Net Assets"))
-                        .font(.system(size: 16, weight: .regular).monospacedDigit())
-                        .foregroundStyle(DS.textSecondary)
-                    Button { app.amountsHidden.toggle() } label: {
-                        Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
-                            .font(.system(size: 14, weight: .regular).monospacedDigit())
-                            .foregroundStyle(DS.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
+                AmountsLabel(title: tr("Net Assets"))
                 Text(Fmt.money(net.assets - net.debts, snapshot.code))
                     .font(DS.money(38))
                     .foregroundStyle(DS.textPrimary)

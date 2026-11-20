@@ -148,6 +148,7 @@ struct PhonePortfolioView: View {
         let code = app.baseCurrency
         let segments = summary.groups.filter { $0.baseValue > 0 }
         return PhoneCard(title: tr("Total value"), icon: "chart.pie.fill") {
+            AmountsEye()
             Spacer()
             PhoneChip(text: "\(Fmt.symbol(for: code)) \(code)") {
                 let all = AppState.baseCurrencies
