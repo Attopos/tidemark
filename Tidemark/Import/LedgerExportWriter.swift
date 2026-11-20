@@ -1,18 +1,5 @@
 import Foundation
 
-// MARK: - Bookkeeping export writer
-//
-// Writes the ledger as iCost's import template (help.icostapp.com, 模板导入;
-// file.icostapp.com/icost_template.xlsx), so iCost can import it — iCost's
-// own export is "not suitable for secondary import". One sheet
-// "icost_template", columns 日期 类型 金额 一级分类 二级分类 账户1 账户2 备注
-// 货币 标签, dates "yyyy年MM月dd日 HH:mm:ss" in local time, types 支出 / 收入 /
-// 转账, amounts as plain positive numbers (expenses net of refunds). The
-// template has only 转账 for money between accounts, so the kind of transfer
-// (Transfer, Lend, Repayment…) goes in 一级分类, where Tidemark's importer
-// reads it back. Records iCost has no type for (investments, adjustments) are
-// left out.
-
 enum LedgerExportWriter {
     static let sheetName = "icost_template"
     static let header = ["日期", "类型", "金额", "一级分类", "二级分类", "账户1", "账户2", "备注", "货币", "标签"]

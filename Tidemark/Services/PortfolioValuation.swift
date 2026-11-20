@@ -1,22 +1,9 @@
 import Foundation
 import SwiftData
 
-// MARK: - Portfolio valuation (pure)
-//
-// The one place that turns dated valuations into totals. A valuation is
-// always "the whole portfolio at one moment": every holding contributes the
-// last value recorded at or before that moment (carried forward, never
-// interpolated), converted with the exchange rate of that moment. A holding
-// that was sold carries an explicit zero from its closing date, so it stops
-// counting instead of lingering at its last value.
-//
-// Inputs are plain values, so everything here is testable without SwiftData.
-
 struct ValuationPoint {
     let date: Date
-    /// Market value in the holding's own currency.
     let value: Decimal
-    /// Unrealized profit as reported by the source, same currency.
     var unrealizedPL: Decimal? = nil
 }
 
@@ -36,7 +23,6 @@ struct PortfolioValuation {
         let nativeValue: Decimal
         let baseValue: Decimal
         let basePL: Decimal?
-        /// Date of the valuation this position is carried from.
         let date: Date
     }
 
@@ -48,28 +34,20 @@ struct PortfolioValuation {
 
     struct Freshness {
         let oldest: Date?
-        /// Share of total value whose valuation is older than the threshold.
         let staleShare: Double
     }
 
-    /// Unrealized profit over the positions that report one. Cost is implied
-    /// (value − profit), so it does not depend on how a source labels cost.
     struct ProfitSummary {
         let profit: Decimal
         let cost: Decimal
-        /// Share of total value covered by positions that report a profit.
         let coverage: Double
         var rate: Double? { cost > 0 ? (profit / cost).doubleValue : nil }
     }
 
-    /// Holdings that have a valuation at or before the moment.
     let positions: [Position]
-    /// The moment exchange rates are taken at.
     let rateDate: Date
     private let byID: [UUID: Position]
 
-    /// - Parameter asOf: the day to value the portfolio on; nil = the latest
-    ///   valuation of every holding at today's rate.
     init(inputs: [ValuationInput], converter: CurrencyConverter,
          asOf: Date? = nil, calendar: Calendar = .current) {
         let cutoff = asOf.flatMap { calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: $0)) }
@@ -120,20 +98,16 @@ struct PortfolioValuation {
         return ProfitSummary(profit: profit, cost: value - profit, coverage: (value / total).doubleValue)
     }
 
-    /// One total per day on which anything was valued, oldest first.
     static func history(inputs: [ValuationInput], converter: CurrencyConverter,
                         calendar: Calendar = .current) -> [HistoryPoint] {
         let days = Set(inputs.flatMap { $0.points.map { calendar.startOfDay(for: $0.date) } }).sorted()
         return days.map { day in
-            // End of the day, so a rate fetched that day is the one used.
             let moment = day.addingTimeInterval(86_399)
             let valuation = PortfolioValuation(inputs: inputs, converter: converter, asOf: moment, calendar: calendar)
             return HistoryPoint(date: day, total: valuation.total)
         }
     }
 }
-
-// MARK: - SwiftData bridge
 
 extension Holding {
     var valuationInput: ValuationInput {
@@ -146,9 +120,6 @@ extension Holding {
                        })
     }
 
-    /// The position was sold: record a zero valuation on that day and take
-    /// the holding off the board. Its history stays, so past totals are
-    /// still right. A later import of the same asset reopens it.
     func close(on date: Date, source: DataSource, in context: ModelContext, calendar: Calendar = .current) {
         if let sameDay = snapshots.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) {
             sameDay.marketValue = 0

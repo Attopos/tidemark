@@ -2,16 +2,8 @@ import XCTest
 import AppKit
 @testable import Tidemark
 
-// Live Vision OCR on a REAL Binance asset-list screenshot. The image and its
-// expected values are real holdings, so both stay local and git-ignored
-// (`binance-fixture-1.png`, `binance-fixture-expected.json`); the test skips
-// when they are absent. Expected format:
-// {"cash": ["USDC", "USDT"],
-//  "assets": [{"code": "BTC", "quantity": "0.01", "value": "500.00", "pnl": "-1.23"}, …]}
-
 @MainActor
 final class BinanceLiveScreenshotTests: XCTestCase {
-
     private struct ExpectedAsset: Decodable {
         let code: String
         let quantity: String

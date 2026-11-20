@@ -2,10 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// A total is the whole portfolio at one moment: every holding carried
-// forward from its last valuation, sold holdings at zero, converted with the
-// rate of that moment.
-
 final class PortfolioValuationTests: XCTestCase {
     private let calendar = Calendar.current
 
@@ -45,7 +41,6 @@ final class PortfolioValuationTests: XCTestCase {
     }
 
     func testCarriedValueUsesTheRateOfTheMoment() {
-        // 10 USD recorded on day 1; the rate moves on day 3.
         let usd = input([(1, 10)], currency: "USD")
         let cny = input([(4, 1)])
         let history = PortfolioValuation.history(inputs: [usd, cny],
@@ -75,9 +70,6 @@ final class PortfolioValuationTests: XCTestCase {
     }
 }
 
-// Import review: nothing uncertain is applied silently, and a holding that
-// left the account is closed with its history intact.
-
 @MainActor
 final class ImportReviewTests: XCTestCase {
     private func makeContext() throws -> ModelContext {
@@ -96,7 +88,6 @@ final class ImportReviewTests: XCTestCase {
         HoldingDraft(name: name, code: nil, nameConfidence: 1, box: .zero)
     }
 
-    /// Two funds imported three days ago.
     private func seed(_ context: ModelContext) throws -> [Holding] {
         let first = ScreenshotImportSession(images: [])
         first.valuationDate = Date(timeIntervalSinceNow: -3 * 86_400)

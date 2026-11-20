@@ -1,7 +1,5 @@
 import SwiftUI
 
-// MARK: - Settings page (a page of the main window, like the others)
-
 struct SettingsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context

@@ -1,8 +1,5 @@
 import SwiftUI
 
-// MARK: - Shared design-system components
-
-/// Small uppercase section label.
 struct SectionLabel: View {
     let text: String
     init(_ text: String) { self.text = text }
@@ -14,7 +11,6 @@ struct SectionLabel: View {
     }
 }
 
-/// Monetary text with tabular figures.
 struct MoneyText: View {
     let amount: Decimal
     let code: String
@@ -43,12 +39,10 @@ struct MoneyText: View {
     }
 }
 
-/// Card container with optional header.
 struct Card<Content: View>: View {
     var title: String?
     var subtitle: String?
     var minHeight: CGFloat?
-    /// Stretch to the row's height (cards placed side by side).
     var fillHeight = false
     @ViewBuilder var content: Content
 
@@ -112,7 +106,6 @@ struct GhostButtonStyle: ButtonStyle {
     }
 }
 
-/// "Updated 2 hr. ago", amber when stale.
 struct FreshnessLabel: View {
     let date: Date?
     var staleAfterDays: Double = 7
@@ -168,7 +161,6 @@ struct EmptyStateView: View {
     }
 }
 
-/// Type-erased button style so empty states can mix styles.
 struct AnyButtonStyle: ButtonStyle {
     private let _makeBody: (Configuration) -> AnyView
     init<S: ButtonStyle>(_ style: S) {
@@ -179,7 +171,6 @@ struct AnyButtonStyle: ButtonStyle {
     }
 }
 
-/// Legend row used beside charts (identity is never color-alone).
 struct LegendRow: View {
     let color: Color
     let label: String
@@ -212,7 +203,6 @@ struct LegendRow: View {
     }
 }
 
-/// Notice strip (storage problems, low-confidence OCR fields).
 struct DataQualityIssue: Identifiable {
     enum Severity { case info, warning }
     let id = UUID()
@@ -251,11 +241,7 @@ struct IssueBanner: View {
     }
 }
 
-// MARK: - Sheet sizing
-
 extension View {
-    /// Editor sheets: a fixed-width panel on the Mac, a full-width scrolling
-    /// page on the iPhone (the keyboard takes half the screen).
     @ViewBuilder
     func editorSheet(width: CGFloat) -> some View {
         #if os(macOS)
@@ -275,7 +261,6 @@ extension View {
         #endif
     }
 
-    /// Opens on a double-click on the Mac and on a tap on the iPhone.
     func onOpenGesture(perform action: @escaping () -> Void) -> some View {
         #if os(macOS)
         onTapGesture(count: 2, perform: action)
@@ -286,7 +271,6 @@ extension View {
 }
 
 extension View {
-    /// Number pad with a decimal point on the iPhone; nothing on the Mac.
     func amountKeyboard() -> some View {
         #if os(iOS)
         keyboardType(.decimalPad)
@@ -295,7 +279,6 @@ extension View {
         #endif
     }
 
-    /// Like `amountKeyboard`, with a minus sign (a balance can be a debt).
     func signedAmountKeyboard() -> some View {
         #if os(iOS)
         keyboardType(.numbersAndPunctuation)
@@ -305,8 +288,6 @@ extension View {
     }
 }
 
-/// A figure's label with the eye that hides every amount, placed right above
-/// the big number on each page.
 struct AmountsLabel: View {
     let title: String
     var color: Color = DS.textSecondary
@@ -322,7 +303,6 @@ struct AmountsLabel: View {
     }
 }
 
-/// The eye on its own, for a card header that already has a title.
 struct AmountsEye: View {
     @Environment(AppState.self) private var app
     var size: CGFloat = 15
@@ -340,7 +320,6 @@ struct AmountsEye: View {
     }
 }
 
-/// Round eye button that hides or shows every amount.
 struct AmountsToggle: View {
     @Binding var hidden: Bool
 
@@ -359,7 +338,6 @@ struct AmountsToggle: View {
     }
 }
 
-/// The large round "add a record" button that floats in the corner.
 struct FloatingAddButton: View {
     let action: () -> Void
 

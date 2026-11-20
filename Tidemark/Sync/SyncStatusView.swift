@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// One line saying whether iCloud sync is on and when it last moved data.
 struct SyncStatusView: View {
     @Environment(CloudSync.self) private var sync: CloudSync?
 

@@ -1,24 +1,12 @@
 import Foundation
 import SwiftData
 
-// MARK: - Recurring records and instalments
-//
-// A scheduled preset writes one ledger record per due date: occurrence n
-// falls on start + n × frequency (n = 0, 1, …), stops at the end date or the
-// occurrence limit, and is written once. Each device runs this on its own;
-// a record's fingerprint is "preset:<id>:<n>", so when both devices write
-// the same occurrence, sync sees one record and keeps one. `generatedThrough`
-// remembers the last occurrence written, so a generated record the user
-// deletes is not written again.
-
 enum PresetScheduler {
-    /// Date of occurrence `index`, nil past the end or the limit.
     static func occurrence(_ index: Int, start: Date, frequency: Frequency, endDate: Date?, limit: Int?,
                            calendar: Calendar = .current) -> Date? {
         if let limit, index >= limit { return nil }
         var date = start
         for _ in 0..<index { date = frequency.next(after: date, calendar: calendar) }
-        // Monthly steps from the 31st drift to the 28th; recompute from the start instead.
         if frequency == .monthly || frequency == .quarterly || frequency == .semiannual || frequency == .yearly {
             let months: Int
             switch frequency {
@@ -33,7 +21,6 @@ enum PresetScheduler {
         return date
     }
 
-    /// Occurrences after `generatedThrough` that are due by `now`.
     static func due(start: Date, frequency: Frequency, endDate: Date?, limit: Int?, generatedThrough: Int,
                     now: Date, calendar: Calendar = .current) -> [(index: Int, date: Date)] {
         var result: [(Int, Date)] = []
@@ -49,7 +36,6 @@ enum PresetScheduler {
 
     static func fingerprint(preset: UUID, index: Int) -> String { "preset:\(preset.uuidString):\(index)" }
 
-    /// Write every due record. Returns how many were added.
     @MainActor
     @discardableResult
     static func run(in context: ModelContext, now: Date = Date()) -> Int {
@@ -83,7 +69,6 @@ enum PresetScheduler {
         return added
     }
 
-    /// A record filled from a preset (also used by templates in the editor).
     static func makeRecord(from preset: RecordPreset, date: Date, accounts: [UUID: Account],
                            fingerprint: String? = nil) -> Transaction {
         let record = Transaction(date: date, kind: preset.kind, amount: preset.amount,

@@ -1,7 +1,5 @@
 import SwiftUI
 
-// MARK: - Card
-
 struct PhoneCard<Accessory: View, Content: View>: View {
     static var twoColumns: [GridItem] { [GridItem(.flexible(), spacing: TS.gridGap), GridItem(.flexible(), spacing: TS.gridGap)] }
 
@@ -46,7 +44,6 @@ extension PhoneCard where Accessory == EmptyView {
     }
 }
 
-/// Small toggle chip in a card's title row ("Level 1 ⇄").
 struct PhoneChip: View {
     let text: String
     let action: () -> Void
@@ -71,10 +68,6 @@ struct PhoneChip: View {
     }
 }
 
-/// The figure above a chart: the picked day and its value.
-
-/// The big number at the top of a page: its label (with the eye), the
-/// amount, and a line of smaller figures. Ledger and Assets share it.
 struct HeroCard<Figures: View>: View {
     let label: String
     var labelColor: Color = DS.textSecondary
@@ -98,7 +91,6 @@ struct HeroCard<Figures: View>: View {
     }
 }
 
-/// "Income ¥1,234" on one line, label dimmer than the figure.
 struct InlineFigure: View {
     let label: String
     let value: String

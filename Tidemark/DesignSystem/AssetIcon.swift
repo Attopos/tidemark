@@ -1,20 +1,6 @@
 import SwiftUI
 import CoreImage
 
-// MARK: - Round asset icons
-//
-// Crypto: the CC0 "cryptocurrency-icons" set (spothq, v0.18.1, white glyph
-// variant), bundled as Resources/CryptoIcons/crypto-<ticker>.png and tinted
-// with the exposure color, so logos stay inside the two-hue palette instead
-// of bringing brand oranges and yellows.
-// Every icon is single-hue: logos are desaturated and tinted with the
-// exposure color (the app shows only violet and lime).
-// Index funds/ETFs: the icon of the index they track, detected from the name
-// or ticker (标普/S&P/SPY → S&P 500, 纳斯达克/QQQ → Nasdaq, DAX, CAC 40,
-// 日经/Nikkei, 黄金/上海金 → gold); see Resources/IndexIcons/SOURCES.md.
-// Anything else gets a monogram in the exposure's color: the fund house for
-// Chinese funds ("南方…" → 南), the ticker's first letter otherwise.
-
 enum AssetIconStore {
     private static var cache: [String: PlatformImage] = [:]
     private static var misses: Set<String> = []
@@ -34,13 +20,8 @@ enum AssetIconStore {
     }
 
     enum MarkStyle {
-        /// Opaque square logo: fills the circle.
         case fill
-        /// Wordmark on a light background: fitted, the background becomes
-        /// the disc.
         case wordmark
-        /// Too wide to read as a fitted image at icon size: drawn as heavy
-        /// black text on the tint instead.
         case text(String)
     }
 
@@ -78,9 +59,6 @@ enum AssetIconStore {
         return IndexMark(image: image, style: style)
     }
 
-    /// Coins the icon set doesn't cover, matched by name or ticker (incl. a
-    /// common OCR misread): drawn as black text on the tint, line-broken to
-    /// stay legible at icon size.
     private static let customCoins: [(names: [String], label: String)] = [
         (["币安人生", "市安人生"], "币安\n人生"),
     ]
@@ -91,10 +69,6 @@ enum AssetIconStore {
         })?.label
     }
 
-    /// Re-color a logo in the palette. Grayscale, then (if `inverted`) flip
-    /// luminance and stretch so the logo's own background lands on full
-    /// tint and its mark goes dark: a light disc with a dark mark, never a
-    /// black disc. Baked into a bitmap (exact everywhere), cached per tint.
     static func duotone(_ image: PlatformImage, key: String, tint: Color, inverted: Bool = false) -> PlatformImage {
         let rgb = sRGBComponents(tint)
         let cacheKey = "\(key)|\(inverted)|\(Int(rgb.red * 255)),\(Int(rgb.green * 255)),\(Int(rgb.blue * 255))"
@@ -112,7 +86,6 @@ enum AssetIconStore {
         var scale: CGFloat = 1
         if inverted {
             gray = gray.applyingFilter("CIColorInvert")
-            // Background sample: a small patch near the left edge, mid-height.
             let e = gray.extent
             let patch = CGRect(x: e.minX + e.width * 0.04, y: e.midY - e.height * 0.03,
                                width: max(1, e.width * 0.03), height: max(1, e.height * 0.06))
@@ -152,14 +125,10 @@ struct AssetIcon: View {
     let color: Color
     var size: CGFloat = 30
 
-    /// One tint per icon: the exposure color, lifted for the darkest
-    /// violets so marks stay readable on the dark panel.
     private var tint: Color {
         color == DS.violetDark || color == DS.violetDeep ? DS.violetSoft : color
     }
 
-    /// Any logo → luminance only → multiplied by the tint: brand colors are
-    /// dropped, the mark's shape and light/dark structure stay.
     private func duotone(_ image: PlatformImage, key: String, fill: Bool) -> some View {
         Image(platformImage: AssetIconStore.duotone(image, key: key, tint: tint, inverted: fill))
             .resizable()
@@ -171,7 +140,6 @@ struct AssetIcon: View {
             .clipShape(Circle())
     }
 
-    /// Black text on a solid tint disc: the look for anything without a logo.
     private func textBadge(_ text: String, scale: CGFloat) -> some View {
         Text(text)
             .font(.system(size: size * scale, weight: .semibold).monospacedDigit())
@@ -214,8 +182,6 @@ struct AssetIcon: View {
                     .clipShape(Circle())
             }
         } else if let image = AssetIconStore.cryptoImage(ticker: symbol) {
-            // The white variant is a disc with the glyph knocked out; tinted,
-            // the glyph shows the dark panel through it.
             Image(platformImage: image)
                 .renderingMode(.template)
                 .resizable()

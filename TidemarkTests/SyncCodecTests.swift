@@ -2,10 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// What travels between devices must rebuild the same row, and the change
-// detector must send exactly what differs — and never sweep the server
-// because a store came up empty.
-
 @MainActor
 final class SyncCodecTests: XCTestCase {
     private func makeContext() throws -> ModelContext {
@@ -94,8 +90,6 @@ final class SyncCodecTests: XCTestCase {
         XCTAssertNotEqual(SyncCodec.digest(SyncCodec.fields(of: record)), before)
     }
 
-    // MARK: Planner
-
     private func entry(_ digest: String) -> SyncEntry { SyncEntry(digest: digest, system: nil) }
 
     func testPlanSendsWhatDiffers() {
@@ -119,7 +113,6 @@ final class SyncCodecTests: XCTestCase {
         let plan = SyncPlanner.plan(local: [:], synced: synced, queued: [:])
         XCTAssertTrue(plan.refusedDeletes)
         XCTAssertTrue(plan.deletes.isEmpty)
-        // A real clean-up of a few rows still goes through.
         var local: [String: String] = [:]
         for index in 0..<90 { local["r\(index)"] = "d" }
         let cleanup = SyncPlanner.plan(local: local, synced: synced, queued: [:])

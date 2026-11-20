@@ -1,23 +1,12 @@
 import SwiftUI
 
-// MARK: - Dashboard kit
-//
-// Dark rounded cards on near-black, solid pastel category cards with dark
-// ink, capsule allocation bars with a hatched
-// remainder. Only two hues exist, each with one meaning (see RiskFamily):
-//   violet = risk assets (equities, crypto); shade = which market
-//   lime   = hedges & cash (gold, bonds, cash); shade = which kind
-// Gray is "other". Lime is also the interaction color (buttons, selection).
-
 extension DS {
     static let page = Color(light: 0xF2F2EE, dark: 0x141414)
     static let panel = Color(light: 0xFFFFFF, dark: 0x1F1F1F)
     static let tile = Color(light: 0xEBEBE6, dark: 0x2A2A2A)
     static let panelRadius: CGFloat = 22
     static let tileRadius: CGFloat = 18
-    /// Gap between iPhone content and the screen edge.
     static let phoneMargin: CGFloat = 25
-    /// Gap between the top safe area and the first line of text on iPhone.
     static let phoneTopMargin: CGFloat = 25
 
     static let violet = Color(hex: 0xA98BFA)
@@ -32,7 +21,6 @@ extension DS {
     static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .regular).monospacedDigit() }
 }
 
-/// Dark rounded card with an optional title row.
 struct Panel<Content: View, Accessory: View>: View {
     var title: String?
     var icon: String?
@@ -78,7 +66,6 @@ extension Panel where Accessory == EmptyView {
     }
 }
 
-/// Small tinted chip ("US equity" tag).
 struct TagChip: View {
     let text: String
     let color: Color
@@ -94,7 +81,6 @@ struct TagChip: View {
     }
 }
 
-/// Diagonal hatch, used for "the rest" / empty capacity.
 struct Hatch: View {
     var color: Color = .white.opacity(0.10)
     var spacing: CGFloat = 6
@@ -112,8 +98,6 @@ struct Hatch: View {
     }
 }
 
-/// Horizontal capsule bar split by segments, with gaps; the remainder (if
-/// the segments don't sum to 1) is hatched.
 struct SegmentBar: View {
     struct Segment: Identifiable {
         let id: String
@@ -144,13 +128,10 @@ struct SegmentBar: View {
     }
 }
 
-/// Two-option capsule switch in palette colors (replaces the system
-/// segmented control, which follows the macOS accent color).
 struct CapsuleSwitch<Value: Hashable>: View {
     let options: [Value]
     @Binding var selection: Value
     let label: (Value) -> String
-    /// Smaller, for filters that sit under a chart.
     var compact = false
 
     init(options: [Value], selection: Binding<Value>, compact: Bool = false, label: @escaping (Value) -> String) {
@@ -185,7 +166,6 @@ struct CapsuleSwitch<Value: Hashable>: View {
     }
 }
 
-/// Checkbox in palette colors (the system one follows the macOS accent).
 struct LimeCheckboxStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {

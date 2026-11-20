@@ -22,4 +22,4 @@
 
 - 余额对齐前备份：~/Library/Application Support/Tidemark Backups/before-balances-20261118/（Mac 数据库）；导入前备份在 before-import-20261115/。 账户图标没加模型字段（加字段要部署 CloudKit 结构），改类型或名称即可换图标。
 - 调试：TIDEMARK_SHOTS 现在也截详情页的三个单项编辑（+TIDEMARK_SHOTS_ENTRY 截录入页）；TIDEMARK_ACCOUNT_SEED（Mac，JSON 按名称设余额/类型/卡号/归档，余额只扣已导入的 iCost 账单）、TIDEMARK_SHOTS（+TIDEMARK_SHOTS_AMOUNTS 显示金额，含详情页截图）、TIDEMARK_PERF*（PERF_ENTRY 会真的存两条 note=perf-probe 的账单再删掉；PERF_TABS=1 先打开所有标签页）、TIDEMARK_IMPORT_TEST，仅 Debug。
-- 构建测试通过后直接更新文档、合并进 main 并 push。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。
+- 源码里已删光注释（2026-11-20），新代码也不写注释。构建测试通过后直接更新文档、合并进 main 并 push。新增同步类型要先跑 TIDEMARK_SYNC_SCHEMA=1 再到 CloudKit Console 部署。

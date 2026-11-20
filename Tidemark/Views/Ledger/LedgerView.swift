@@ -1,13 +1,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Ledger — day-to-day cash flow
-//
-// Month (or year) at a glance: what went out and came in, the trend of cash
-// net assets, spending by category, a calendar of daily totals and the
-// records of the selected day. Picking a category or typing in the search
-// field replaces the day list with the matching records of the period.
-
 struct LedgerView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
@@ -80,8 +73,6 @@ struct LedgerView: View {
             selectedDay = period.contains(today) ? today : nil
         }
     }
-
-    // MARK: Header
 
     private func header(period: Binding<CashPeriod>) -> some View {
         ViewThatFits(in: .horizontal) {
@@ -159,7 +150,6 @@ struct LedgerView: View {
         .frame(maxWidth: .infinity, minHeight: 320)
     }
 
-    /// Reimbursable spending not yet paid back, all periods.
     private var pendingClaims: Decimal {
         let converter = CurrencyConverter(rates: rates, base: app.baseCurrency)
         return transactions.filter { $0.claimStatus == .pending }
@@ -170,8 +160,6 @@ struct LedgerView: View {
                          code: String, stacked: Bool) -> some View {
         let expense = HeroFigure(title: tr("Expense"), value: summary.expense, code: code,
                                  details: [(tr("Income"), Fmt.money(summary.income, code)), (tr("Balance"), Fmt.money(summary.balance, code, showSign: true))])
-        // Reimbursement: what is still owed back (all time), and what came
-        // back this period. The daily average lives on the statistics chart.
         let pendingAll = pendingClaims
         let daily = HeroFigure(title: tr("Reimbursement pending"), value: pendingAll, code: code,
                                details: [(tr("Claimed"), Fmt.money(summary.claimed, code)),
@@ -186,8 +174,6 @@ struct LedgerView: View {
             }
         }
     }
-
-    // MARK: Calendar + records
 
     private func dayColumn(period: CashPeriod, entries: [CashEntry], code: String) -> some View {
         @Bindable var app = app
@@ -208,7 +194,6 @@ struct LedgerView: View {
         var shown: [Transaction]
         var showsDate = true
         if !query.isEmpty {
-            // Search covers everything, not just the period on screen.
             title = trf("Results for “%@”", search)
             shown = transactions.filter { transaction in
                 [transaction.category, transaction.subcategory, transaction.note,
@@ -235,13 +220,6 @@ struct LedgerView: View {
     }
 }
 
-// MARK: - Month calendar
-//
-// Whole weeks, Monday first: the days of the neighbouring months that fill
-// the first and last week are shown dimmed with their own totals, and a tap
-// on one moves to that month. Every day that has begun shows both its
-// spending and its income, zeros included.
-
 struct MonthCalendar: View {
     @Binding var period: CashPeriod
     let entries: [CashEntry]
@@ -250,7 +228,7 @@ struct MonthCalendar: View {
 
     private var calendar: Calendar {
         var calendar = Calendar.current
-        calendar.firstWeekday = 2 // Monday
+        calendar.firstWeekday = 2
         return calendar
     }
 

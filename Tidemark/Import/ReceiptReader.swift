@@ -3,17 +3,6 @@ import Vision
 import CoreGraphics
 import SwiftData
 
-// MARK: - Receipt screenshots
-//
-// A payment screenshot (an Alipay or WeChat bill detail, a bank app's
-// transaction page) becomes a filled-in record: the amount is the largest
-// money figure on the page, the merchant is the line just above it, the
-// time is the first date-and-time on the page, and the account is guessed
-// from the payment-method line. Category and subcategory are taken from the
-// latest record with the same merchant, so the ledger's own habits fill
-// them in. Nothing is saved until the user confirms the editor.
-
-/// What a screenshot told us; every part is optional.
 struct ReceiptDraft: Equatable {
     var kind: TransactionKind = .expense
     var amount: Decimal?
@@ -26,17 +15,12 @@ struct ReceiptDraft: Equatable {
     var subcategory: String?
 }
 
-/// One recognized line and where it sat (Vision coordinates: 0…1, origin
-/// bottom-left).
 struct ReceiptLine: Equatable {
     let text: String
     let box: CGRect
 }
 
 enum ReceiptReader {
-
-    // MARK: Recognition
-
     static func recognize(_ image: CGImage) async throws -> [ReceiptLine] {
         try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
@@ -60,29 +44,22 @@ enum ReceiptReader {
         }
     }
 
-    // MARK: Parsing
-
     private static let moneyPattern = try! NSRegularExpression(
         pattern: #"^([+\-−])?\s*([¥￥$€]|CNY|RMB)?\s*([+\-−])?\s*(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})(?:\s*元)?$"#)
     private static let datePattern = try! NSRegularExpression(
         pattern: #"(20\d{2})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?"#)
 
-    /// Words that sit near the amount but are never the merchant.
     private static let notMerchant = ["交易成功", "支付成功", "已支付", "当前状态", "账单详情", "付款成功", "成功",
                                       "Transaction", "Success", "Paid", "收款", "全部账单"]
     private static let methodLabels = ["付款方式", "支付方式", "付款卡", "Payment method", "Paid with"]
 
-    /// Read a draft out of recognized lines. `history` maps merchant text to
-    /// its latest (category, subcategory); `accounts` are (id, name) pairs.
     static func parse(_ lines: [ReceiptLine],
                       history: [String: (category: String, subcategory: String)] = [:],
                       accounts: [(id: UUID, name: String)] = [],
                       timeZone: TimeZone = .current) -> ReceiptDraft {
         var draft = ReceiptDraft()
-        // Top of the page first.
         let ordered = lines.sorted { $0.box.midY > $1.box.midY }
 
-        // Amount: the tallest standalone money figure.
         var amountLine: ReceiptLine?
         for line in ordered {
             let text = line.text.replacingOccurrences(of: " ", with: "")
@@ -106,7 +83,6 @@ enum ReceiptReader {
             }
         }
 
-        // Merchant: the nearest real line above the amount.
         if let amountLine {
             let above = ordered.filter { $0.box.midY > amountLine.box.maxY }
                 .sorted { $0.box.midY < $1.box.midY }
@@ -117,7 +93,6 @@ enum ReceiptReader {
             }?.text.trimmingCharacters(in: .whitespaces)
         }
 
-        // Time: the first full date and time on the page.
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         for line in ordered {
@@ -134,7 +109,6 @@ enum ReceiptReader {
             break
         }
 
-        // Payment method: text after the label, on the same line or to its right.
         for line in ordered {
             guard let label = methodLabels.first(where: line.text.contains) else { continue }
             var value = line.text.components(separatedBy: label).last?
@@ -151,7 +125,6 @@ enum ReceiptReader {
             draft.accountID = matchAccount(method, accounts: accounts)
         }
 
-        // Category from the ledger's own history with this merchant.
         if let merchant = draft.note, let known = history[merchant] {
             draft.category = known.category
             draft.subcategory = known.subcategory
@@ -159,10 +132,8 @@ enum ReceiptReader {
         return draft
     }
 
-    /// Payment-method text → one of the user's accounts.
     static func matchAccount(_ method: String, accounts: [(id: UUID, name: String)]) -> UUID? {
         let text = method.lowercased()
-        // Direct name match first ("BOC", "WECHAT").
         if let direct = accounts.first(where: { !$0.name.isEmpty && text.contains($0.name.lowercased()) }) {
             return direct.id
         }
@@ -189,17 +160,12 @@ enum ReceiptReader {
     }
 }
 
-// MARK: - From an image to an editor
-
-/// A draft waiting for the editor sheet.
 struct PendingReceipt: Identifiable {
     let id = UUID()
     let draft: ReceiptDraft
 }
 
 enum ReceiptImport {
-    /// Recognize the screenshot and fill a draft from the ledger's accounts
-    /// and the categories already used with the same merchant.
     @MainActor
     static func draft(from image: CGImage, context: ModelContext) async -> ReceiptDraft {
         let lines = (try? await ReceiptReader.recognize(image)) ?? []

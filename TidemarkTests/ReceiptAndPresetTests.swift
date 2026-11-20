@@ -2,9 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// Receipts become drafts, presets become records exactly once, and a
-// reimbursement nets out of spending only when it has been paid back.
-
 @MainActor
 final class ReceiptAndPresetTests: XCTestCase {
     private let utc = TimeZone(identifier: "UTC")!
@@ -16,8 +13,6 @@ final class ReceiptAndPresetTests: XCTestCase {
     private func line(_ text: String, y: CGFloat, height: CGFloat = 0.02, x: CGFloat = 0.1) -> ReceiptLine {
         ReceiptLine(text: text, box: CGRect(x: x, y: y, width: 0.5, height: height))
     }
-
-    // MARK: Receipts
 
     func testAlipayStyleBillDetail() {
         let bank = UUID(), wallet = UUID()
@@ -63,8 +58,6 @@ final class ReceiptAndPresetTests: XCTestCase {
         XCTAssertNil(draft.date)
         XCTAssertNil(draft.accountID)
     }
-
-    // MARK: Schedules
 
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -122,7 +115,6 @@ final class ReceiptAndPresetTests: XCTestCase {
         XCTAssertFalse(plan.isActive, "a finished instalment plan stops")
         XCTAssertTrue(records.allSatisfy { $0.presetID != template.id }, "templates never write records")
 
-        // A deleted occurrence is not written again.
         context.delete(records.first { $0.presetID == rent.id }!)
         try context.save()
         XCTAssertEqual(PresetScheduler.run(in: context), 0)
@@ -140,14 +132,11 @@ final class ReceiptAndPresetTests: XCTestCase {
         [source, copy].forEach(context.insert)
         SyncCodec.apply(SyncCodec.fields(of: source), to: copy)
         XCTAssertEqual(SyncCodec.fields(of: copy), SyncCodec.fields(of: source))
-        // generatedThrough never goes backwards.
         var older = SyncCodec.fields(of: source)
         older["through"] = "1"
         SyncCodec.apply(older, to: copy)
         XCTAssertEqual(copy.generatedThrough, 4)
     }
-
-    // MARK: Reimbursement
 
     func testReimbursementCountsOnlyOncePaidBack() throws {
         let context = try makeContext()

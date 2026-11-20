@@ -1,15 +1,6 @@
 import SwiftUI
 
-// MARK: - Category icons
-//
-// Categories carry their own emoji at the front of the name ("🍔FOOD",
-// "☕ Coffee"), so that emoji is the icon, set on a round tile whose tint
-// says the direction: violet for spending, lime for income, gray for money
-// moved between own accounts. Names without one get a glyph guessed from
-// the words in them, else their first letter.
-
 enum CategoryName {
-    /// Leading emoji, if any, and the rest of the name.
     static func split(_ name: String) -> (emoji: String?, label: String) {
         guard let first = name.first, first.isEmojiIcon else {
             return (nil, name.trimmingCharacters(in: .whitespaces))
@@ -51,7 +42,6 @@ enum CategoryName {
 }
 
 extension Character {
-    /// A pictographic emoji (not a digit or symbol that merely can be one).
     var isEmojiIcon: Bool {
         guard let scalar = unicodeScalars.first else { return false }
         return scalar.properties.isEmojiPresentation

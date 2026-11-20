@@ -7,14 +7,6 @@ import SwiftData
 import UniformTypeIdentifiers
 import LocalAuthentication
 
-// MARK: - App state
-//
-// Two halves share one window: long-term holdings (the portfolio, updated
-// from Alipay / Binance screenshots) and day-to-day cash flow (the ledger,
-// its accounts and analysis). State here is the page on screen, the display
-// currency, the UI language and the import pipelines.
-
-/// Pages of the main window.
 enum AppSection: String, CaseIterable, Identifiable {
     case ledger, accounts, analysis, portfolio, settings
 
@@ -43,16 +35,12 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 @Observable
 final class AppState {
-    /// Display currencies offered for totals and allocation.
     static let baseCurrencies = ["CNY", "USD"]
 
-    /// Display currency for totals and allocation (CNY by default). Each
-    /// holding is still recorded in its own currency.
     var baseCurrency: String {
         didSet { UserDefaults.standard.set(baseCurrency, forKey: "baseCurrency") }
     }
 
-    /// UI language — switches live, no relaunch.
     var language: AppLanguage {
         didSet {
             UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
@@ -60,8 +48,6 @@ final class AppState {
         }
     }
 
-    /// Page on screen; remembered across launches (the portfolio is not:
-    /// it is locked, so the app opens on the ledger).
     var section: AppSection {
         didSet {
             UserDefaults.standard.set(section.rawValue, forKey: "appSection")
@@ -87,14 +73,6 @@ final class AppState {
         #endif
     }
 
-    // MARK: Portfolio lock
-    //
-    // Holdings are looked at rarely and are the most private figures, so the
-    // portfolio page asks for the Mac's login password (or Touch ID) each
-    // time it is opened. Leaving the page or the app locks it again. Nothing
-    // is stored: the check is the system's own (LocalAuthentication).
-
-    /// Whether the portfolio asks for a password at all (off by default for now).
     var portfolioLockEnabled: Bool = UserDefaults.standard.bool(forKey: "portfolioLockEnabled") {
         didSet {
             UserDefaults.standard.set(portfolioLockEnabled, forKey: "portfolioLockEnabled")
@@ -104,7 +82,6 @@ final class AppState {
 
     private(set) var portfolioUnlocked = !UserDefaults.standard.bool(forKey: "portfolioLockEnabled")
     private(set) var unlockMessage: String?
-    /// A screenshot dropped while locked opens the import once unlocked.
     private var importAfterUnlock = false
 
     func lockPortfolio() {
@@ -139,7 +116,6 @@ final class AppState {
         }
     }
 
-    /// Open the screenshot import, unlocking the portfolio first if needed.
     @MainActor
     func openScreenshotImport() {
         if portfolioUnlocked {
@@ -150,7 +126,6 @@ final class AppState {
         }
     }
 
-    /// Eye toggle: every amount shows as dots (for screens others can see).
     var amountsHidden: Bool = UserDefaults.standard.bool(forKey: "amountsHidden") {
         didSet {
             UserDefaults.standard.set(amountsHidden, forKey: "amountsHidden")
@@ -158,12 +133,9 @@ final class AppState {
         }
     }
 
-    /// The add-record sheet from the floating button (or ⌘N).
     var addingRecord = false
-    /// A receipt screenshot read into a draft, waiting in the editor.
     var pendingReceipt: PendingReceipt?
 
-    /// Read a receipt screenshot into a new record (the editor opens).
     @MainActor
     func importReceipt(url: URL, context: ModelContext) {
         let scoped = url.startAccessingSecurityScopedResource()
@@ -186,20 +158,15 @@ final class AppState {
     }
     #endif
 
-    /// Month or year the Ledger and Analysis pages show.
     var cashPeriod = CashPeriod(unit: .month, containing: Date())
 
-    /// Result of the last bookkeeping-export import, for Settings and the banner.
     var ledgerImportMessage: String?
     var ledgerImportFailed = false
 
-    // Backup (see BackupService)
     var lastBackup: Date?
-    /// Why the last automatic backup or restore failed, or what a restore did.
     var backupMessage: String?
     var backupFailed = false
 
-    // Alipay OCR import flow
     var pendingOCRImages: [PlatformImage] = []
     var ocrImportPresented = false
 
@@ -214,7 +181,6 @@ final class AppState {
         Fmt.amountsHidden = UserDefaults.standard.bool(forKey: "amountsHidden")
     }
 
-    /// Route a dropped/picked image into the OCR flow.
     func routeImport(url: URL) {
         let ext = url.pathExtension.lowercased()
         guard ["png", "jpg", "jpeg", "heic", "tiff", "webp"].contains(ext),
@@ -223,9 +189,6 @@ final class AppState {
         Task { @MainActor in openScreenshotImport() }
     }
 
-    // MARK: Bookkeeping export
-
-    /// Import a bookkeeping export (.xlsx). Rows already in the ledger are skipped.
     @MainActor
     func importLedgerExport(url: URL, into context: ModelContext) {
         let scoped = url.startAccessingSecurityScopedResource()
@@ -259,7 +222,6 @@ final class AppState {
     #endif
 
     #if os(macOS)
-    /// Save the ledger as iCost's import template (see LedgerExportWriter).
     @MainActor
     func exportLedger(from context: ModelContext) {
         let panel = NSSavePanel()
@@ -278,16 +240,10 @@ final class AppState {
     }
     #endif
 
-    // MARK: Backup & restore
-
     private var backupSettings: BackupFile.Settings {
         .init(baseCurrency: baseCurrency, language: language.rawValue)
     }
 
-    /// Write today's backup to iCloud Drive › Tidemark. An empty store is
-    /// never backed up: on a new device that would shadow the real backup.
-    /// Runs on a background context: exporting every record took ~250 ms
-    /// of main thread after each save.
     @MainActor
     func backUp(_ context: ModelContext) {
         let container = context.container
@@ -318,7 +274,6 @@ final class AppState {
     }
     @ObservationIgnored private var backupTask: Task<Void, Never>?
 
-    /// A backup file in the temporary folder, for the share sheet.
     @MainActor
     func backupFile(_ context: ModelContext) -> URL? {
         do {
@@ -335,7 +290,6 @@ final class AppState {
         }
     }
 
-    /// Merge a backup file into the store (nothing is deleted).
     @MainActor
     func restoreBackup(from url: URL, into context: ModelContext) {
         let scoped = url.startAccessingSecurityScopedResource()
@@ -355,7 +309,6 @@ final class AppState {
     }
 
     #if os(macOS)
-    /// Save a backup wherever the user chooses.
     @MainActor
     func exportBackup(_ context: ModelContext) {
         let panel = NSSavePanel()
@@ -373,7 +326,6 @@ final class AppState {
         }
     }
 
-    /// Pick a backup file and merge it into the store (nothing is deleted).
     @MainActor
     func restoreBackup(_ context: ModelContext) {
         let panel = NSOpenPanel()

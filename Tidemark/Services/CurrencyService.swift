@@ -1,18 +1,8 @@
 import Foundation
 import SwiftData
 
-// MARK: - Currency conversion
-//
-// All stored rates pivot through CNY: one CurrencyRate row says
-// "1 unit of CODE = rate CNY" at a date. Conversion to any base currency is
-// rateToCNY(code) / rateToCNY(base). Dated rows are kept so historical
-// conversions use the closest rate at-or-before the date (falling back to the
-// earliest known rate). Codes with no rate at all convert 1:1 and are
-// surfaced as a data-quality warning — never silently trusted.
-
 struct CurrencyConverter {
     let base: String
-    /// code -> sorted [(date, rate-to-CNY)]
     private let history: [String: [(date: Date, rate: Decimal)]]
 
     init(rates: [CurrencyRate], base: String) {
@@ -25,12 +15,10 @@ struct CurrencyConverter {
         self.history = map
     }
 
-    /// 1 unit of `code` in CNY at `date`. CNY itself is always 1.
     func rateToCNY(_ code: String, at date: Date = Date()) -> Decimal? {
         let c = code.uppercased()
         if c == "CNY" { return 1 }
         guard let series = history[c], !series.isEmpty else { return nil }
-        // Latest at-or-before date, else the earliest known.
         var low = 0, high = series.count
         while low < high {
             let mid = (low + high) / 2
@@ -39,15 +27,12 @@ struct CurrencyConverter {
         return series[max(low - 1, 0)].rate
     }
 
-    /// 1 unit of `code` in `base` at `date`; nil when either leg is unknown.
     func rate(_ code: String, at date: Date = Date()) -> Decimal? {
         guard let toCNY = rateToCNY(code, at: date),
               let baseToCNY = rateToCNY(base, at: date), baseToCNY != 0 else { return nil }
         return toCNY / baseToCNY
     }
 
-    /// Convert to base currency. Unknown codes convert 1:1 (callers can check
-    /// `knows(_:)` and surface the gap).
     func toBase(_ amount: Decimal, _ code: String, at date: Date = Date()) -> Decimal {
         if amount == 0 || code == base { return amount }
         guard let r = rate(code, at: date) else { return amount }
@@ -61,12 +46,7 @@ struct CurrencyConverter {
     var knownCodes: Set<String> { Set(history.keys).union(["CNY"]) }
 }
 
-// MARK: - Seeding & maintenance
-
 enum CurrencyService {
-    /// Offline-safe approximate anchors (editable in Data Sources → Market data;
-    /// refreshable from the network when the user opts in). Dated far in the
-    /// past so they act as the baseline for all history until real rates arrive.
     static let seedRates: [String: Decimal] = [
         "USD": 7.10, "EUR": 7.72, "GBP": 9.02, "JPY": 0.047, "HKD": 0.91,
         "THB": 0.205, "KRW": 0.0051, "VND": 0.00027, "TWD": 0.225,
@@ -76,7 +56,6 @@ enum CurrencyService {
 
     static let seedDate = DateComponents(calendar: .current, year: 2015, month: 1, day: 1).date ?? .distantPast
 
-    /// Insert seed rates for any currency that has no rate rows yet.
     static func ensureSeeds(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<CurrencyRate>())) ?? []
         let existingCodes = Set(existing.map { $0.code.uppercased() })
@@ -88,7 +67,6 @@ enum CurrencyService {
         if added { try? context.save() }
     }
 
-    /// Record a fresh rate (one row per code per day; same-day rows are updated).
     static func record(code: String, rate: Decimal, date: Date = Date(),
                        source: DataSource, in context: ModelContext) {
         let cal = Calendar.current
@@ -103,11 +81,6 @@ enum CurrencyService {
         }
     }
 
-    // MARK: Live USD rate
-
-    /// Fetch today's USD→CNY reference rate (ECB data via frankfurter.app; no
-    /// key, nothing about the user is sent) when no fetched rate exists for
-    /// today. Failures keep the last known rate. USDT/USDC follow USD.
     @MainActor
     static func refreshUSDIfStale(in context: ModelContext) async {
         let cal = Calendar.current
@@ -125,7 +98,6 @@ enum CurrencyService {
             }
             try? context.save()
         } catch {
-            // Offline: the latest stored rate stays in effect.
         }
     }
 }

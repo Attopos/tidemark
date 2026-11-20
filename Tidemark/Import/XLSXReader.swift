@@ -1,12 +1,6 @@
 import Foundation
 import Compression
 
-// MARK: - Minimal .xlsx reader
-//
-// An .xlsx file is a zip of XML parts. This reads the first worksheet as rows
-// of strings and nothing else: no styles, formulas or dates. It exists so a
-// spreadsheet export can be imported without a third-party dependency.
-
 enum XLSXError: LocalizedError {
     case notAZip
     case missingPart(String)
@@ -23,8 +17,6 @@ enum XLSXError: LocalizedError {
     }
 }
 
-// MARK: Zip
-
 struct ZipArchive {
     private struct Entry {
         let method: Int
@@ -40,7 +32,6 @@ struct ZipArchive {
 
     init(data: Data) throws {
         self.data = data
-        // End of central directory: scan backwards for its signature.
         let minimum = 22
         guard data.count >= minimum else { throw XLSXError.notAZip }
         var eocd = -1
@@ -87,7 +78,6 @@ struct ZipArchive {
                 body.withUnsafeBytes { source -> Int in
                     guard let dst = destination.bindMemory(to: UInt8.self).baseAddress,
                           let src = source.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-                    // COMPRESSION_ZLIB is raw DEFLATE, which is what zip stores.
                     return compression_decode_buffer(dst, entry.uncompressedSize, src, body.count, nil, COMPRESSION_ZLIB)
                 }
             }
@@ -107,11 +97,7 @@ struct ZipArchive {
     }
 }
 
-// MARK: Workbook
-
 enum XLSXReader {
-    /// Rows of the first worksheet. Missing cells are empty strings; every
-    /// row is as wide as its last filled cell.
     static func firstSheetRows(of data: Data) throws -> [[String]] {
         let zip = try ZipArchive(data: data)
         let sheets = zip.names
@@ -129,7 +115,6 @@ enum XLSXReader {
         try firstSheetRows(of: try Data(contentsOf: url))
     }
 
-    /// "A" → 0, "Z" → 25, "AA" → 26.
     static func columnIndex(ofReference reference: String) -> Int {
         var index = 0
         for scalar in reference.unicodeScalars {

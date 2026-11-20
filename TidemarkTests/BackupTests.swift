@@ -2,9 +2,6 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// A backup must bring everything the board is built from to an empty store,
-// exactly, and restoring must never duplicate or delete.
-
 @MainActor
 final class BackupTests: XCTestCase {
     private func makeContext() throws -> ModelContext {
@@ -85,7 +82,6 @@ final class BackupTests: XCTestCase {
     }
 
     func testRestoreMatchesAnImportedRecordByFingerprint() throws {
-        // The same export imported on two Macs: ids differ, fingerprints agree.
         let source = try makeContext()
         source.insert(Transaction(date: Date(timeIntervalSince1970: 1_750_000_000), kind: .expense, amount: 10,
                                   source: .icost, fingerprint: "ledger:same"))
@@ -185,7 +181,7 @@ final class BackupTests: XCTestCase {
             backup.createdAt = start.addingTimeInterval(Double(offset) * 86_400)
             try BackupService.writeBackup(backup, to: folder)
         }
-        try BackupService.writeBackup(backup, to: folder)   // same day again
+        try BackupService.writeBackup(backup, to: folder)
 
         let files = BackupService.backupFiles(in: folder)
         XCTAssertEqual(files.count, BackupService.keepFiles)

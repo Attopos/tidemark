@@ -38,7 +38,6 @@ enum RecordField: String, Identifiable {
     #endif
 }
 
-/// One field of a record, edited on its own from the details page.
 struct RecordFieldEditor: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -206,8 +205,6 @@ struct RecordFieldEditor: View {
         .scrollIndicators(.hidden)
     }
 
-    // MARK: Type
-
     private var typePicker: some View {
         let stats = EntryStats.latest ?? EntryStats.load(context)
         let names = stats.categories[kind] ?? []
@@ -292,8 +289,6 @@ struct RecordFieldEditor: View {
         commit()
     }
 
-    // MARK: Load & save
-
     private static var currencies: [String] {
         let first = ["CNY", "USD", "EUR", "HKD", "JPY", "GBP"]
         return first + Fmt.currencySymbols.keys.filter { !first.contains($0) }.sorted()
@@ -368,7 +363,6 @@ private struct NumberPad: ViewModifier {
     }
 }
 
-/// Ledger accounts with their icons, for picking one.
 struct AccountPickerList: View {
     @Query(sort: \Account.createdAt) private var allAccounts: [Account]
     let selected: UUID?
@@ -414,7 +408,6 @@ struct AccountPickerList: View {
     }
 }
 
-/// The account picker in a sheet of its own, for the entry page.
 struct AccountPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let title: String

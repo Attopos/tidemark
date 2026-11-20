@@ -1,19 +1,6 @@
 import Foundation
 import SwiftData
 
-// MARK: - Canonical financial schema
-//
-// Design rules that keep the numbers honest:
-//  * Money is stored as Decimal in the transaction's original currency.
-//  * Cash-like accounts are ledger-driven: value = opening balance + signed
-//    transactions, re-anchored by the most recent BalanceSnapshot (reconciliation).
-//  * Investment/crypto accounts are holdings-driven: value = Σ holding values
-//    (quantity × latest price, else the latest dated HoldingSnapshot). Account
-//    BalanceSnapshots are used only when an account has no holdings — one source
-//    of truth per account, so nothing is double counted.
-//  * Every imported record keeps its source, raw payload and a deterministic
-//    fingerprint so imports are idempotent and reviewable.
-
 @Model
 final class Account {
     @Attribute(.unique) var id: UUID
@@ -27,14 +14,9 @@ final class Account {
     var createdAt: Date
     var updatedAt: Date
     var isArchived: Bool
-    // Cash-side details (all default so older stores migrate).
-    /// AccountGroup raw value; "" = guessed from the kind and name.
     var groupRaw: String = ""
-    /// Card or account number, shown under the name.
     var cardNumber: String = ""
-    /// "Debit Card", "WeChat Wallet", "Membership Card"…
     var typeLabel: String = ""
-    /// Credit cards: limit, statement day and payment-due day of the month.
     var creditLimit: Decimal? = nil
     var billingDay: Int? = nil
     var repaymentDay: Int? = nil
@@ -83,8 +65,6 @@ final class Transaction {
     @Attribute(.unique) var id: UUID
     var date: Date
     var kindRaw: String
-    /// Positive magnitude in `currencyCode` (sign comes from `kind`;
-    /// `.adjustment` may carry a signed amount).
     var amount: Decimal
     var currencyCode: String
     var category: String
@@ -93,35 +73,22 @@ final class Transaction {
     var note: String
     var tags: String
     var account: Account?
-    /// Destination account for transfers / repayments.
     var transferAccount: Account?
     var sourceRaw: String
     var externalID: String?
-    /// Deterministic dedup key — unique across the store.
     @Attribute(.unique) var fingerprint: String
-    /// JSON of the original source row, preserved verbatim.
     var rawPayload: String?
     var createdAt: Date
     var excludeFromStats: Bool
     var importRecord: ImportRecord?
-    // Cash-flow ledger fields. All have defaults so older stores migrate.
-    /// Where it happened (free text).
     var address: String = ""
-    /// Part of an expense that came back; statistics count amount − refund.
     var refundAmount: Decimal = 0
     var discountAmount: Decimal = 0
     var feeAmount: Decimal = 0
-    /// Amount that arrived in `transferAccount`, in that account's currency,
-    /// when it differs from `amount` (cross-currency transfer). Nil = converted
-    /// at the dated rate.
     var transferAmount: Decimal? = nil
     var updatedAt: Date = Date()
-    /// Reimbursement: "" (none), "pending" (to be paid back) or "claimed".
     var claimStatusRaw: String = ""
-    /// What was actually paid back, once claimed.
     var claimAmount: Decimal = 0
-    /// The preset (template, recurring record, instalment plan) this record
-    /// came from, if any.
     var presetID: UUID? = nil
 
     var claimStatus: ClaimStatus {
@@ -129,14 +96,11 @@ final class Transaction {
         set { claimStatusRaw = newValue.rawValue }
     }
 
-    /// What this record really cost or brought in: an expense net of its
-    /// refund and of any reimbursement already received.
     var netAmount: Decimal {
         guard kind == .expense else { return amount }
         return amount - refundAmount - (claimStatus == .claimed ? claimAmount : 0)
     }
 
-    /// Money that came back to the paying account.
     var returnedAmount: Decimal { amount - netAmount }
 
     var kind: TransactionKind {
@@ -148,7 +112,6 @@ final class Transaction {
         set { sourceRaw = newValue.rawValue }
     }
 
-    /// Signed effect of this transaction on the given account's balance.
     func cashDelta(for target: Account) -> Decimal {
         let isSource = account?.id == target.id
         let isDestination = transferAccount?.id == target.id
@@ -163,7 +126,6 @@ final class Transaction {
             if isDestination { return amount }
             return 0
         case .investBuy:
-            // Cash leaves the paying account; the invested value is tracked by holdings.
             return isSource ? -amount : 0
         case .investSell:
             return isSource ? amount : 0
@@ -225,11 +187,6 @@ enum ClaimStatus: String, CaseIterable, Identifiable {
     }
 }
 
-/// A record kept for reuse. Without a schedule it is a template (one tap
-/// fills the editor); with one it adds itself on every due date; with an
-/// occurrence limit it is an instalment plan (N payments, then it stops).
-/// Accounts are referenced by id so a preset travels between devices as
-/// plain fields.
 @Model
 final class RecordPreset {
     @Attribute(.unique) var id: UUID
@@ -243,14 +200,10 @@ final class RecordPreset {
     var transferAccountID: UUID?
     var note: String
     var tags: String
-    /// "" = template only, else a Frequency raw value.
     var scheduleRaw: String
     var startDate: Date
     var endDate: Date?
-    /// Instalments: stop after this many records.
     var occurrenceLimit: Int?
-    /// Index of the last occurrence already written (−1 = none). Records the
-    /// user deletes later are not written again.
     var generatedThrough: Int
     var isActive: Bool
     var createdAt: Date
@@ -293,17 +246,12 @@ final class RecordPreset {
 final class Asset {
     @Attribute(.unique) var id: UUID
     var name: String
-    /// Fund code ("005827") or ticker ("BTC").
     var symbol: String
     var classRaw: String
-    /// Currency its price/valuation is quoted in.
     var currencyCode: String
     var note: String
     var createdAt: Date
-    /// User-chosen risk exposure (Exposure.rawValue); nil = guessed.
     var exposureRaw: String? = nil
-    /// User-chosen display name; `name` stays as recognized so later
-    /// imports still match this asset.
     var customName: String? = nil
 
     var displayName: String {
@@ -337,9 +285,7 @@ final class Holding {
     @Attribute(.unique) var id: UUID
     var asset: Asset?
     var account: Account?
-    /// Units/shares, when known. Nil means only valuation snapshots exist.
     var quantity: Decimal?
-    /// Total cost in the asset's currency, when known. Never fabricated.
     var costBasis: Decimal?
     var openedAt: Date?
     var isActive: Bool
@@ -368,13 +314,11 @@ final class Holding {
     }
 }
 
-/// A dated valuation of one holding (the unit the Alipay OCR importer writes).
 @Model
 final class HoldingSnapshot {
     @Attribute(.unique) var id: UUID
     var holding: Holding?
     var date: Date
-    /// Market value in the asset's currency.
     var marketValue: Decimal
     var quantity: Decimal?
     var unitNAV: Decimal?
@@ -427,7 +371,6 @@ final class PricePoint {
     }
 }
 
-/// Account-level reconciliation anchor ("the real balance was X on date D").
 @Model
 final class BalanceSnapshot {
     @Attribute(.unique) var id: UUID
@@ -459,8 +402,6 @@ final class RecurringCommitment {
     var endDate: Date?
     var isActive: Bool
     var note: String
-    /// Substring used to match real imported transactions, so a commitment
-    /// that already appears in the ledger isn't projected twice.
     var matchKeyword: String
     var sourceRaw: String
     var createdAt: Date
@@ -514,8 +455,6 @@ final class FinancialGoal {
     }
 }
 
-/// A named what-if configuration for the Planning module. All outputs derived
-/// from it are projections, never promises.
 @Model
 final class PlanScenario {
     @Attribute(.unique) var id: UUID
@@ -523,11 +462,8 @@ final class PlanScenario {
     var startingPortfolio: Decimal
     var monthlySavings: Decimal
     var annualSpending: Decimal
-    /// Expected *real* annual return, as a fraction (0.04 = 4%).
     var expectedRealReturn: Double
-    /// Safe withdrawal rate, as a fraction (0.04 = 4%).
     var withdrawalRate: Double
-    /// Months of zero income at the start of the projection (stress case).
     var incomeGapMonths: Int
     var isBaseline: Bool
     var sortOrder: Int
@@ -594,7 +530,6 @@ final class ImportRecord {
     }
 }
 
-/// Per-source connection state shown on the Import Center cards.
 @Model
 final class ImportSourceState {
     @Attribute(.unique) var sourceRaw: String
@@ -619,8 +554,6 @@ final class ImportSourceState {
     }
 }
 
-/// 1 unit of `code` = `rate` CNY (all rates pivot through CNY).
-/// Dated rows are kept as history so period FX effects can be estimated.
 @Model
 final class CurrencyRate {
     @Attribute(.unique) var id: UUID
@@ -640,8 +573,6 @@ final class CurrencyRate {
     }
 }
 
-// MARK: - Container
-
 enum TidemarkSchema {
     static let models: [any PersistentModel.Type] = [
         Account.self, Transaction.self, Asset.self, Holding.self,
@@ -652,9 +583,6 @@ enum TidemarkSchema {
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
         let schema = Schema(models)
-        // Sync is our own (see CloudSync). SwiftData's built-in CloudKit mirroring
-        // must stay off: with an iCloud entitlement it turns itself on, and it
-        // rejects this schema (unique ids, non-optional attributes).
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// One type and spacing scale for every page's cards, so Ledger, Assets,
-/// Portfolio and Analysis read the same. The phone is compact; the Mac a
-/// little larger.
 enum TS {
     #if os(iOS)
     private static let k: CGFloat = 1

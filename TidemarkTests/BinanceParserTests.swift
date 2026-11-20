@@ -2,14 +2,8 @@ import XCTest
 import SwiftData
 @testable import Tidemark
 
-// Binance asset-list parsing on synthetic Vision output that mirrors the web
-// "My Assets → Asset View" layout (positions as Vision reports them, values
-// made up). Covers stablecoin exclusion, the dropped-decimal repair, signed
-// PNL, platform detection, and saving into a USD account.
-
 @MainActor
 final class BinanceParserTests: XCTestCase {
-
     private func line(_ text: String, _ minX: CGFloat, _ maxX: CGFloat, _ midY: CGFloat,
                       height: CGFloat = 0.015, confidence: Double = 0.5) -> RecognizedLine {
         RecognizedLine(text: text,
@@ -17,8 +11,6 @@ final class BinanceParserTests: XCTestCase {
                        confidence: confidence)
     }
 
-    /// Header + four assets: a coin, a stablecoin, a tokenized ETF, and a coin
-    /// whose quantity lost its decimal point in OCR.
     private var sampleLines: [RecognizedLine] {
         [
             line("Est. Total Value ©", 0.042, 0.153, 0.941, height: 0.022, confidence: 0.3),
@@ -31,7 +23,6 @@ final class BinanceParserTests: XCTestCase {
             line("Asset Price / Cost Price O", 0.663, 0.760, 0.635),
             line("Floating PNL ：", 0.869, 0.926, 0.636),
 
-            // BTC: 0.01 × 50,000 = 500.00
             line("BTC", 0.065, 0.087, 0.595, height: 0.013, confidence: 1),
             line("0.0100000000", 0.503, 0.576, 0.594),
             line("$50,000.00", 0.695, 0.757, 0.592, height: 0.020),
@@ -40,7 +31,6 @@ final class BinanceParserTests: XCTestCase {
             line("Bitcoin", 0.065, 0.096, 0.570, height: 0.013),
             line("$60,000.00", 0.690, 0.744, 0.569, height: 0.020),
 
-            // USDC: stablecoin, cost "--"; a stray icon glyph to the left.
             line("USDC", 0.065, 0.096, 0.531),
             line("$1.00", 0.725, 0.757, 0.528, height: 0.019),
             line("200.5000000000", 0.488, 0.576, 0.527, height: 0.017, confidence: 1),
@@ -49,7 +39,6 @@ final class BinanceParserTests: XCTestCase {
             line("USDC", 0.064, 0.093, 0.506, height: 0.014),
             line("$200.50", 0.536, 0.577, 0.504, height: 0.017),
 
-            // QQQ tokenized ETF: 0.5 × 600 = 300.00; fullwidth dollar in PNL.
             line("QQQ", 0.061, 0.092, 0.465),
             line("0.500000000", 0.507, 0.576, 0.463, height: 0.020, confidence: 1),
             line("$600.00", 0.712, 0.757, 0.463, height: 0.019),
@@ -58,7 +47,6 @@ final class BinanceParserTests: XCTestCase {
             line("$300.00", 0.539, 0.577, 0.441, height: 0.013, confidence: 1),
             line("Invesco QQQ Trust, Series 1", 0.064, 0.188, 0.440),
 
-            // BNB: "0.0200000000" read as "00200000000"; 0.02 × 500 = 10.00.
             line("BNB", 0.065, 0.089, 0.141, height: 0.013, confidence: 1),
             line("00200000000", 0.501, 0.576, 0.139, height: 0.013),
             line("$500.00", 0.712, 0.756, 0.138, height: 0.019, confidence: 1),
@@ -154,7 +142,6 @@ final class BinanceParserTests: XCTestCase {
         let btc = try XCTUnwrap(holdings.first { $0.asset?.symbol == "BTC" })
         XCTAssertEqual(btc.snapshots.first?.marketValue, 500, "stored in USD as shown")
 
-        // Totals convert to RMB through the dated USD rate.
         let converter = CurrencyConverter(rates: [CurrencyRate(code: "USD", rate: 7, date: .distantPast, source: .market)],
                                           base: "CNY")
         XCTAssertEqual(converter.toBase(500, "USD"), 3500)

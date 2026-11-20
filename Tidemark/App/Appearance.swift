@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Light, dark, or whatever the system uses. Chosen in Settings, per device.
 enum AppAppearance: String, CaseIterable, Identifiable {
     case system, light, dark
 
@@ -14,7 +13,6 @@ enum AppAppearance: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Nil follows the system.
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil

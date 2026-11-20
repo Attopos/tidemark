@@ -2,12 +2,6 @@ import SwiftUI
 import SwiftData
 import Charts
 
-// MARK: - Shared ledger data
-//
-// Everything the Ledger, Accounts and Analysis pages draw comes from one
-// snapshot built per render: records reduced to statistics entries, account
-// movements, and the converter for the display currency.
-
 struct LedgerSnapshot {
     let code: String
     let converter: CurrencyConverter
@@ -40,10 +34,7 @@ struct LedgerSnapshot {
     }
 }
 
-/// Meaning of color on the cash-flow pages: violet is money going out,
-/// lime is money coming in. Shades rank categories inside one family.
 enum FlowPalette {
-    /// Text, lines and bars: deeper shades in light mode so they read on white.
     static let expense = Color(light: 0x7458E0, dark: 0xA98BFA)
     static let income = Color(light: 0x6B8E12, dark: 0xD5F56B)
     private static let expenseRamp = [expense, DS.violetSoft, DS.violetDeep, DS.violetDark]
@@ -76,15 +67,12 @@ enum FlowMode: String, CaseIterable {
     }
 }
 
-// MARK: - Period bar
-
 struct PeriodBar: View {
     @Binding var period: CashPeriod
 
     private var title: String { period.title }
 
     var body: some View {
-        // The "Today" shortcut is the first thing to go when space is short.
         ViewThatFits(in: .horizontal) {
             bar(withToday: true)
             bar(withToday: false)
@@ -140,7 +128,6 @@ extension CashPeriod.Unit {
 }
 
 extension CashPeriod {
-    /// "Nov 2026", "2026", "Nov 10 – Nov 16".
     var title: String {
         let calendar = Calendar.current
         func format(_ date: Date, _ template: String) -> String {
@@ -162,7 +149,6 @@ extension CashPeriod {
         }
     }
 
-    /// The month, week or year a category's history steps by.
     var historyStep: CashPeriod {
         switch unit {
         case .week, .month, .year: return self
@@ -173,15 +159,12 @@ extension CashPeriod {
     }
 }
 
-// MARK: - Small figures
-
 struct StatTile: View {
     let title: String
     let value: Decimal
     let code: String
     var color: Color = DS.textPrimary
     var signed = false
-    /// Plain number instead of money (a count).
     var isCount = false
 
     var body: some View {
@@ -206,10 +189,8 @@ struct StatTile: View {
 
 struct HeroFigure: View {
     let title: String
-    /// Nil shows the privacy mask.
     let value: Decimal?
     let code: String
-    /// Label and formatted figure.
     let details: [(String, String)]
 
     var body: some View {
@@ -238,19 +219,15 @@ struct HeroFigure: View {
     }
 }
 
-// MARK: - Expense / income bars
-
 struct FlowBarsPanel: View {
     let buckets: [CashBucket]
     let summary: CashSummary
     let period: CashPeriod
     let code: String
-    /// Day picked in the calendar; highlighted when nothing is hovered.
     var selectedDay: Date?
 
     @State private var mode: FlowMode = .expense
     @State private var hovered: Date?
-    /// Line instead of bars (remembered).
     @AppStorage("statisticsAsLine") private var asLine = false
 
     private func value(_ bucket: CashBucket) -> Decimal {
@@ -322,7 +299,6 @@ struct FlowBarsPanel: View {
                 Chart {
                     ForEach(buckets) { bucket in
                         if asLine {
-                            // Days still to come are left off the line.
                             if bucket.start <= Date() {
                                 AreaMark(x: .value("Date", bucket.start, unit: unit),
                                          y: .value("Amount", value(bucket).doubleValue))
@@ -388,8 +364,6 @@ struct FlowBarsPanel: View {
     }
 }
 
-// MARK: - Net assets trend
-
 struct NetTrendPanel: View {
     enum Series: String, CaseIterable { case net, assets, debts }
 
@@ -415,7 +389,6 @@ struct NetTrendPanel: View {
     }
 
     var body: some View {
-        // Days still to come: the last value, carried flat and dashed.
         let ahead: [(Date, Double)] = {
             guard let last = points.last else { return [] }
             return period.bucketStarts().filter { $0 >= last.date }.map { ($0, value(last).doubleValue) }
@@ -433,8 +406,6 @@ struct NetTrendPanel: View {
                         .clipShape(Capsule())
                 }
                 Chart {
-                    // A solid area and line for what happened; the days still
-                    // to come carry the last value as a flat dashed line.
                     ForEach(points) { point in
                         AreaMark(x: .value("Date", point.date), y: .value("Value", value(point).doubleValue))
                             .foregroundStyle(color.opacity(0.18))
@@ -496,19 +467,15 @@ struct NetTrendPanel: View {
     }
 }
 
-// MARK: - Categories
-
 struct CategoryPanel: View {
     let entries: [CashEntry]
     let period: CashPeriod
     let code: String
 
-    /// Category whose detail sheet is open.
     @State private var selection: CategorySelection?
     @State private var kind: TransactionKind = .expense
     @State private var level: CategoryLevel = .first
     @State private var expanded = false
-    /// Row under the pointer; highlights its slice.
     @State private var hovered: String?
 
     private static let collapsedCount = 10
@@ -612,7 +579,6 @@ struct CategoryPanel: View {
                         }
                     }
                     .frame(height: 4)
-                    // Change against the previous period, then the record count.
                     Text((stat.change == 0 ? "" : "\(stat.change > 0 ? "▲" : "▼") \(Fmt.money(abs(stat.change), code)) · ")
                          + "\(stat.count)")
                         .font(.system(size: 11).monospacedDigit())
@@ -651,8 +617,6 @@ struct CategorySelection: Equatable, Identifiable {
         }
     }
 }
-
-// MARK: - Record rows
 
 struct RecordRow: View {
     let transaction: Transaction
@@ -729,7 +693,6 @@ struct RecordRow: View {
     }
 }
 
-/// A list of records with edit and delete, used by every page.
 struct RecordList: View {
     @Environment(\.modelContext) private var context
     let transactions: [Transaction]
@@ -785,10 +748,6 @@ struct RecordList: View {
     }
 }
 
-// MARK: - Category detail
-
-/// One category over time: this period's total, the last twelve periods,
-/// its second-level split, and its records.
 struct CategoryDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Transaction.date, order: .reverse) private var transactions: [Transaction]

@@ -1,9 +1,6 @@
 import XCTest
 @testable import Tidemark
 
-// Risk-exposure guesses: the wrapper (CNY QDII fund, tokenized stock, coin)
-// must not decide the exposure — what it tracks does.
-
 final class ExposureTests: XCTestCase {
     private func guess(_ name: String, _ symbol: String = "", _ cls: AssetClass = .equity) -> Exposure {
         Exposure.guess(name: name, symbol: symbol, assetClass: cls)
