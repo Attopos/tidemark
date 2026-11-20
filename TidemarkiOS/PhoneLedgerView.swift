@@ -73,7 +73,7 @@ private struct PhoneLedgerPage: View {
         @Bindable var app = app
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
+                LazyVStack(alignment: .leading, spacing: TS.cardSpacing + 2) {
                     header
                     summaryCard(summary, code: code)
                     if showsCalendar && period.unit == .month {
@@ -132,35 +132,13 @@ private struct PhoneLedgerPage: View {
     }
 
     private func summaryCard(_ summary: CashSummary, code: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AmountsLabel(title: tr("Expense"), color: FlowPalette.expense, size: 15)
-            Text(Fmt.money(summary.expense, code))
-                .font(DS.money(34))
-                .foregroundStyle(DS.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-            HStack(spacing: 18) {
-                figure(tr("Income"), Fmt.money(summary.income, code))
-                figure(tr("Balance"), Fmt.money(summary.balance, code, showSign: true))
-                if summary.claimPending > 0 {
-                    figure(tr("Pending"), Fmt.money(summary.claimPending, code))
-                }
+        HeroCard(label: tr("Expense"), labelColor: FlowPalette.expense, value: Fmt.money(summary.expense, code)) {
+            InlineFigure(label: tr("Income"), value: Fmt.money(summary.income, code))
+            InlineFigure(label: tr("Balance"), value: Fmt.money(summary.balance, code, showSign: true))
+            if summary.claimPending > 0 {
+                InlineFigure(label: tr("Pending"), value: Fmt.money(summary.claimPending, code))
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DS.panel)
-        .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
-    }
-
-    private func figure(_ label: String, _ value: String) -> some View {
-        HStack(spacing: 6) {
-            Text(label).foregroundStyle(DS.textTertiary)
-            Text(value).foregroundStyle(DS.textSecondary)
-        }
-        .font(.system(size: 14).monospacedDigit())
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
     }
 
     private func dayBlock(_ group: DayGroup, code: String) -> some View {

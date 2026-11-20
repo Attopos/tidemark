@@ -132,25 +132,12 @@ struct AccountsView: View {
             if account.group == .receivable { lent += value }
             if account.group == .payable { borrowed += -value }
         }
-        return VStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 8) {
-                AmountsLabel(title: tr("Net Assets"))
-                Text(Fmt.money(net.assets - net.debts, snapshot.code))
-                    .font(DS.money(38))
-                    .foregroundStyle(DS.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                HStack(spacing: 16) {
-                    figure(tr("Total"), Fmt.money(net.assets, snapshot.code))
-                    figure(tr("Debts"), Fmt.money(net.debts, snapshot.code))
-                }
+        return VStack(spacing: TS.cardSpacing) {
+            HeroCard(label: tr("Net Assets"), value: Fmt.money(net.assets - net.debts, snapshot.code)) {
+                InlineFigure(label: tr("Total"), value: Fmt.money(net.assets, snapshot.code))
+                InlineFigure(label: tr("Debts"), value: Fmt.money(net.debts, snapshot.code))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DS.panel)
-            .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
-            HStack(spacing: 12) {
+            HStack(spacing: TS.cardSpacing) {
                 smallCard(tr("Total Borrowing"), Fmt.money(Swift.max(0, borrowed), snapshot.code),
                           icon: "arrow.down", tint: DS.textTertiary)
                 smallCard(tr("Total Lending"), Fmt.money(Swift.max(0, lent), snapshot.code),
@@ -159,39 +146,29 @@ struct AccountsView: View {
         }
     }
 
-    private func figure(_ label: String, _ value: String) -> some View {
-        HStack(spacing: 6) {
-            Text(label).foregroundStyle(DS.textTertiary)
-            Text(value).foregroundStyle(DS.textSecondary)
-        }
-        .font(.system(size: 15).monospacedDigit())
-        .lineLimit(1)
-        .minimumScaleFactor(0.7)
-    }
-
     private func smallCard(_ title: String, _ value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium).monospacedDigit())
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(DS.ink)
-                .frame(width: 30, height: 30)
+                .frame(width: 26, height: 26)
                 .background(tint)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14).monospacedDigit())
+                    .font(TS.caption)
                     .foregroundStyle(DS.textTertiary)
                     .lineLimit(1)
                 Text(value)
-                    .font(DS.money(17))
+                    .font(TS.rowFigure)
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
+        .padding(.horizontal, TS.rowInsetH - 2)
+        .padding(.vertical, TS.rowInsetV)
         .frame(maxWidth: .infinity)
         .background(DS.panel)
         .clipShape(RoundedRectangle(cornerRadius: DS.tileRadius, style: .continuous))
@@ -222,18 +199,18 @@ struct AccountsView: View {
                     Button { withAnimation(.easeInOut(duration: 0.2)) { toggle(group) } } label: {
                         HStack(spacing: 4) {
                             Text(group.displayName)
-                                .font(.system(size: 17, weight: .medium).monospacedDigit())
+                                .font(TS.title.weight(.medium))
                                 .foregroundStyle(DS.textPrimary)
                             Text("(\(members.count))")
-                                .font(.system(size: 14).monospacedDigit())
+                                .font(TS.label)
                                 .foregroundStyle(DS.textTertiary)
                             Spacer(minLength: 8)
                             Text("\(tr("Balance")): \(Fmt.money(total, snapshot.code))")
-                                .font(.system(size: 14, weight: .regular).monospacedDigit())
+                                .font(TS.label)
                                 .foregroundStyle(DS.textTertiary)
                                 .lineLimit(1)
                             Image(systemName: folded ? "chevron.right" : "chevron.down")
-                                .font(.system(size: 12, weight: .regular).monospacedDigit())
+                                .font(.system(size: 11))
                                 .foregroundStyle(DS.textTertiary)
                         }
                         .contentShape(Rectangle())
@@ -244,15 +221,15 @@ struct AccountsView: View {
                             ForEach(Array(members.enumerated()), id: \.element.id) { index, account in
                                 accountRow(account, snapshot: snapshot)
                                 if index < members.count - 1 {
-                                    Divider().overlay(DS.border.opacity(0.5)).padding(.leading, 72)
+                                    Divider().overlay(DS.border.opacity(0.5)).padding(.leading, TS.rowInsetH + TS.rowIcon + 12)
                                 }
                             }
                         }
                         .background(DS.panel)
-                        .clipShape(RoundedRectangle(cornerRadius: DS.panelRadius, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: TS.cardRadius, style: .continuous))
                     }
                 }
-                .padding(.top, 10)
+                .padding(.top, 6)
             }
         }
     }
@@ -275,12 +252,12 @@ struct AccountsView: View {
         let isCredit = account.group == .credit
         let owed = Swift.max(0, -balance)
         return Button { selectedID = selected ? nil : account.id } label: {
-            HStack(alignment: .center, spacing: 14) {
-                AccountIcon(account: account, size: 40)
-                VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .center, spacing: 12) {
+                AccountIcon(account: account, size: TS.rowIcon)
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(account.name)
-                            .font(.system(size: 16, weight: .medium).monospacedDigit())
+                            .font(TS.title)
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         if !account.includeInNetWorth { TagChip(text: tr("Not counted"), color: DS.textSecondary) }
@@ -288,7 +265,7 @@ struct AccountsView: View {
                     }
                     ForEach(subtitleLines(account), id: \.self) { line in
                         Text(line)
-                            .font(.system(size: 14).monospacedDigit())
+                            .font(TS.caption)
                             .foregroundStyle(DS.textTertiary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -297,21 +274,21 @@ struct AccountsView: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(Fmt.money(isCredit ? owed : balance, account.currencyCode))
-                        .font(DS.money(17))
+                        .font(TS.rowFigure)
                         .foregroundStyle(!isCredit && balance < 0 ? FlowPalette.expense : DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
                     if isCredit, let limit = account.creditLimit {
                         Text("\(tr("Avl Credit")): \(Fmt.money(limit - owed, account.currencyCode))")
-                            .font(.system(size: 13).monospacedDigit())
+                            .font(TS.caption)
                             .foregroundStyle(DS.textTertiary)
                             .lineLimit(1)
                             .fixedSize()
                     }
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 15)
+            .padding(.horizontal, TS.rowInsetH)
+            .padding(.vertical, TS.rowInsetV)
             .background(selected ? DS.tile : Color.clear)
             .contentShape(Rectangle())
         }

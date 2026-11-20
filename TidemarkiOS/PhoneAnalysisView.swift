@@ -46,7 +46,7 @@ struct PhoneAnalysisView: View {
         let code = snapshot.code
 
         ScrollView {
-                VStack(spacing: 10) {
+                VStack(spacing: TS.cardSpacing) {
                     PageTitle(title: tr("Analysis")) { EmptyView() }
                     PhonePeriodSwitcher(selected: period.unit) { select($0, from: period) }
                     navigator(period)
@@ -163,78 +163,6 @@ struct PhonePeriodSwitcher: View {
     }
 }
 
-// MARK: - Card
-
-struct PhoneCard<Accessory: View, Content: View>: View {
-    static var twoColumns: [GridItem] { [GridItem(.flexible(), spacing: 7.5), GridItem(.flexible(), spacing: 7.5)] }
-
-    let title: String
-    let icon: String
-    @ViewBuilder var accessory: Accessory
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10.5) {
-            HStack(spacing: 7.5) {
-                Image(systemName: icon)
-                    .font(.system(size: 10.5, weight: .medium).monospacedDigit())
-                    .foregroundStyle(DS.ink)
-                    .frame(width: 20, height: 20)
-                    .background(DS.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                Text(title)
-                    .font(.system(size: 16.5, weight: .regular).monospacedDigit())
-                    .foregroundStyle(DS.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .layoutPriority(1)
-                accessory
-            }
-            .frame(minHeight: 27)
-            content
-        }
-        .padding(12.5)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DS.panel)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-}
-
-extension PhoneCard where Accessory == EmptyView {
-    init(title: String, icon: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.accessory = EmptyView()
-        self.content = content()
-    }
-}
-
-/// Small toggle chip in a card's title row ("Level 1 ⇄").
-struct PhoneChip: View {
-    let text: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 2) {
-                Text(text)
-                Image(systemName: "arrow.left.arrow.right").font(.system(size: 9.5, weight: .medium).monospacedDigit())
-            }
-            .font(.system(size: 11, weight: .regular).monospacedDigit())
-            .foregroundStyle(DS.textSecondary)
-            .lineLimit(1)
-            .fixedSize()
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4.5)
-            .background(DS.tile)
-            .clipShape(Capsule())
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// The figure above a chart: the picked day and its value.
 struct PhoneFocusChip: View {
     let text: String
 

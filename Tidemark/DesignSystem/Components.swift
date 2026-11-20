@@ -310,7 +310,7 @@ extension View {
 struct AmountsLabel: View {
     let title: String
     var color: Color = DS.textSecondary
-    var size: CGFloat = 16
+    var size: CGFloat = 14
 
     var body: some View {
         HStack(spacing: 6) {

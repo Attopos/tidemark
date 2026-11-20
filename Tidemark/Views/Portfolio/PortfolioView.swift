@@ -287,22 +287,22 @@ struct PortfolioView: View {
         var body: some View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(group.exposure.displayName)
-                    .font(.system(size: 16, weight: .regular).monospacedDigit())
+                    .font(TS.title)
                     .foregroundStyle(group.exposure.ink)
                     .lineLimit(2)
-                Spacer(minLength: 22)
+                Spacer(minLength: 16)
                 Text("\(tr("Share")) \(Fmt.percent(share, showSign: false))")
-                    .font(.system(size: 13).monospacedDigit())
+                    .font(TS.caption)
                     .foregroundStyle(group.exposure.ink.opacity(0.65))
                 Text(Fmt.money(group.baseValue, baseCurrency))
-                    .font(DS.money(22))
+                    .font(TS.figure)
                     .minimumScaleFactor(0.6)
                     .foregroundStyle(group.exposure.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
+            .padding(TS.cardPadding + 1.5)
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
             .background(group.exposure.color)
             .clipShape(RoundedRectangle(cornerRadius: DS.tileRadius, style: .continuous))
         }
