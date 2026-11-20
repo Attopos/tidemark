@@ -16,6 +16,7 @@ final class PerfProbe: NSObject {
     static let openAccountEditor = Notification.Name("probe.openAccountEditor")
     static let pushAccountType = Notification.Name("probe.pushAccountType")
     static let entryKey = Notification.Name("probe.entryKey")
+    static let openField = Notification.Name("probe.openField")
     static var importTestOn: Bool { ProcessInfo.processInfo.environment["TIDEMARK_IMPORT_TEST"] != nil }
 
     /// TIDEMARK_IMPORT_TEST=1: reads Documents/import-test.xlsx the way Import
@@ -63,6 +64,22 @@ final class PerfProbe: NSObject {
         NotificationCenter.default.post(name: Self.openDetail, object: nil)
         try? await Task.sleep(for: .milliseconds(1500))
         capture("detail")
+        for field in ["type", "remark", "account"] {
+            NotificationCenter.default.post(name: Self.openField, object: field)
+            try? await Task.sleep(for: .milliseconds(1500))
+            capture("field-\(field)")
+            UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+                .first?.presentedViewController?.dismiss(animated: false)
+            try? await Task.sleep(for: .milliseconds(600))
+        }
+        if ProcessInfo.processInfo.environment["TIDEMARK_SHOTS_ENTRY"] != nil {
+            UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
+                .first?.dismiss(animated: false)
+            try? await Task.sleep(for: .milliseconds(800))
+            NotificationCenter.default.post(name: Self.openEntry, object: nil)
+            try? await Task.sleep(for: .milliseconds(1500))
+            capture("entry")
+        }
         UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }
             .first?.dismiss(animated: false)
         app.section = .accounts

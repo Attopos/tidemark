@@ -169,6 +169,12 @@ struct QuickEntryView: View {
     @State private var readingImage = false
     @State private var savedCount = 0
     @State private var carried: (category: String, subcategory: String)?
+    @State private var picking: AccountSlot?
+
+    private enum AccountSlot: String, Identifiable {
+        case account, to
+        var id: String { rawValue }
+    }
     #if os(iOS)
     @State private var photo: PhotosPickerItem?
     #endif
@@ -229,6 +235,16 @@ struct QuickEntryView: View {
             carried = nil
             accountID = stats.lastAccount[kind] ?? accounts.first?.id
             if kind == .transfer && transferAccountID == nil { transferAccountID = stats.lastTransferTarget }
+        }
+        .sheet(item: $picking) { slot in
+            AccountPickerSheet(title: slot == .to ? tr("To") : (kind == .transfer ? tr("From") : tr("Account")),
+                               selected: slot == .to ? transferAccountID : accountID) { chosen in
+                if slot == .to { transferAccountID = chosen.id } else { accountID = chosen.id }
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            #endif
         }
         .sheet(item: $moreDraft, onDismiss: load) {
             TransactionEditor(transaction: nil, draft: $0.draft)
@@ -382,25 +398,24 @@ struct QuickEntryView: View {
 
     private var transferPickers: some View {
         VStack(spacing: 10) {
-            accountMenu(title: tr("From"), selection: $accountID)
+            accountMenu(title: tr("From"), slot: .account, selection: accountID)
             Image(systemName: "arrow.down")
                 .foregroundStyle(DS.textTertiary)
-            accountMenu(title: tr("To"), selection: $transferAccountID)
+            accountMenu(title: tr("To"), slot: .to, selection: transferAccountID)
         }
         .padding(.horizontal, Self.margin)
         .padding(.vertical, 16)
     }
 
-    private func accountMenu(title: String, selection: Binding<UUID?>) -> some View {
-        Menu {
-            ForEach(accounts) { item in
-                Button("\(item.name) · \(item.currencyCode)") { selection.wrappedValue = item.id }
-            }
-        } label: {
-            HStack {
+    private func accountMenu(title: String, slot: AccountSlot, selection: UUID?) -> some View {
+        Button { picking = slot } label: {
+            HStack(spacing: 10) {
                 Text(title).foregroundStyle(DS.textTertiary)
                 Spacer()
-                Text(accounts.first { $0.id == selection.wrappedValue }?.name ?? "—")
+                if let chosen = accounts.first(where: { $0.id == selection }) {
+                    AccountIcon(account: chosen, size: 26)
+                }
+                Text(accounts.first { $0.id == selection }?.name ?? "—")
                     .foregroundStyle(DS.textPrimary)
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 11).monospacedDigit()).foregroundStyle(DS.textTertiary)
             }
@@ -410,7 +425,6 @@ struct QuickEntryView: View {
             .background(DS.bgElevated)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .menuIndicator(.hidden)
         .buttonStyle(.plain)
     }
 
@@ -421,20 +435,19 @@ struct QuickEntryView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     if kind != .transfer {
-                        Menu {
-                            ForEach(accounts) { item in
-                                Button("\(item.name) · \(item.currencyCode)") { accountID = item.id }
-                            }
-                        } label: {
+                        Button { picking = .account } label: {
                             EntryChip(text: account?.name ?? tr("Account")) {
-                                Image(systemName: "creditcard.fill")
-                                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                                    .foregroundStyle(DS.ink)
-                                    .frame(width: 24, height: 24)
-                                    .background(Circle().fill(DS.accent))
+                                if let account {
+                                    AccountIcon(account: account, size: 24)
+                                } else {
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(DS.ink)
+                                        .frame(width: 24, height: 24)
+                                        .background(Circle().fill(DS.accent))
+                                }
                             }
                         }
-                        .menuIndicator(.hidden)
                         .buttonStyle(.plain)
                     }
                     if kind == .expense {
