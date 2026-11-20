@@ -47,9 +47,7 @@ struct PhoneAnalysisView: View {
 
         ScrollView {
                 VStack(spacing: 14) {
-                    PageTitle(title: tr("Analysis")) {
-                        RoundIconButton(symbol: app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
-                    }
+                    PageTitle(title: tr("Analysis")) { EmptyView() }
                     PhonePeriodSwitcher(selected: period.unit) { select($0, from: period) }
                     navigator(period)
                     PhoneOverviewCard(summary: summary, period: period, code: code) { title, kinds in
@@ -294,6 +292,7 @@ struct PhoneOverviewCard: View {
     var body: some View {
         let average = period.bucketComponent == .day ? tr("Daily expense") : tr("Monthly expense")
         PhoneCard(title: tr("Expense & income"), icon: "square.grid.2x2.fill") {
+            AmountsEye()
             Spacer(minLength: 8)
             Button { withAnimation(.snappy) { showsMore.toggle() } } label: {
                 Image(systemName: "chevron.right")

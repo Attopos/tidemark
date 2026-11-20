@@ -305,6 +305,41 @@ extension View {
     }
 }
 
+/// A figure's label with the eye that hides every amount, placed right above
+/// the big number on each page.
+struct AmountsLabel: View {
+    let title: String
+    var color: Color = DS.textSecondary
+    var size: CGFloat = 16
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: size, weight: .regular).monospacedDigit())
+                .foregroundStyle(color)
+            AmountsEye(size: size - 1)
+        }
+    }
+}
+
+/// The eye on its own, for a card header that already has a title.
+struct AmountsEye: View {
+    @Environment(AppState.self) private var app
+    var size: CGFloat = 15
+
+    var body: some View {
+        Button { app.amountsHidden.toggle() } label: {
+            Image(systemName: app.amountsHidden ? "eye.slash" : "eye")
+                .font(.system(size: size, weight: .regular))
+                .foregroundStyle(DS.textSecondary)
+                .frame(width: 28, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(app.amountsHidden ? tr("Show amounts") : tr("Hide amounts"))
+    }
+}
+
 /// Round eye button that hides or shows every amount.
 struct AmountsToggle: View {
     @Binding var hidden: Bool

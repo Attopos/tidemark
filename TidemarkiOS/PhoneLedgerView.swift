@@ -1,13 +1,12 @@
 import SwiftUI
 import SwiftData
-import PhotosUI
 
 // MARK: - Ledger (iPhone)
 //
 // The phone is where records are entered, so this page is built around that:
 // the month's totals on top, then every record of the month grouped by day,
 // and one large button in the thumb's corner that opens a new record. The
-// calendar and the search field are a tap away rather than always on screen.
+// month switcher sits in the title row; the calendar is a tap away.
 
 /// Reads only the shown period's records: refetching and reading all of them
 /// after every save cost ~150 ms on the phone.
@@ -20,7 +19,6 @@ struct PhoneLedgerView: View {
 private struct PhoneLedgerPage: View {
     @Environment(AppState.self) private var app
     @Query private var transactions: [Transaction]
-    @State private var allRecords: [Transaction] = []
 
     init(period: CashPeriod) {
         let start = period.start, limit = period.limit
@@ -30,13 +28,8 @@ private struct PhoneLedgerPage: View {
     @Query private var rates: [CurrencyRate]
 
     @State private var showsCalendar = false
-    @State private var showsSearch = false
     @State private var selectedDay: Date?
-    @State private var search = ""
     @State private var editing: Transaction?
-    @State private var receiptItem: PhotosPickerItem?
-    @State private var pendingReceipt: PendingReceipt?
-    @State private var readingReceipt = false
 
     private struct DayGroup: Identifiable {
         let day: Date
@@ -48,12 +41,6 @@ private struct PhoneLedgerPage: View {
 
     private var monthTitle: String { app.cashPeriod.title }
 
-    private func matches(_ transaction: Transaction, _ query: String) -> Bool {
-        [transaction.category, transaction.subcategory, transaction.note, transaction.address,
-         transaction.account?.name ?? "", transaction.transferAccount?.name ?? "", "\(transaction.amount)"]
-            .contains { $0.lowercased().contains(query) }
-    }
-
     var body: some View {
         let code = app.baseCurrency
         let converter = CurrencyConverter(rates: rates, base: code)
@@ -62,12 +49,9 @@ private struct PhoneLedgerPage: View {
         let entries = inPeriod.map { $0.cashEntry(using: converter) }
         let baseByID = Dictionary(zip(inPeriod.map(\.id), entries.map(\.base)), uniquingKeysWith: { a, _ in a })
         let summary = CashflowAnalytics.summary(entries, in: period)
-        let query = search.trimmingCharacters(in: .whitespaces).lowercased()
         let calendar = Calendar.current
 
-        // Search looks through everything; otherwise the month, or one day of it.
         let shown: [Transaction] = {
-            if !query.isEmpty { return allRecords.filter { matches($0, query) } }
             if showsCalendar, let day = selectedDay {
                 return transactions.filter { calendar.isDate($0.date, inSameDayAs: day) }
             }
@@ -91,9 +75,8 @@ private struct PhoneLedgerPage: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     header
-                    if showsSearch { searchField }
                     summaryCard(summary, code: code)
-                    if showsCalendar && query.isEmpty && period.unit == .month {
+                    if showsCalendar && period.unit == .month {
                         Panel {
                             MonthCalendar(period: $app.cashPeriod, entries: entries,
                                           code: code, selectedDay: $selectedDay)
@@ -118,17 +101,6 @@ private struct PhoneLedgerPage: View {
         }
         .background(DS.page)
         .sheet(item: $editing) { RecordDetailView(transaction: $0) }
-        .sheet(item: $pendingReceipt) { TransactionEditor(transaction: nil, draft: $0.draft) }
-        .onChange(of: receiptItem) { _, item in
-            guard let item else { return }
-            readingReceipt = true
-            Task { @MainActor in
-                defer { readingReceipt = false; receiptItem = nil }
-                guard let data = try? await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data)?.cgImage else { return }
-                pendingReceipt = PendingReceipt(draft: await ReceiptImport.draft(from: image, context: context))
-            }
-        }
         .onChange(of: app.cashPeriod) { _, _ in selectedDay = nil }
         #if DEBUG
         .onReceive(NotificationCenter.default.publisher(for: PerfProbe.openDetail)) { _ in
@@ -141,65 +113,27 @@ private struct PhoneLedgerPage: View {
 
     private var header: some View {
         @Bindable var app = app
-        return VStack(alignment: .leading, spacing: 10) {
-            PageTitle(title: tr("Ledger")) {
-                PhotosPicker(selection: $receiptItem, matching: .screenshots) {
-                    RoundIcon(symbol: readingReceipt ? "hourglass" : "doc.text.viewfinder")
-                }
-                .accessibilityLabel(tr("Receipt"))
-                RoundIconButton(symbol: app.amountsHidden ? "eye.slash" : "eye") { app.amountsHidden.toggle() }
-                RoundIconButton(symbol: "magnifyingglass", active: showsSearch) {
-                    showsSearch.toggle()
-                    if !showsSearch { search = "" }
-                    allRecords = showsSearch
-                        ? (try? context.fetch(FetchDescriptor<Transaction>(sortBy: [SortDescriptor(\.date, order: .reverse)]))) ?? []
-                        : []
-                }
-            }
-            HStack(spacing: 8) {
-                Text(monthTitle)
-                    .font(.system(size: 19, weight: .medium).monospacedDigit())
-                    .foregroundStyle(DS.textPrimary)
+        return PageTitle(title: tr("Ledger")) {
+            HStack(spacing: 6) {
                 RoundIconButton(symbol: "chevron.left", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: -1) }
+                Text(monthTitle)
+                    .font(.system(size: 16, weight: .medium).monospacedDigit())
+                    .foregroundStyle(DS.textPrimary)
+                    .lineLimit(1)
+                    .fixedSize()
                 RoundIconButton(symbol: "chevron.right", size: 30) { app.cashPeriod = app.cashPeriod.shifted(by: 1) }
-                Spacer()
-                Button {
+                RoundIconButton(symbol: "calendar", size: 30, active: showsCalendar) {
                     showsCalendar.toggle()
                     if showsCalendar { app.cashPeriod = CashPeriod(unit: .month, containing: app.cashPeriod.start) }
-                } label: {
-                    Text(tr("Calendar"))
-                        .font(.system(size: 14, weight: .regular).monospacedDigit())
-                        .foregroundStyle(showsCalendar ? DS.ink : DS.textSecondary)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 7)
-                        .background(showsCalendar ? DS.accent : DS.tile)
-                        .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .padding(.leading, 4)
             }
         }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(DS.textTertiary)
-            TextField(tr("Search"), text: $search)
-                .textFieldStyle(.plain)
-                .foregroundStyle(DS.textPrimary)
-                .autocorrectionDisabled()
-        }
-        .font(.system(size: 16).monospacedDigit())
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(DS.tile)
-        .clipShape(Capsule())
     }
 
     private func summaryCard(_ summary: CashSummary, code: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(tr("Expense"))
-                .font(.system(size: 15, weight: .regular).monospacedDigit())
-                .foregroundStyle(FlowPalette.expense)
+            AmountsLabel(title: tr("Expense"), color: FlowPalette.expense, size: 15)
             Text(Fmt.money(summary.expense, code))
                 .font(DS.money(34))
                 .foregroundStyle(DS.textPrimary)
