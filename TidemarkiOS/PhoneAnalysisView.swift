@@ -46,7 +46,7 @@ struct PhoneAnalysisView: View {
         let code = snapshot.code
 
         ScrollView {
-                VStack(spacing: 14) {
+                VStack(spacing: 10) {
                     PageTitle(title: tr("Analysis")) { EmptyView() }
                     PhonePeriodSwitcher(selected: period.unit) { select($0, from: period) }
                     navigator(period)
@@ -102,7 +102,7 @@ struct PhoneAnalysisView: View {
                 }
             } label: {
                 Text(period.title)
-                    .font(.system(size: 18, weight: .regular).monospacedDigit())
+                    .font(.system(size: 16, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -119,7 +119,7 @@ struct PhoneAnalysisView: View {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium).monospacedDigit())
                 .foregroundStyle(DS.ink)
-                .frame(width: 34, height: 34)
+                .frame(width: 30, height: 30)
                 .background(DS.accent)
                 .clipShape(Circle())
                 .contentShape(Circle())
@@ -143,11 +143,11 @@ struct PhonePeriodSwitcher: View {
                 let on = unit == selected
                 Button { select(unit) } label: {
                     Text(unit.title)
-                        .font(.system(size: 16, weight: on ? .semibold : .medium).monospacedDigit())
+                        .font(.system(size: 14, weight: on ? .semibold : .medium).monospacedDigit())
                         .foregroundStyle(on ? DS.ink : DS.textPrimary)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 38)
+                        .frame(height: 32)
                         .background {
                             if on { Capsule().fill(DS.accent).matchedGeometryEffect(id: "pill", in: pill) }
                         }
@@ -156,7 +156,7 @@ struct PhonePeriodSwitcher: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(4)
+        .padding(3)
         .background(DS.tile)
         .clipShape(Capsule())
         .animation(.snappy(duration: 0.25), value: selected)
@@ -166,7 +166,7 @@ struct PhonePeriodSwitcher: View {
 // MARK: - Card
 
 struct PhoneCard<Accessory: View, Content: View>: View {
-    static var twoColumns: [GridItem] { [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)] }
+    static var twoColumns: [GridItem] { [GridItem(.flexible(), spacing: 7.5), GridItem(.flexible(), spacing: 7.5)] }
 
     let title: String
     let icon: String
@@ -174,26 +174,26 @@ struct PhoneCard<Accessory: View, Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10.5) {
+            HStack(spacing: 7.5) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .font(.system(size: 10.5, weight: .medium).monospacedDigit())
                     .foregroundStyle(DS.ink)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 20, height: 20)
                     .background(DS.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 Text(title)
-                    .font(.system(size: 19, weight: .regular).monospacedDigit())
+                    .font(.system(size: 16.5, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .layoutPriority(1)
                 accessory
             }
-            .frame(minHeight: 32)
+            .frame(minHeight: 27)
             content
         }
-        .padding(16)
+        .padding(12.5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DS.panel)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -216,16 +216,16 @@ struct PhoneChip: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 3) {
+            HStack(spacing: 2) {
                 Text(text)
-                Image(systemName: "arrow.left.arrow.right").font(.system(size: 10, weight: .medium).monospacedDigit())
+                Image(systemName: "arrow.left.arrow.right").font(.system(size: 9.5, weight: .medium).monospacedDigit())
             }
-            .font(.system(size: 12.5, weight: .regular).monospacedDigit())
+            .font(.system(size: 11, weight: .regular).monospacedDigit())
             .foregroundStyle(DS.textSecondary)
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4.5)
             .background(DS.tile)
             .clipShape(Capsule())
             .contentShape(Capsule())
@@ -240,12 +240,12 @@ struct PhoneFocusChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 15, weight: .regular).monospacedDigit())
+            .font(.system(size: 13, weight: .regular).monospacedDigit())
             .foregroundStyle(DS.textPrimary)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5.5)
             .background(DS.tile)
             .clipShape(Capsule())
     }
@@ -296,15 +296,15 @@ struct PhoneOverviewCard: View {
             Spacer(minLength: 8)
             Button { withAnimation(.snappy) { showsMore.toggle() } } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .regular).monospacedDigit())
+                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
                     .rotationEffect(.degrees(showsMore ? 90 : 0))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 27, height: 27)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         } content: {
-            LazyVGrid(columns: PhoneCard<EmptyView, EmptyView>.twoColumns, spacing: 10) {
+            LazyVGrid(columns: PhoneCard<EmptyView, EmptyView>.twoColumns, spacing: 7.5) {
                 tile(tr("Expense"), summary.expense) { open(tr("Expense"), [.expense]) }
                 tile(tr("Income"), summary.income, color: FlowPalette.income) { open(tr("Income"), [.income]) }
                 tile(tr("Balance"), summary.balance,
@@ -327,21 +327,21 @@ struct PhoneOverviewCard: View {
     private func tile(_ title: String, _ value: Decimal, color: Color = DS.textPrimary, signed: Bool = false,
                       action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 4.5) {
+                HStack(spacing: 3) {
                     Text(title).lineLimit(1).minimumScaleFactor(0.8)
-                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .medium).monospacedDigit())
+                    Image(systemName: "chevron.right").font(.system(size: 9.5, weight: .medium).monospacedDigit())
                 }
-                .font(.system(size: 15, weight: .regular).monospacedDigit())
+                .font(.system(size: 13, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 Text(Fmt.money(value, code, showSign: signed))
-                    .font(DS.money(22))
+                    .font(DS.money(18.5))
                     .foregroundStyle(color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(DS.tile)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -411,22 +411,22 @@ struct PhoneStatisticsCard: View {
         let lineColor = color(mode == .balance ? summary.balance : 1)
         PhoneCard(title: title, icon: "chart.xyaxis.line") {
             Text(trf("Avg: %@", Fmt.money(average, code)))
-                .font(.system(size: 13, weight: .regular).monospacedDigit())
+                .font(.system(size: 11.5, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textTertiary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 6)
             Button { asLine.toggle() } label: {
                 Image(systemName: asLine ? "chart.bar.xaxis" : "chart.xyaxis.line")
-                    .font(.system(size: 15, weight: .regular).monospacedDigit())
+                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
-                    .frame(width: 42, height: 32)
+                    .frame(width: 35.5, height: 27)
                     .background(DS.tile)
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             }
             .buttonStyle(.plain)
         } content: {
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 PhoneFocusChip(text: focus.map {
                     "\(PhoneChartAxis.focus($0.start, period: period))  \(Fmt.money(value($0), code))"
                 } ?? "\(tr("Average")) \(Fmt.money(average, code))")
@@ -469,7 +469,7 @@ struct PhoneStatisticsCard: View {
                 }
                 .chartXSelection(value: $selected)
                 .phoneChartAxes(starts: buckets.map(\.start), period: period, code: code)
-                .frame(height: 240)
+                .frame(height: 165)
                 CapsuleSwitch(options: FlowMode.allCases, selection: $mode) {
                     switch $0 {
                     case .expense: return tr("Exp")
@@ -495,7 +495,7 @@ extension View {
                 AxisValueLabel(centered: false, collisionResolution: .disabled) {
                     if let date = value.as(Date.self) {
                         Text(PhoneChartAxis.label(date, period: period))
-                            .font(.system(size: 13, weight: .regular).monospacedDigit())
+                            .font(.system(size: 11.5, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                 }
@@ -508,7 +508,7 @@ extension View {
                 AxisValueLabel {
                     if let amount = value.as(Double.self) {
                         Text(Fmt.moneyCompact(Decimal(amount), code))
-                            .font(.system(size: 12, weight: .regular).monospacedDigit())
+                            .font(.system(size: 10.5, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                     }
                 }
@@ -551,7 +551,7 @@ struct PhoneCategoriesCard: View {
                     Text(tr("No records in this period"))
                         .font(DS.caption)
                         .foregroundStyle(DS.textTertiary)
-                        .frame(maxWidth: .infinity, minHeight: 140)
+                        .frame(maxWidth: .infinity, minHeight: 117.5)
                 } else {
                     PhoneCalloutDonut(
                         slices: stats.enumerated().map { rank, stat in
@@ -561,29 +561,29 @@ struct PhoneCategoriesCard: View {
                         title: kind.displayName,
                         value: Fmt.money(total, code)
                     ) { kind = kind == .expense ? .income : .expense }
-                    .frame(height: 280)
+                    .frame(height: 205)
                 }
                 CapsuleSwitch(options: [TransactionKind.expense, .income], selection: $kind) {
                     $0 == .expense ? tr("Exp") : tr("Inc")
                 }
-                .padding(.top, 6)
-                .padding(.bottom, 4)
+                .padding(.top, 4.5)
+                .padding(.bottom, 3)
                 ForEach(Array(stats.enumerated()), id: \.element.id) { rank, stat in
                     if showsAll || rank < Self.collapsedCount {
-                        if rank > 0 { Divider().overlay(DS.border.opacity(0.6)).padding(.leading, 56) }
+                        if rank > 0 { Divider().overlay(DS.border.opacity(0.6)).padding(.leading, 43.5) }
                         row(stat, rank: rank)
                     }
                 }
                 if stats.count > Self.collapsedCount {
                     Button { withAnimation(.snappy) { showsAll.toggle() } } label: {
                         Text(showsAll ? tr("Fold") : trf("Show all %d", stats.count))
-                            .font(.system(size: 16, weight: .regular).monospacedDigit())
+                            .font(.system(size: 14, weight: .regular).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .frame(maxWidth: .infinity, minHeight: 37)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, 4)
+                    .padding(.top, 3)
                 }
             }
         }
@@ -604,16 +604,16 @@ struct PhoneCategoriesCard: View {
         let change = compares && stat.change != 0
             ? "\(stat.change > 0 ? "▲" : "▼")\(Fmt.money(abs(stat.change), code)) · " : ""
         return VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                CategoryIcon(name: stat.name, kind: kind, size: 44)
-                VStack(alignment: .leading, spacing: 9) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(spacing: 9) {
+                CategoryIcon(name: stat.name, kind: kind, size: 38.5)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4.5) {
                         Text(CategoryName.label(stat.name))
-                            .font(.system(size: 16, weight: .medium).monospacedDigit())
+                            .font(.system(size: 14, weight: .medium).monospacedDigit())
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                         Text(Fmt.percent(stat.share, decimals: 2, showSign: false))
-                            .font(.system(size: 14.5).monospacedDigit())
+                            .font(.system(size: 13).monospacedDigit())
                             .foregroundStyle(DS.textSecondary)
                             .fixedSize()
                     }
@@ -623,16 +623,16 @@ struct PhoneCategoriesCard: View {
                             Capsule().fill(color).frame(width: max(5, geometry.size.width * stat.share))
                         }
                     }
-                    .frame(height: 6)
+                    .frame(height: 5)
                 }
-                VStack(alignment: .trailing, spacing: 6) {
+                VStack(alignment: .trailing, spacing: 4.5) {
                     Text(Fmt.money(stat.amount, code))
-                        .font(DS.money(17))
+                        .font(DS.money(14.5))
                         .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .fixedSize()
                     Text("\(change)\(stat.count)")
-                        .font(.system(size: 13).monospacedDigit())
+                        .font(.system(size: 11.5).monospacedDigit())
                         .foregroundStyle(DS.textTertiary)
                         .lineLimit(1)
                         .fixedSize()
@@ -647,37 +647,37 @@ struct PhoneCategoriesCard: View {
                     }
                 } label: {
                     Image(systemName: isOpen ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 15, weight: .regular).monospacedDigit())
+                        .font(.system(size: 13, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textTertiary)
-                        .frame(width: 24, height: 44)
+                        .frame(width: 20, height: 37)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.vertical, 12)
+            .padding(.vertical, 9.5)
             .contentShape(Rectangle())
             .onTapGesture { selection = CategorySelection(name: stat.name, level: level, kind: kind) }
             if isOpen {
-                VStack(spacing: 6) {
+                VStack(spacing: 4.5) {
                     ForEach(subs) { sub in
                         Button {
                             selection = CategorySelection(name: sub.name, level: .second, kind: kind)
                         } label: {
-                            HStack(spacing: 10) {
-                                CategoryIcon(name: sub.name, kind: kind, size: 30)
+                            HStack(spacing: 7.5) {
+                                CategoryIcon(name: sub.name, kind: kind, size: 26.5)
                                 Text(CategoryName.label(sub.name))
-                                    .font(.system(size: 15, weight: .regular).monospacedDigit())
+                                    .font(.system(size: 13, weight: .regular).monospacedDigit())
                                     .foregroundStyle(DS.textPrimary)
                                     .lineLimit(1)
                                 Spacer(minLength: 6)
                                 Text("\(Fmt.money(sub.amount, code)) [\(sub.count)/\(Fmt.percent(sub.share, decimals: 2, showSign: false))]")
-                                    .font(.system(size: 14, weight: .regular).monospacedDigit())
+                                    .font(.system(size: 12.5, weight: .regular).monospacedDigit())
                                     .foregroundStyle(DS.textSecondary)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 9)
+                            .padding(.horizontal, 9.5)
+                            .padding(.vertical, 7)
                             .background(DS.tile)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             .contentShape(Rectangle())
@@ -685,8 +685,8 @@ struct PhoneCategoriesCard: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.leading, 28)
-                .padding(.bottom, 12)
+                .padding(.leading, 22)
+                .padding(.bottom, 9.5)
             }
         }
     }
@@ -748,7 +748,7 @@ struct PhoneCalloutDonut: View {
                         Text(callout.percent).monospacedDigit()
                         Text(callout.label)
                     }
-                    .font(.system(size: 11.5, weight: .regular).monospacedDigit())
+                    .font(.system(size: 10, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -756,15 +756,15 @@ struct PhoneCalloutDonut: View {
                     .position(x: textX + (callout.right ? 1 : -1) * (labelWidth / 2 + 3), y: callout.y)
                 }
                 Button(action: onCenterTap) {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 3) {
+                    VStack(spacing: 3) {
+                        HStack(spacing: 2) {
                             Text(title)
-                            Image(systemName: "arrow.left.arrow.right").font(.system(size: 11, weight: .medium).monospacedDigit())
+                            Image(systemName: "arrow.left.arrow.right").font(.system(size: 9.5, weight: .medium).monospacedDigit())
                         }
-                        .font(.system(size: 14, weight: .regular).monospacedDigit())
+                        .font(.system(size: 12.5, weight: .regular).monospacedDigit())
                         .foregroundStyle(DS.textSecondary)
                         Text(value)
-                            .font(DS.money(19))
+                            .font(DS.money(16))
                             .foregroundStyle(DS.textPrimary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
@@ -879,7 +879,7 @@ struct PhoneNetTrendCard: View {
         PhoneCard(title: tr("Net assets trend"), icon: "chart.line.uptrend.xyaxis") {
             Spacer(minLength: 0)
         } content: {
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 if let focus {
                     PhoneFocusChip(text: "\(PhoneChartAxis.focus(focus.date, period: period))  \(Fmt.money(value(focus), code))")
                 }
@@ -913,7 +913,7 @@ struct PhoneNetTrendCard: View {
                 .chartXSelection(value: $selected)
                 .chartYScale(domain: .automatic(includesZero: false))
                 .phoneChartAxes(starts: starts, period: period, code: code)
-                .frame(height: 240)
+                .frame(height: 165)
                 CapsuleSwitch(options: Series.allCases, selection: $series) {
                     switch $0 {
                     case .net: return tr("Net")
@@ -960,7 +960,7 @@ struct PhoneSummaryCard: View {
                     Text(tr("Income"))
                     Text(tr("Balance"))
                 }
-                .font(.system(size: 14, weight: .regular).monospacedDigit())
+                .font(.system(size: 12.5, weight: .regular).monospacedDigit())
                 .foregroundStyle(DS.textSecondary)
                 line(tr("Total"), summary.expense, summary.income, summary.balance, strong: true)
                 line(tr("Average"), summary.averageExpense, summary.averageIncome, summary.averageBalance, strong: true)
@@ -969,7 +969,7 @@ struct PhoneSummaryCard: View {
                     line(label(bucket.start), bucket.expense, bucket.income, bucket.balance, strong: false)
                 }
             }
-            .padding(14)
+            .padding(11)
             .background(DS.tile)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
@@ -987,7 +987,7 @@ struct PhoneSummaryCard: View {
                 .foregroundStyle(balanceColor ? (balance >= 0 ? FlowPalette.income : FlowPalette.expense)
                                               : DS.textPrimary)
         }
-        .font(.system(size: 13, weight: strong ? .medium : .regular).monospacedDigit())
+        .font(.system(size: 11.5, weight: strong ? .medium : .regular).monospacedDigit())
         .lineLimit(1)
         .minimumScaleFactor(0.7)
     }
