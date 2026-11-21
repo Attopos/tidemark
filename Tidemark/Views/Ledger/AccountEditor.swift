@@ -36,7 +36,7 @@ struct AccountTypePreset: Identifiable, Hashable {
         .init(label: "Naver Pay", group: .fund, brand: .glyph("acct-naver", color: 0x03C75A)),
         .init(label: "GrabPay", group: .fund, brand: .glyph("acct-grab", color: 0x00B14F)),
         .init(label: "GoPay", group: .fund, brand: .glyph("acct-gojek", color: 0x00AA13)),
-        .init(label: "Credit Card", group: .credit, brand: .symbol("creditcard.fill", color: 0x4F7183), asksCardNumber: true),
+        .init(label: "Credit Card", group: .credit, brand: .symbol("creditcard.fill", color: 0x8E8A96), asksCardNumber: true),
         .init(label: "Huabei", group: .credit, brand: .glyph("acct-alipay", color: 0x1677FF)),
         .init(label: "Douyin Monthly", group: .credit, brand: .glyph("acct-tiktok", color: 0x000000)),
         .init(label: "Meituan Monthly", group: .credit, brand: .glyph("acct-meituan", color: 0xFFC300)),
@@ -53,12 +53,12 @@ struct AccountTypePreset: Identifiable, Hashable {
         .init(label: "Phone Credit", group: .recharge, brand: .symbol("phone.fill", color: 0x34C759)),
         .init(label: "Gas Card", group: .recharge, brand: .symbol("fuelpump.fill", color: 0xE5484D)),
         .init(label: "Gift Card", group: .recharge, brand: .symbol("gift.fill", color: 0xD94F9A)),
-        .init(label: "Lend", group: .receivable, brand: .symbol("arrow.up.right", color: 0xC93D6E)),
+        .init(label: "Lend", group: .receivable, brand: .symbol("arrow.up.right", color: 0xC4276A)),
         .init(label: "Deposit", group: .receivable, brand: .symbol("lock.fill", color: 0x8E8E93)),
         .init(label: "Reimbursement", group: .receivable, brand: .symbol("arrow.uturn.left", color: 0x30B0C7)),
-        .init(label: "Borrow", group: .payable, brand: .symbol("arrow.down.left", color: 0x4F7183)),
-        .init(label: "Loan", group: .payable, brand: .symbol("building.columns.fill", color: 0x1E3442)),
-        .init(label: "Mortgage", group: .payable, brand: .symbol("house.fill", color: 0x4F7183)),
+        .init(label: "Borrow", group: .payable, brand: .symbol("arrow.down.left", color: 0x8E8A96)),
+        .init(label: "Loan", group: .payable, brand: .symbol("building.columns.fill", color: 0x3A3740)),
+        .init(label: "Mortgage", group: .payable, brand: .symbol("house.fill", color: 0x8E8A96)),
     ]
 }
 
