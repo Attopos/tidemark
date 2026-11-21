@@ -708,7 +708,7 @@ struct PhoneCalloutDonut: View {
             all.append(Callout(
                 id: slice.id,
                 percent: Fmt.percent(slice.share, decimals: 2, showSign: false),
-                label: "\(parts.emoji ?? "")\(parts.label)",
+                label: parts.label,
                 color: slice.color,
                 anchor: CGPoint(x: center.x + (outer + 3) * cos(mid), y: center.y + (outer + 3) * sin(mid)),
                 y: center.y + (outer + 16) * sin(mid),

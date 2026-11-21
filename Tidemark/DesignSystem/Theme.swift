@@ -67,8 +67,8 @@ enum DS {
     static let border       = Color(light: 0xE2E0E5, dark: 0x2A272E)
 
     static let finBlue      = Color(light: 0x5E5A64, dark: 0xB5B1BB)
-    static let positive     = Color(light: 0xD1246C, dark: 0xFF3D8A)
-    static let negative     = Color(light: 0x5E5A64, dark: 0xC9C5CF)
+    static let positive     = Color(light: 0x0F9E6E, dark: 0x3DD9A0)
+    static let negative     = Color(light: 0xE62A78, dark: 0xFF3D8A)
     static let warning      = Color(light: 0x5E5A64, dark: 0xC9C5CF)
 
     static let categorical: [Color] = [
