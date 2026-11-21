@@ -136,12 +136,12 @@ struct PhonePeriodSwitcher: View {
                 Button { select(unit) } label: {
                     Text(unit.title)
                         .font(.system(size: 14, weight: on ? .semibold : .medium).monospacedDigit())
-                        .foregroundStyle(on ? DS.ink : DS.textPrimary)
+                        .foregroundStyle(DS.textPrimary)
                         .lineLimit(1)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {
-                            if on { Capsule().fill(DS.accent).matchedGeometryEffect(id: "pill", in: pill) }
+                            if on { Capsule().fill(DS.selection).matchedGeometryEffect(id: "pill", in: pill) }
                         }
                         .contentShape(Capsule())
                 }

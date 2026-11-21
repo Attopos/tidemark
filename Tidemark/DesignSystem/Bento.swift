@@ -14,7 +14,7 @@ extension DS {
     static let violetDeep = Color(hex: 0x5F5B66)
     static let violetDark = Color(hex: 0x3A3740)
     static let limeSoft = Color(hex: 0xFFB8D4)
-    static let lime = Color(hex: 0xFF3D8A)
+    static let lime = Color(hex: 0xE04A82)
     static let limeDeep = Color(hex: 0xC4276A)
     static let ink = Color(hex: 0x141217)
 
@@ -150,10 +150,10 @@ struct CapsuleSwitch<Value: Hashable>: View {
                         .font(.system(size: compact ? 11.5 : 13, weight: .regular).monospacedDigit())
                         .lineLimit(1)
                         .fixedSize()
-                        .foregroundStyle(selected ? DS.ink : DS.textSecondary)
+                        .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
                         .padding(.horizontal, compact ? 9 : 11)
                         .padding(.vertical, compact ? 3.5 : 5)
-                        .background(selected ? DS.accent : Color.clear)
+                        .background(selected ? DS.selection : Color.clear)
                         .clipShape(Capsule())
                         .contentShape(Capsule())
                 }
