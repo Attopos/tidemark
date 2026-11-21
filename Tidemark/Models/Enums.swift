@@ -393,13 +393,13 @@ enum RiskFamily: CaseIterable {
 extension Exposure {
     var markColor: Color {
         switch self {
-        case .usEquity: return Color(light: 0x8A6CF0, dark: 0xA98BFA)
-        case .intlEquity: return Color(light: 0xA98BFA, dark: 0xCDBDFD)
-        case .chinaEquity: return Color(light: 0x6A4BD6, dark: 0x7E5FE6)
-        case .crypto: return Color(light: 0x5E43B8, dark: 0x5E43B8)
-        case .gold: return Color(light: 0x9CB84A, dark: 0xD5F56B)
-        case .bond: return Color(light: 0x6B8E12, dark: 0x9CB84A)
-        case .cash: return Color(light: 0xB9D95A, dark: 0xE9FAB0)
+        case .usEquity: return Color(light: 0x4F7183, dark: 0x85A3B2)
+        case .intlEquity: return Color(light: 0x85A3B2, dark: 0xB9CCD6)
+        case .chinaEquity: return Color(light: 0x2E4C5E, dark: 0x4F7183)
+        case .crypto: return Color(light: 0x732553, dark: 0xA0457D)
+        case .gold: return Color(light: 0xC93D6E, dark: 0xFF5C8D)
+        case .bond: return Color(light: 0x8E2F5E, dark: 0xC93D6E)
+        case .cash: return Color(light: 0xE58AA8, dark: 0xFFC2D4)
         case .other: return DS.textTertiary
         }
     }
