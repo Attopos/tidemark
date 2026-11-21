@@ -1,22 +1,22 @@
 import SwiftUI
 
 extension DS {
-    static let page = Color(light: 0xF2F2EE, dark: 0x141414)
-    static let panel = Color(light: 0xFFFFFF, dark: 0x1F1F1F)
-    static let tile = Color(light: 0xEBEBE6, dark: 0x2A2A2A)
+    static let page = Color(light: 0xF4EDE6, dark: 0x142030)
+    static let panel = Color(light: 0xFFFBF7, dark: 0x1A2A38)
+    static let tile = Color(light: 0xECE1D6, dark: 0x1E3442)
     static let panelRadius: CGFloat = 22
     static let tileRadius: CGFloat = 18
     static let phoneMargin: CGFloat = 25
     static let phoneTopMargin: CGFloat = 25
 
-    static let violet = Color(hex: 0xA98BFA)
-    static let violetSoft = Color(hex: 0xCDBDFD)
-    static let violetDeep = Color(hex: 0x7E5FE6)
-    static let violetDark = Color(hex: 0x5E43B8)
-    static let limeSoft = Color(hex: 0xE9FAB0)
-    static let lime = Color(hex: 0xD5F56B)
-    static let limeDeep = Color(hex: 0x9CB84A)
-    static let ink = Color(hex: 0x141414)
+    static let violet = Color(hex: 0x85A3B2)
+    static let violetSoft = Color(hex: 0xB9CCD6)
+    static let violetDeep = Color(hex: 0x4F7183)
+    static let violetDark = Color(hex: 0x1E3442)
+    static let limeSoft = Color(hex: 0xFFC2D4)
+    static let lime = Color(hex: 0xFF5C8D)
+    static let limeDeep = Color(hex: 0xC93D6E)
+    static let ink = Color(hex: 0x142030)
 
     static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .regular).monospacedDigit() }
 }
