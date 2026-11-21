@@ -637,8 +637,6 @@ private struct EntryCategoryCell: View {
                         Image(systemName: symbol)
                             .font(.system(size: size * 0.42, weight: .regular).monospacedDigit())
                             .foregroundStyle(selected ? DS.ink : DS.textPrimary)
-                    } else if let emoji = parts.emoji {
-                        Text(emoji).font(.system(size: size * 0.46).monospacedDigit())
                     } else {
                         Text(String(parts.label.prefix(1)).uppercased())
                             .font(.system(size: size * 0.42, weight: .medium).monospacedDigit())
@@ -654,7 +652,7 @@ private struct EntryCategoryCell: View {
                             .offset(x: 3, y: 1)
                     }
                 }
-                Text((parts.emoji ?? "") + parts.label)
+                Text(parts.label)
                     .font(.system(size: 12, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)

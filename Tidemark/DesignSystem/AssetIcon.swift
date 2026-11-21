@@ -125,9 +125,7 @@ struct AssetIcon: View {
     let color: Color
     var size: CGFloat = 30
 
-    private var tint: Color {
-        color == DS.violetDark || color == DS.violetDeep ? DS.violetSoft : color
-    }
+    private var tint: Color { DS.violetSoft }
 
     private func duotone(_ image: PlatformImage, key: String, fill: Bool) -> some View {
         Image(platformImage: AssetIconStore.duotone(image, key: key, tint: tint, inverted: fill))
