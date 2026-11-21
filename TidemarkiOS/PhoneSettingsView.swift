@@ -51,7 +51,7 @@ struct PhoneSettingsView: View {
                               value: app.baseCurrency) { CurrencySettingsView() }
                 }
                 SetupCard {
-                    SetupLink(icon: "globe", color: .teal, title: tr("Language Settings"),
+                    SetupLink(icon: "globe", color: .teal, title: tr("Language"),
                               value: app.language.displayName) { LanguageSettingsView() }
                 }
             }
@@ -231,13 +231,11 @@ struct ProtectionView: View {
                         .tint(.green)
                 }
             }
-            SetupNote(text: trf("Ask for %@ or the device passcode when Tidemark opens or comes back, and hide its content in the app switcher.", lock.biometryName))
             if let message = lock.message {
                 SetupNote(text: message)
             }
             if lock.enabled {
                 SetupChoices(options: AppLock.Delay.allCases, selection: lock.delay, title: \.title) { lock.delay = $0 }
-                SetupNote(text: tr("How long Tidemark may stay in the background before it locks."))
             }
             SetupCard {
                 SetupRowLabel(icon: "chart.pie.fill", color: .purple, title: tr("Portfolio lock")) {
@@ -246,7 +244,6 @@ struct ProtectionView: View {
                         .tint(.green)
                 }
             }
-            SetupNote(text: trf("Ask for %@ or the device passcode each time the Portfolio tab is opened.", lock.biometryName))
         }
     }
 }
@@ -286,7 +283,6 @@ struct BackupSettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
-            SetupNote(text: tr("Saved automatically on this iPhone (Files › On My iPhone › Tidemark › Backups), one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted."))
             if let message = app.backupMessage {
                 SetupNote(text: message)
             } else if let last = app.lastBackup {
@@ -329,7 +325,6 @@ struct CloudSyncSettingsView: View {
                     .buttonStyle(.plain)
                 }
             }
-            SetupNote(text: tr("Records, accounts and presets sync with your other devices through your private iCloud database."))
             if let storageError {
                 SetupNote(text: storageError)
             }
@@ -359,7 +354,6 @@ struct ImportDataView: View {
                 }
                 .buttonStyle(.plain)
             }
-            SetupNote(text: tr("In iCost: Settings → Export Data, then share the file to Tidemark or choose it here. Records already in Tidemark are skipped and records edited in iCost are updated, so importing a newer export adds only what changed."))
             if let error {
                 SetupNote(text: error)
             }
@@ -420,7 +414,6 @@ struct LedgerImportReview: View {
                             row(tr("New accounts"), result.accountsCreated)
                         }
                         SetupNote(text: tr("Imported."))
-                        SetupNote(text: tr("iCost exports carry records but not account balances. If a balance differs from iCost, set it in Assets › ⋯ › Reconcile."))
                     } else if let preview {
                         SetupCard {
                             row(tr("To add"), preview.inserted)
@@ -440,10 +433,8 @@ struct LedgerImportReview: View {
                             }
                         }
                         if preview.updated > 0 {
-                            SetupNote(text: tr("“To update” are records edited in iCost since they were imported; they are changed in place."))
                         }
                         if preview.notInFile > 0 {
-                            SetupNote(text: tr("“Not in this file” are imported records this export no longer has (deleted in iCost?). Nothing is deleted."))
                         }
                     } else if error == nil {
                         ProgressView().frame(maxWidth: .infinity, minHeight: 120)
@@ -520,7 +511,7 @@ struct ExportDataView: View {
                 SetupDivider(inset: 18)
                 SetupChoice(title: app.cashPeriod.title, selected: onlyPeriod) { choose(true) }
             }
-            SetupNote(text: trf("%d records as iCost's import template (.xlsx): in iCost, Settings › Bill Import › Template Import; Tidemark imports it too. Expenses are net of refunds; investment records and balance adjustments are left out.", count))
+            SetupNote(text: trf("%d records", count))
             SetupCard {
                 if let file {
                     ShareLink(item: file) {
@@ -581,7 +572,6 @@ struct CurrencySettingsView: View {
         SetupPage(title: tr("Currency")) {
             SetupChoices(options: AppState.baseCurrencies, selection: app.baseCurrency,
                          title: { "\(Fmt.symbol(for: $0)) \($0)" }) { app.baseCurrency = $0 }
-            SetupNote(text: tr("Totals and charts are shown in this currency."))
         }
     }
 }
@@ -590,7 +580,7 @@ struct LanguageSettingsView: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
-        SetupPage(title: tr("Language Settings")) {
+        SetupPage(title: tr("Language")) {
             SetupChoices(options: AppLanguage.allCases, selection: app.language, title: \.displayName) { app.language = $0 }
         }
     }
