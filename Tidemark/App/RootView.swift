@@ -28,7 +28,7 @@ struct RootView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if [.ledger, .accounts, .analysis].contains(app.section) {
+            if app.section == .ledger {
                 FloatingAddButton { app.addingRecord = true }
                     .keyboardShortcut("n", modifiers: .command)
                     .padding(28)

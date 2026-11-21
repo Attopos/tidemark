@@ -15,7 +15,7 @@ struct SettingsView: View {
                     .padding(.bottom, 10)
 
                 MacSetupCard {
-                    MacSetupRow(icon: "lock.fill", color: .blue, title: tr("Ask for the Mac password to open the portfolio")) {
+                    MacSetupRow(icon: "lock.fill", color: .blue, title: tr("Portfolio lock")) {
                         Toggle("", isOn: $app.portfolioLockEnabled)
                             .labelsHidden()
                             .toggleStyle(.switch)
@@ -29,37 +29,32 @@ struct SettingsView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    MacSetupCard {
-                        MacSetupAction(icon: "square.and.arrow.down.fill", color: .indigo, title: tr("Import bookkeeping export…")) {
-                            app.pickLedgerExport(into: context)
-                        }
-                        MacSetupDivider()
-                        MacSetupAction(icon: "square.and.arrow.up.fill", color: .orange, title: tr("Export for iCost…")) {
-                            app.exportLedger(from: context)
-                        }
+                MacSetupCard {
+                    MacSetupAction(icon: "square.and.arrow.down.fill", color: .indigo, title: tr("Import Data")) {
+                        app.pickLedgerExport(into: context)
                     }
-                    MacSetupNote(text: tr("Reads the .xlsx a bookkeeping app exports (date, type, amount, categories, accounts, remark, currency). Records already imported are skipped, so a newer export can be imported on top."),
-                                 message: app.ledgerImportMessage, failed: app.ledgerImportFailed)
+                    MacSetupDivider()
+                    MacSetupAction(icon: "square.and.arrow.up.fill", color: .orange, title: tr("Export Data")) {
+                        app.exportLedger(from: context)
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    MacSetupCard {
-                        MacSetupAction(icon: "arrow.clockwise.icloud.fill", color: .mint, title: tr("Back up now")) {
-                            app.backUp(context)
-                        }
-                        MacSetupDivider()
-                        MacSetupAction(icon: "doc.badge.arrow.up.fill", color: .mint, title: tr("Export…")) {
-                            app.exportBackup(context)
-                        }
-                        MacSetupDivider()
-                        MacSetupAction(icon: "clock.arrow.circlepath", color: .mint, title: tr("Restore…")) {
-                            app.restoreBackup(context)
-                        }
+                MacSetupCard {
+                    MacSetupAction(icon: "arrow.clockwise.icloud.fill", color: .mint, title: tr("Back up now"),
+                                   value: app.lastBackup.map { Fmt.relative($0) }) {
+                        app.backUp(context)
                     }
-                    MacSetupNote(text: tr("Saved automatically to iCloud Drive › Tidemark, one file per day: holdings, every valuation, ledger records, accounts, rates and settings. Restoring merges the file in; nothing is deleted."),
-                                 message: app.backupMessage ?? app.lastBackup.map { "\(tr("Last backup")) \(Fmt.relative($0))" },
-                                 failed: app.backupMessage != nil && app.backupFailed)
+                    MacSetupDivider()
+                    MacSetupAction(icon: "doc.badge.arrow.up.fill", color: .mint, title: tr("Export backup")) {
+                        app.exportBackup(context)
+                    }
+                    MacSetupDivider()
+                    MacSetupAction(icon: "clock.arrow.circlepath", color: .mint, title: tr("Restore from backup…")) {
+                        app.restoreBackup(context)
+                    }
+                }
+                if app.backupFailed, let message = app.backupMessage {
+                    MacSetupNote(text: message)
                 }
 
                 MacSetupCard {
@@ -74,7 +69,7 @@ struct SettingsView: View {
                 }
 
                 MacSetupCard {
-                    MacSetupMenu(icon: "globe", color: .teal, title: tr("Language Settings"),
+                    MacSetupMenu(icon: "globe", color: .teal, title: tr("Language"),
                                  options: AppLanguage.allCases, selection: $app.language) { $0.displayName }
                 }
             }
@@ -140,12 +135,18 @@ private struct MacSetupAction: View {
     let icon: String
     let color: Color
     let title: String
+    var value: String?
     let action: () -> Void
     @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
             MacSetupRow(icon: icon, color: color, title: title) {
+                if let value {
+                    Text(value)
+                        .font(.system(size: 13).monospacedDigit())
+                        .foregroundStyle(DS.textTertiary)
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
@@ -205,17 +206,11 @@ private struct MacSetupDivider: View {
 
 private struct MacSetupNote: View {
     let text: String
-    var message: String?
-    var failed = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(text).foregroundStyle(DS.textTertiary)
-            if let message {
-                Text(message).foregroundStyle(failed ? DS.warning : DS.textSecondary)
-            }
-        }
-        .font(DS.caption)
+        Text(text)
+            .foregroundStyle(DS.warning)
+            .font(DS.caption)
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
