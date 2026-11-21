@@ -52,42 +52,42 @@ extension NSColor {
 #endif
 
 enum DS {
-    static let bgPrimary    = Color(light: 0xF4EDE6, dark: 0x142030)
-    static let bgSecondary  = Color(light: 0xFFFBF7, dark: 0x1A2A38)
-    static let bgElevated   = Color(light: 0xFFFBF7, dark: 0x1E3442)
+    static let bgPrimary    = Color(light: 0xF6F5F7, dark: 0x0E0D10)
+    static let bgSecondary  = Color(light: 0xFFFFFF, dark: 0x18161B)
+    static let bgElevated   = Color(light: 0xFFFFFF, dark: 0x221F26)
 
-    static let accent       = Color(hex: 0xFF5C8D)
-    static let accentDark   = Color(light: 0xFBDDE6, dark: 0x3A1E33)
-    static let accentText   = Color(light: 0xB8336A, dark: 0xFF5C8D)
+    static let accent       = Color(hex: 0xFF3D8A)
+    static let accentDark   = Color(light: 0xFFE1EC, dark: 0x3A1426)
+    static let accentText   = Color(light: 0xD1246C, dark: 0xFF3D8A)
 
-    static let textPrimary  = Color(light: 0x142030, dark: 0xF4EDE6)
-    static let textSecondary = Color(light: 0x4F5E6B, dark: 0x85A3B2)
-    static let textTertiary = Color(light: 0x7A8C97, dark: 0x5E7584)
+    static let textPrimary  = Color(light: 0x141217, dark: 0xF5F3F6)
+    static let textSecondary = Color(light: 0x5E5A64, dark: 0x9A96A0)
+    static let textTertiary = Color(light: 0x8B8791, dark: 0x6A6670)
 
-    static let border       = Color(light: 0xE5D9CD, dark: 0x263B4B)
+    static let border       = Color(light: 0xE2E0E5, dark: 0x2A272E)
 
-    static let finBlue      = Color(light: 0x4F7183, dark: 0x85A3B2)
-    static let positive     = Color(light: 0xB8336A, dark: 0xFF5C8D)
-    static let negative     = Color(light: 0x4F7183, dark: 0xB9CCD6)
-    static let warning      = Color(light: 0x4F7183, dark: 0xB9CCD6)
+    static let finBlue      = Color(light: 0x5E5A64, dark: 0xB5B1BB)
+    static let positive     = Color(light: 0xD1246C, dark: 0xFF3D8A)
+    static let negative     = Color(light: 0x5E5A64, dark: 0xC9C5CF)
+    static let warning      = Color(light: 0x5E5A64, dark: 0xC9C5CF)
 
     static let categorical: [Color] = [
-        Color(hex: 0x85A3B2), Color(hex: 0xFF5C8D), Color(hex: 0x4F7183),
-        Color(hex: 0xC93D6E), Color(hex: 0xB9CCD6), Color(hex: 0xFFC2D4), Color(hex: 0x732553),
+        Color(hex: 0xFF3D8A), Color(hex: 0xC9C5CF), Color(hex: 0xC4276A),
+        Color(hex: 0x8E8A96), Color(hex: 0xFFB8D4), Color(hex: 0x5F5B66), Color(hex: 0x7A2350),
     ]
-    static let categoricalOther = Color(hex: 0x7A8C97)
+    static let categoricalOther = Color(hex: 0x4A4750)
 
     static func categoryColor(_ index: Int) -> Color {
         index >= 0 && index < categorical.count ? categorical[index] : categoricalOther
     }
 
     static let heroGradient = LinearGradient(
-        colors: [Color(hex: 0xFF8AAE), Color(hex: 0xFF5C8D), Color(hex: 0xE2477A)],
+        colors: [Color(hex: 0xFF5FA0), Color(hex: 0xFF3D8A), Color(hex: 0xE62A78)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
-    static let heroInk = Color(hex: 0x142030)
-    static let heroInkSecondary = Color(hex: 0x142030).opacity(0.62)
+    static let heroInk = Color(hex: 0x141217)
+    static let heroInkSecondary = Color(hex: 0x141217).opacity(0.62)
 
     static let cardRadius: CGFloat = 16
     static let smallRadius: CGFloat = 10

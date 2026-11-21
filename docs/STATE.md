@@ -5,15 +5,15 @@
 ## 现在
 
 日常记账用 Tidemark（从 2026-11-16 起）；iCost 导出（2026-11-15，2658 行）已导入，iPhone 与 Mac 同步一致。
-主色调换成用户给的 MP088 配色：草莓粉 #FF5C8D 为主色（收入、正数、选中），蓝灰 #85A3B2/#4F7183 为辅色（支出、负数），深色底 #142030/#1A2A38/#1E3442，浅色底偏暖 #F4EDE6，文字 #142030 / #F4EDE6。只改了 DS 色值（Theme、Bento）和资产类别、账本、账户预设里的硬编码色，token 名（lime、violet）没改。
-App 图标：黑底粉色缺口圆环 + 浪（Design/AppIcon 四个 SVG 渲染成 PNG），Mac 本机已重装为新图标；图标仍是 ACdian 的 #D93B86/#141217，未跟主色统一。
+配色是「中性黑 + 一个粉」：底色和卡片用不带色相的近黑（#0E0D10 / #18161B / #221F26，浅色模式 #F6F5F7 / 白），文字和次要信息全用灰阶，亮粉 #FF3D8A 只留给选中、主按钮、收入/正数和对冲类资产；支出、负数、风险资产、图表辅色都是灰。token 名（lime=粉、violet=灰）没改。
+App 图标：黑底粉色缺口圆环 + 浪（Design/AppIcon 四个 SVG 渲染成 PNG），粉色已统一成 #FF3D8A，Mac 本机已重装。
 iPhone 账本页顶部只剩标题和月份切换；隐藏金额的小眼睛放在各页大金额标签旁。点开账单进入「账单详情」（RecordDetailView，iPhone/Mac 共用），点哪一行只改那一项。
 资产页照 iCost 排版，账户图标用开源圆形图标（Resources/AccountIcons，来源见 SOURCES-account-icons.md）；余额已按 iCost 截图对齐（2026-11-18），负债记在「YEB Credit」。
 字体 SF Pro Rounded、等宽数字，全站共用字号表 TS 和卡片组件（TypeScale.swift、Cards.swift）。导出仍是 iCost 导入模板（10 列）。
 
 ## 下一步
 
-- 用户看新配色和新图标（Mac 已装；iPhone 新配色还没发 TestFlight），决定图标是否改用 #FF5C8D/#142030 与主色统一。
+- 用户看新配色（Mac 已装；iPhone 的新配色和新粉图标还没发 TestFlight，build 6 是旧粉 + 旧青柠界面）。
 - 用户在 iPhone 上看一遍详情页、资产页、字体和录入手感；「YEB Credit」名字暂定。
 - 收起录入面板的第一帧仍有约 100 ms（系统模糊和阴影），没再动。
 

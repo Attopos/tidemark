@@ -35,10 +35,10 @@ struct LedgerSnapshot {
 }
 
 enum FlowPalette {
-    static let expense = Color(light: 0x4F7183, dark: 0x85A3B2)
-    static let income = Color(light: 0xC93D6E, dark: 0xFF5C8D)
+    static let expense = Color(light: 0x3A3740, dark: 0xC9C5CF)
+    static let income = Color(light: 0xE62A78, dark: 0xFF3D8A)
     private static let expenseRamp = [expense, DS.violetSoft, DS.violetDeep, DS.violetDark]
-    private static let incomeRamp = [income, Color(light: 0xE58AA8, dark: 0xFFC2D4), DS.limeDeep]
+    private static let incomeRamp = [income, Color(light: 0xF27DAE, dark: 0xFFB8D4), DS.limeDeep]
 
     static func color(kind: TransactionKind, rank: Int) -> Color {
         let ramp = kind == .income ? incomeRamp : expenseRamp
