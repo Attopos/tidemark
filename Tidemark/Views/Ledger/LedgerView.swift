@@ -282,7 +282,7 @@ struct MonthCalendar: View {
         let selected = cell.inMonth && (selectedDay.map { calendar.isDate($0, inSameDayAs: bucket.start) } ?? false)
         let isToday = calendar.isDateInToday(bucket.start)
         let begun = bucket.start <= Date()
-        let ink = selected ? DS.ink.opacity(0.75) : nil
+        let ink: Color? = nil
         return Button {
             if !cell.inMonth { period = CashPeriod(unit: .month, containing: bucket.start) }
             selectedDay = bucket.start
@@ -290,7 +290,7 @@ struct MonthCalendar: View {
             VStack(spacing: 1) {
                 Text("\(calendar.component(.day, from: bucket.start))")
                     .font(.system(size: 13, weight: isToday ? .semibold : .medium).monospacedDigit())
-                    .foregroundStyle(selected ? DS.ink : (isToday ? DS.accentText : DS.textPrimary))
+                    .foregroundStyle(selected || isToday ? DS.accentText : DS.textPrimary)
                 Text(begun ? "-\(compact(bucket.expense))" : " ")
                     .foregroundStyle(ink ?? (bucket.expense > 0 ? FlowPalette.expense : DS.textTertiary))
                 Text(begun ? "+\(compact(bucket.income))" : " ")
@@ -301,7 +301,7 @@ struct MonthCalendar: View {
             .minimumScaleFactor(0.7)
             .frame(maxWidth: .infinity)
             .frame(height: 50)
-            .background(selected ? DS.accent : DS.tile.opacity(bucket.expense > 0 || bucket.income > 0 ? 1 : 0.45))
+            .background(selected ? DS.accentDark : DS.tile.opacity(bucket.expense > 0 || bucket.income > 0 ? 1 : 0.45))
             .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .opacity(cell.inMonth ? 1 : 0.4)
             .contentShape(Rectangle())

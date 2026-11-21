@@ -148,9 +148,9 @@ private struct SectionRail: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
-            .foregroundStyle(selected ? DS.ink : DS.textSecondary)
+            .foregroundStyle(selected ? DS.accentText : DS.textSecondary)
             .frame(width: 60, height: 52)
-            .background(selected ? DS.accent : Color.clear)
+            .background(selected ? DS.accentDark : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
             .contentShape(Rectangle())
         }
