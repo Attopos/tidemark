@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftData
 
 struct CustomCategory: Codable, Hashable, Identifiable {
     var kind: String
@@ -65,6 +66,24 @@ final class CategoryStyles {
 
     func remove(_ entry: CustomCategory) {
         catalog.custom.removeAll { $0 == entry || ($0.kind == entry.kind && $0.parent == entry.name && entry.parent.isEmpty) }
+        save()
+    }
+
+    func rename(kind: TransactionKind, name: String, parent: String, to newName: String) {
+        let oldKey = Self.iconKey(kind, name)
+        if let symbol = catalog.icons.removeValue(forKey: oldKey) {
+            catalog.icons[Self.iconKey(kind, newName)] = symbol
+        }
+        for index in catalog.custom.indices where catalog.custom[index].kind == kind.rawValue {
+            if catalog.custom[index].name == name && catalog.custom[index].parent == parent {
+                catalog.custom[index].name = newName
+            }
+            if parent.isEmpty && catalog.custom[index].parent == name {
+                catalog.custom[index].parent = newName
+            }
+        }
+        var seen = Set<CustomCategory>()
+        catalog.custom = catalog.custom.filter { seen.insert($0).inserted }
         save()
     }
 
@@ -142,5 +161,51 @@ enum CategoryIconLibrary {
             let haystack = ([symbol] + (file.keywords[symbol] ?? [])).joined(separator: " ")
             return words.allSatisfy { haystack.contains($0) }
         }
+    }
+}
+
+enum CategoryRenamer {
+    @MainActor
+    static func rename(kind: TransactionKind, name: String, parent: String, to newName: String,
+                       in context: ModelContext) throws -> Int {
+        guard newName != name, !newName.isEmpty else { return 0 }
+        let changed = try renameRecords(kind: kind, name: name, parent: parent, to: newName, in: context)
+        CategoryStyles.shared.rename(kind: kind, name: name, parent: parent, to: newName)
+        return changed
+    }
+
+    @MainActor
+    static func renameRecords(kind: TransactionKind, name: String, parent: String, to newName: String,
+                              in context: ModelContext) throws -> Int {
+        let kindRaw = kind.rawValue
+        var changed = 0
+        if parent.isEmpty {
+            let records = try context.fetch(FetchDescriptor<Transaction>(
+                predicate: #Predicate { $0.kindRaw == kindRaw && $0.category == name }))
+            for record in records { record.category = newName; changed += 1 }
+            let presets = try context.fetch(FetchDescriptor<RecordPreset>(
+                predicate: #Predicate { $0.kindRaw == kindRaw && $0.category == name }))
+            for preset in presets { preset.category = newName }
+            if kind == .expense {
+                let commitments = try context.fetch(FetchDescriptor<RecurringCommitment>(
+                    predicate: #Predicate { $0.category == name }))
+                for commitment in commitments { commitment.category = newName }
+            }
+        } else {
+            let records = try context.fetch(FetchDescriptor<Transaction>(
+                predicate: #Predicate { $0.kindRaw == kindRaw && $0.category == parent && $0.subcategory == name }))
+            for record in records { record.subcategory = newName; changed += 1 }
+            let presets = try context.fetch(FetchDescriptor<RecordPreset>(
+                predicate: #Predicate { $0.kindRaw == kindRaw && $0.category == parent && $0.subcategory == name }))
+            for preset in presets { preset.subcategory = newName }
+        }
+        try context.save()
+        return changed
+    }
+
+    static func fullName(replacingLabelOf name: String, with label: String) -> String {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let emoji = CategoryName.split(name).emoji else { return trimmed }
+        return "\(emoji) \(trimmed)"
     }
 }

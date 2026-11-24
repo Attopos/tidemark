@@ -31,4 +31,27 @@ final class CategoryStylesTests: XCTestCase {
         XCTAssertTrue(stats.categories[.expense]?.contains("Pets zz") ?? false)
         XCTAssertEqual(stats.subcategories[.expense]?["Pets zz"], ["Vet zz"])
     }
+
+    func testRenameUpdatesRecordsAndPresets() throws {
+        let container = try TidemarkSchema.makeContainer(inMemory: true)
+        let context = container.mainContext
+        let account = Account(name: "Cash", kind: .payment)
+        context.insert(account)
+        context.insert(Transaction(date: Date(), kind: .expense, amount: 5, category: "Food", subcategory: "Meal", account: account))
+        context.insert(Transaction(date: Date(), kind: .expense, amount: 6, category: "Food", subcategory: "Fruit", account: account))
+        context.insert(Transaction(date: Date(), kind: .income, amount: 7, category: "Food", account: account))
+        let preset = RecordPreset(name: "Lunch", kind: .expense, amount: 5)
+        preset.category = "Food"; preset.subcategory = "Meal"
+        context.insert(preset)
+        try context.save()
+
+        XCTAssertEqual(try CategoryRenamer.renameRecords(kind: .expense, name: "Meal", parent: "Food", to: "Dinner", in: context), 1)
+        XCTAssertEqual(try CategoryRenamer.renameRecords(kind: .expense, name: "Food", parent: "", to: "Eating", in: context), 2)
+        let records = try context.fetch(FetchDescriptor<Transaction>())
+        XCTAssertEqual(Set(records.filter { $0.kind == .expense }.map { "\($0.category)/\($0.subcategory)" }), ["Eating/Dinner", "Eating/Fruit"])
+        XCTAssertEqual(records.first { $0.kind == .income }?.category, "Food")
+        XCTAssertEqual(preset.category, "Eating")
+        XCTAssertEqual(preset.subcategory, "Dinner")
+        XCTAssertEqual(CategoryRenamer.fullName(replacingLabelOf: "🍔 Food", with: "Eating"), "🍔 Eating")
+    }
 }
