@@ -1,0 +1,3 @@
+# Category icons
+
+category-icons.json lists SF Symbols names only; the glyphs come from the system at run time, so nothing from Apple is bundled. Generated from /System/Library/CoreServices/CoreGlyphs.bundle (symbol_order, symbol_categories, name_availability, symbol_search): outline symbols available on macOS 15 and iOS 18, without .fill/.circle/.square/.slash/.badge variants or symbols Apple restricts to its own products, grouped by Apple's categories, plus a Common group of the glyphs auto-matched by category name. Keywords are Apple's search terms. SF Symbols are licensed for use in apps on Apple platforms.

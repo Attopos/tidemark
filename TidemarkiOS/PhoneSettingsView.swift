@@ -42,6 +42,17 @@ struct PhoneSettingsView: View {
                                 PhoneHeader(title: tr("Periodic Records")) { PhoneBackButton() } trailing: { EmptyView() }
                             }
                     }
+                    SetupDivider()
+                    SetupLink(icon: "square.grid.2x2.fill", color: .pink, title: tr("Categories")) {
+                        CategoryManagerView(showsDone: false)
+                            .padding(.horizontal, DS.phoneMargin)
+                            .padding(.vertical, 16)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .background(DS.page)
+                            .phoneHeader {
+                                PhoneHeader(title: tr("Categories")) { PhoneBackButton() } trailing: { EmptyView() }
+                            }
+                    }
                 }
                 SetupCard {
                     SetupLink(icon: "sun.max.fill", color: .yellow, title: tr("Appearance"),

@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
     @State private var showsPresets = false
+    @State private var showsCategories = false
 
     var body: some View {
         @Bindable var app = app
@@ -61,6 +62,10 @@ struct SettingsView: View {
                     MacSetupAction(icon: "repeat", color: .green, title: tr("Periodic Records")) {
                         showsPresets = true
                     }
+                    MacSetupDivider()
+                    MacSetupAction(icon: "square.grid.2x2.fill", color: .pink, title: tr("Categories")) {
+                        showsCategories = true
+                    }
                 }
 
                 MacSetupCard {
@@ -82,6 +87,7 @@ struct SettingsView: View {
         .scrollIndicators(.hidden)
         .background(DS.page)
         .sheet(isPresented: $showsPresets) { PresetsView() }
+        .sheet(isPresented: $showsCategories) { CategoryManagerView() }
     }
 }
 
