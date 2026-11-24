@@ -146,4 +146,15 @@ final class BinanceParserTests: XCTestCase {
                                           base: "CNY")
         XCTAssertEqual(converter.toBase(500, "USD"), 3500)
     }
+
+    func testLetterOInQuantityAndFlippedDollarDetection() {
+        XCTAssertTrue(BinanceScreenshotParser.isBareQuantity("O.472080818"))
+        XCTAssertEqual(BinanceScreenshotParser.digitsRepaired("O.472080818"), "0.472080818")
+        XCTAssertFalse(BinanceScreenshotParser.isBareQuantity("OO"))
+        XCTAssertFalse(BinanceScreenshotParser.isBareQuantity("IO"))
+        XCTAssertTrue(ScreenshotOCRService.looksFlipped("SL DSL$"))
+        XCTAssertTrue(ScreenshotOCRService.looksFlipped("^LE$-"))
+        XCTAssertFalse(ScreenshotOCRService.looksFlipped("$754.75"))
+        XCTAssertFalse(ScreenshotOCRService.looksFlipped("-$3.7"))
+    }
 }

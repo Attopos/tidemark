@@ -107,6 +107,8 @@ struct CategoryEditTarget: Identifiable {
 
 private struct CategoryEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @State private var failure: String?
     let target: CategoryEditTarget
     let parents: [String]
 
@@ -161,10 +163,13 @@ private struct CategoryEditor: View {
                         .pickerStyle(.menu)
                     }
                 } else {
-                    Text(CategoryName.label(target.name))
+                    TextField(tr("Name"), text: $name)
+                        .textFieldStyle(.plain)
                         .font(.system(size: 17))
-                        .foregroundStyle(DS.textPrimary)
-                    Spacer()
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(DS.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: DS.smallRadius, style: .continuous))
                     if styles.isCustom(kind: target.kind, name: target.name, parent: target.parent) {
                         Button(tr("Delete"), role: .destructive) {
                             styles.remove(CustomCategory(kind: target.kind.rawValue, name: target.name, parent: target.parent))
@@ -174,6 +179,9 @@ private struct CategoryEditor: View {
                     }
                 }
             }
+            if let failure {
+                Text(failure).font(DS.caption).foregroundStyle(DS.negative)
+            }
             CategoryIconPicker(selection: $symbol)
         }
         .padding(18)
@@ -182,7 +190,7 @@ private struct CategoryEditor: View {
         #endif
         .background(DS.page)
         .onAppear {
-            name = target.name
+            name = target.isNew ? "" : CategoryName.label(target.name)
             parent = target.parent
             symbol = target.isNew ? nil
                 : styles.symbol(kind: target.kind, name: target.name) ?? EntryGlyph.symbol(for: target.name)
@@ -197,6 +205,16 @@ private struct CategoryEditor: View {
             styles.add(name: trimmed, parent: parent, kind: target.kind, symbol: symbol)
         } else {
             styles.setSymbol(symbol, kind: target.kind, name: target.name)
+            let renamed = CategoryRenamer.fullName(replacingLabelOf: target.name, with: trimmed)
+            if renamed != target.name {
+                do {
+                    _ = try CategoryRenamer.rename(kind: target.kind, name: target.name, parent: target.parent,
+                                                   to: renamed, in: context)
+                } catch {
+                    failure = error.localizedDescription
+                    return
+                }
+            }
         }
         dismiss()
     }

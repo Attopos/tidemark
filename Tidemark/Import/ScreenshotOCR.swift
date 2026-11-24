@@ -45,7 +45,7 @@ enum ScreenshotOCRService {
                 if lines.isEmpty {
                     continuation.resume(throwing: OCRError.noText)
                 } else {
-                    continuation.resume(returning: lines)
+                    continuation.resume(returning: lines.map { reread($0, in: cgImage) })
                 }
             }
             request.recognitionLevel = .accurate
@@ -60,6 +60,34 @@ enum ScreenshotOCRService {
                 }
             }
         }
+    }
+}
+
+extension ScreenshotOCRService {
+    static func looksFlipped(_ text: String) -> Bool {
+        guard text.contains("$") else { return false }
+        return text.range(of: #"\$\s*-?\s*$"#, options: .regularExpression) != nil || text.contains("^")
+    }
+
+    static func reread(_ line: RecognizedLine, in image: CGImage) -> RecognizedLine {
+        guard looksFlipped(line.text) else { return line }
+        let width = CGFloat(image.width), height = CGFloat(image.height)
+        let pad = line.box.height * height * 0.6
+        let rect = CGRect(x: line.box.minX * width - pad, y: (1 - line.box.maxY) * height - pad,
+                          width: line.box.width * width + pad * 2, height: line.box.height * height + pad * 2)
+            .integral.intersection(CGRect(x: 0, y: 0, width: width, height: height))
+        guard !rect.isEmpty, let crop = image.cropping(to: rect) else { return line }
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        request.usesLanguageCorrection = false
+        guard (try? VNImageRequestHandler(cgImage: crop, options: [:]).perform([request])) != nil else { return line }
+        let candidates = (request.results ?? []).compactMap { $0.topCandidates(1).first }
+        guard let best = candidates.first(where: { candidate in
+            let t = candidate.string.trimmingCharacters(in: .whitespaces)
+            return t.range(of: #"^[-+]?\s*\$\s*\d"#, options: .regularExpression) != nil
+        }) else { return line }
+        return RecognizedLine(text: best.string, box: line.box, confidence: Double(best.confidence))
     }
 }
 

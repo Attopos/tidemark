@@ -81,9 +81,14 @@ enum BinanceScreenshotParser {
         return t.range(of: #"^[-+]\s*\$"#, options: .regularExpression) != nil
     }
 
-    static func isBareQuantity(_ text: String) -> Bool {
+    static func digitsRepaired(_ text: String) -> String {
         let t = normalized(text).replacingOccurrences(of: " ", with: "")
-        return t.range(of: #"^\d[\d,]*(\.\d+)?$"#, options: .regularExpression) != nil
+        let mapped = String(t.map { "Oo".contains($0) ? "0" : "lI".contains($0) ? "1" : $0 })
+        return t.filter(\.isNumber).count >= max(3, t.count - 2) ? mapped : t
+    }
+
+    static func isBareQuantity(_ text: String) -> Bool {
+        digitsRepaired(text).range(of: #"^\d[\d,]*(\.\d+)?$"#, options: .regularExpression) != nil
     }
 
     static func cleanLabel(_ text: String) -> String {
@@ -170,7 +175,7 @@ enum BinanceScreenshotParser {
             let priceValue = price.flatMap(dollarValue)
             let marketValue = value.flatMap(dollarValue)
 
-            var quantity = AlipayScreenshotParser.extractNumber(qtyLine.text)?.value
+            var quantity = AlipayScreenshotParser.extractNumber(digitsRepaired(qtyLine.text))?.value
             var consistent = false
             var repaired = false
             if let q = quantity, let p = priceValue, let v = marketValue {
@@ -223,7 +228,7 @@ enum BinanceScreenshotParser {
     }
 
     static func repairDecimal(_ text: String, price: Decimal, value: Decimal) -> Decimal? {
-        let digits = normalized(text).filter(\.isNumber)
+        let digits = digitsRepaired(text).filter(\.isNumber)
         guard digits.count >= 2, price > 0 else { return nil }
         var fits: [Decimal] = []
         for split in 1..<digits.count {
