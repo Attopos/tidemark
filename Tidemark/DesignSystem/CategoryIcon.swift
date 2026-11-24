@@ -59,7 +59,7 @@ struct CategoryIcon: View {
         let parts = CategoryName.split(name)
         ZStack {
             Circle().fill(DS.bgElevated)
-            if let symbol = EntryGlyph.symbol(for: name) ?? CategoryName.glyph(for: name) ?? (kind.isConsumptionFlow ? nil : kind.icon) {
+            if let symbol = CategoryStyles.shared.symbol(kind: kind, name: name) ?? EntryGlyph.symbol(for: name) ?? CategoryName.glyph(for: name) ?? (kind.isConsumptionFlow ? nil : kind.icon) {
                 Image(systemName: symbol)
                     .font(.system(size: size * 0.4, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)

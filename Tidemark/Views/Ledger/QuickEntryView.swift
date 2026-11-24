@@ -130,6 +130,17 @@ struct EntryStats {
         }
         for (kind, counts) in top { stats.categories[kind] = ranked(counts) }
         for (kind, parents) in second { stats.subcategories[kind] = parents.mapValues(ranked) }
+        for entry in CategoryStyles.stored().custom {
+            guard let kind = TransactionKind(rawValue: entry.kind) else { continue }
+            if entry.parent.isEmpty {
+                if !(stats.categories[kind] ?? []).contains(entry.name) { stats.categories[kind, default: []].append(entry.name) }
+            } else {
+                var subs = stats.subcategories[kind]?[entry.parent] ?? []
+                if !subs.contains(entry.name) { subs.append(entry.name) }
+                stats.subcategories[kind, default: [:]][entry.parent] = subs
+                if !(stats.categories[kind] ?? []).contains(entry.parent) { stats.categories[kind, default: []].append(entry.parent) }
+            }
+        }
         return stats
     }
 }
@@ -341,14 +352,14 @@ struct QuickEntryView: View {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                     LazyVGrid(columns: columns, spacing: 18) {
                         ForEach(row, id: \.self) { name in
-                            EntryCategoryCell(name: name, selected: category == name, size: 46,
+                            EntryCategoryCell(name: name, kind: kind, selected: category == name, size: 46,
                                               hasChildren: !subs(name).isEmpty) { pick(name) }
                         }
                     }
                     if row.contains(category), !subs(category).isEmpty {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(subs(category), id: \.self) { name in
-                                EntryCategoryCell(name: name, selected: subcategory == name, size: 42,
+                                EntryCategoryCell(name: name, kind: kind, selected: subcategory == name, size: 42,
                                                   hasChildren: false) {
                                     subcategory = subcategory == name ? "" : name
                                 }
@@ -622,6 +633,7 @@ enum EntryGlyph {
 
 private struct EntryCategoryCell: View {
     let name: String
+    let kind: TransactionKind
     let selected: Bool
     let size: CGFloat
     let hasChildren: Bool
@@ -633,7 +645,7 @@ private struct EntryCategoryCell: View {
             VStack(spacing: 7) {
                 ZStack {
                     Circle().fill(selected ? DS.accent : DS.bgElevated)
-                    if let symbol = EntryGlyph.symbol(for: name) {
+                    if let symbol = CategoryStyles.shared.symbol(kind: kind, name: name) ?? EntryGlyph.symbol(for: name) {
                         Image(systemName: symbol)
                             .font(.system(size: size * 0.42, weight: .regular).monospacedDigit())
                             .foregroundStyle(selected ? DS.ink : DS.textPrimary)

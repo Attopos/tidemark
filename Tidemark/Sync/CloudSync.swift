@@ -119,6 +119,14 @@ final class CloudSync {
         NSApplication.shared.registerForRemoteNotifications()
         let active = NSApplication.didBecomeActiveNotification
         #endif
+        observers.append(NotificationCenter.default.addObserver(
+            forName: CategoryStyles.didChange, object: nil, queue: .main) { [weak self] _ in
+                UserDefaults.standard.set(true, forKey: Self.catalogDirtyKey)
+                Task { @MainActor in
+                    self?.catalogRetryAt = .distantPast
+                    self?.fetchNow()
+                }
+            })
         observers.append(NotificationCenter.default.addObserver(forName: active, object: nil, queue: .main) {
             [weak self] _ in Task { @MainActor in self?.fetchNow() }
         })
@@ -176,6 +184,11 @@ final class CloudSync {
                 _ = try await database.deleteRecord(withID: ckRecord.recordID)
                 log("schema seed: \(type) with \(fields.count) fields")
             }
+            let catalog = CKRecord(recordType: Self.catalogType, recordID: recordID("schema-seed-C"))
+            catalog["json"] = "{}"
+            _ = try await database.save(catalog)
+            _ = try await database.deleteRecord(withID: catalog.recordID)
+            log("schema seed: \(Self.catalogType) with 1 field")
             log("schema seed done")
         } catch {
             log("schema seed failed: \(error)")
@@ -274,6 +287,7 @@ final class CloudSync {
                 persist()
                 log("zone ready")
             }
+            await pushCatalog(to: database)
             try await push(to: database)
             try await pull(from: database)
             if case .off = phase { return }
@@ -575,7 +589,9 @@ final class CloudSync {
         var more = true
         while more {
             let changes = try await database.recordZoneChanges(inZoneWith: Self.zoneID, since: token)
-            let modifications = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+            let fetched = changes.modificationResultsByID.values.compactMap { try? $0.get().record }
+            applyCatalog(fetched.filter { $0.recordType == Self.catalogType })
+            let modifications = fetched.filter { $0.recordType != Self.catalogType }
             let deletions = changes.deletions.map(\.recordID.recordName)
             applyFetched(modifications: modifications, deletions: deletions)
             token = changes.changeToken
@@ -586,6 +602,47 @@ final class CloudSync {
             state.token = archived
             persist()
         }
+    }
+
+    nonisolated static let catalogType = "CategoryCatalog"
+    nonisolated static let catalogDirtyKey = "categoryCatalogDirty"
+    private var catalogRecordID: CKRecord.ID { recordID("category-catalog") }
+    private var catalogRetryAt = Date.distantPast
+
+    private func pushCatalog(to database: CKDatabase) async {
+        guard UserDefaults.standard.bool(forKey: Self.catalogDirtyKey), Date() >= catalogRetryAt,
+              let data = try? JSONEncoder().encode(CategoryStyles.shared.catalog),
+              let json = String(data: data, encoding: .utf8) else { return }
+        do {
+            let existing = try? await database.record(for: catalogRecordID)
+            if let existing, let remote = Self.catalog(from: existing),
+               remote.updatedAt > CategoryStyles.shared.catalog.updatedAt {
+                CategoryStyles.shared.replace(with: remote)
+                UserDefaults.standard.set(false, forKey: Self.catalogDirtyKey)
+                return
+            }
+            let record = existing ?? CKRecord(recordType: Self.catalogType, recordID: catalogRecordID)
+            record["json"] = json
+            let result = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
+            for outcome in result.saveResults.values { _ = try outcome.get() }
+            UserDefaults.standard.set(false, forKey: Self.catalogDirtyKey)
+            log("category catalog sent")
+        } catch {
+            catalogRetryAt = Date().addingTimeInterval(600)
+            log("category catalog not sent: \(String(describing: error).prefix(160))")
+        }
+    }
+
+    private func applyCatalog(_ records: [CKRecord]) {
+        for record in records {
+            guard let remote = Self.catalog(from: record) else { continue }
+            CategoryStyles.shared.replace(with: remote)
+        }
+    }
+
+    private static func catalog(from record: CKRecord) -> CategoryCatalog? {
+        guard let json = record["json"] as? String, let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(CategoryCatalog.self, from: data)
     }
 
     private func record(for recordID: CKRecord.ID, index: Index) -> CKRecord? {
