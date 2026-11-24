@@ -35,7 +35,7 @@ struct LedgerSnapshot {
 }
 
 enum FlowPalette {
-    static let expense = Color(light: 0xD63C78, dark: 0xE04A82)
+    static let expense = Color(hex: 0xD93B86)
     static let income = Color(light: 0x0F9E6E, dark: 0x3DD9A0)
     private static let expenseRamp = [expense, Color(light: 0xEE8AB2, dark: 0xF08DB5), Color(light: 0xA81F5A, dark: 0xC4276A), Color(light: 0x6A1E45, dark: 0x7A2350)]
     private static let incomeRamp = [income, Color(light: 0x6FCFA8, dark: 0x9BEBC9), Color(light: 0x0B6E4D, dark: 0x1F8A63)]
