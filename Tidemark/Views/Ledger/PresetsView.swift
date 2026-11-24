@@ -178,8 +178,8 @@ struct PresetEditor: View {
         _kind = State(initialValue: preset?.kind ?? (type == .instalment ? .liabilityPayment : .expense))
         _amountText = State(initialValue: preset.map { text($0.amount) } ?? "")
         _currency = State(initialValue: preset?.currencyCode ?? "CNY")
-        _category = State(initialValue: preset?.category ?? "")
-        _subcategory = State(initialValue: preset?.subcategory ?? "")
+        _category = State(initialValue: CategoryName.label(preset?.category ?? ""))
+        _subcategory = State(initialValue: CategoryName.label(preset?.subcategory ?? ""))
         _accountID = State(initialValue: preset?.accountID)
         _transferAccountID = State(initialValue: preset?.transferAccountID)
         _note = State(initialValue: preset?.note ?? "")
@@ -330,8 +330,10 @@ struct PresetEditor: View {
         target.amount = amount
         target.currencyCode = currency.trimmingCharacters(in: .whitespaces).uppercased().isEmpty
             ? "CNY" : currency.trimmingCharacters(in: .whitespaces).uppercased()
-        target.category = isFlow ? category.trimmingCharacters(in: .whitespaces) : (kind == .liabilityPayment ? "Repayment" : "Transfer")
-        target.subcategory = isFlow ? subcategory.trimmingCharacters(in: .whitespaces) : ""
+        let stats = EntryStats.load(context)
+        let parent = CategoryName.resolve(category, among: stats.categories[kind] ?? [])
+        target.category = isFlow ? parent : (kind == .liabilityPayment ? "Repayment" : "Transfer")
+        target.subcategory = isFlow ? CategoryName.resolve(subcategory, among: stats.subcategories[kind]?[parent] ?? []) : ""
         target.accountID = accountID
         target.transferAccountID = isFlow ? nil : transferAccountID
         target.note = note

@@ -196,7 +196,7 @@ struct LedgerView: View {
         if !query.isEmpty {
             title = trf("Results for “%@”", search)
             shown = transactions.filter { transaction in
-                [transaction.category, transaction.subcategory, transaction.note,
+                [CategoryName.label(transaction.category), CategoryName.label(transaction.subcategory), transaction.note,
                  transaction.address, transaction.account?.name ?? "", transaction.transferAccount?.name ?? "",
                  "\(transaction.amount)"].contains { $0.lowercased().contains(query) }
             }

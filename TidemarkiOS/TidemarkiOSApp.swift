@@ -32,7 +32,10 @@ struct TidemarkiOSApp: App {
                 .environment(appState)
                 .environment(appLock)
                 .environment(sync)
-                .task { sync?.start() }
+                .task {
+                    if sync != nil { CategorySymbolMigration.runIfNeeded(container.mainContext) }
+                    sync?.start()
+                }
         }
         .modelContainer(container)
     }

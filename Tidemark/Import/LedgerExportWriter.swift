@@ -29,10 +29,10 @@ enum LedgerExportWriter {
             var amount = record.amount
             switch record.kind {
             case .expense:
-                type = "支出"; category = record.category; subcategory = record.subcategory
+                type = "支出"; category = CategoryName.withoutSymbol(record.category); subcategory = CategoryName.withoutSymbol(record.subcategory)
                 amount = max(0, record.amount - record.refundAmount)
             case .income:
-                type = "收入"; category = record.category; subcategory = record.subcategory
+                type = "收入"; category = CategoryName.withoutSymbol(record.category); subcategory = CategoryName.withoutSymbol(record.subcategory)
             case .liabilityPayment:
                 type = "转账"; category = "Repayment"; subcategory = ""
             default:

@@ -509,13 +509,14 @@ struct QuickEntryView: View {
     #endif
 
     private func apply(_ draft: ReceiptDraft) {
-        let name = draft.category ?? ""
+        let name = CategoryName.resolve(draft.category ?? "", among: stats.categories[draft.kind] ?? [])
+        let sub = CategoryName.resolve(draft.subcategory ?? "", among: stats.subcategories[draft.kind]?[name] ?? [])
         if draft.kind != kind && Self.kinds.contains(draft.kind) {
-            if !name.isEmpty { carried = (name, draft.subcategory ?? "") }
+            if !name.isEmpty { carried = (name, sub) }
             kind = draft.kind
         } else if !name.isEmpty {
             category = name
-            subcategory = draft.subcategory ?? ""
+            subcategory = sub
         }
         if let amount = draft.amount { input.set(amount: amount) }
         if let note = draft.note, input.note.isEmpty { input.note = note }
@@ -645,7 +646,7 @@ private struct EntryCategoryCell: View {
             VStack(spacing: 7) {
                 ZStack {
                     Circle().fill(selected ? DS.accent : DS.bgElevated)
-                    if let symbol = CategoryStyles.shared.symbol(kind: kind, name: name) ?? EntryGlyph.symbol(for: name) {
+                    if let symbol = CategoryName.displaySymbol(for: name) {
                         Image(systemName: symbol)
                             .font(.system(size: size * 0.42, weight: .regular).monospacedDigit())
                             .foregroundStyle(selected ? DS.ink : DS.textPrimary)
