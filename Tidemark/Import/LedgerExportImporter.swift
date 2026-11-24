@@ -313,7 +313,15 @@ enum LedgerExportImporter {
         }
 
         let prints = fingerprints(for: rows)
-        let (steps, missing) = plan(rows, fingerprints: prints, existing: try context.fetch(FetchDescriptor<Transaction>()))
+        let existingRecords = try context.fetch(FetchDescriptor<Transaction>())
+        let (steps, missing) = plan(rows, fingerprints: prints, existing: existingRecords)
+        var symbolNames: [String: String] = [:]
+        for item in existingRecords where CategoryName.symbol(item.category) != nil || CategoryName.symbol(item.subcategory) != nil {
+            symbolNames["\(item.kindRaw)|\(CategoryName.label(item.category))"] = item.category
+            if !item.subcategory.isEmpty {
+                symbolNames["\(item.kindRaw)|\(CategoryName.label(item.category))|\(CategoryName.label(item.subcategory))"] = item.subcategory
+            }
+        }
         stats.notInFile = missing
         let record = ImportRecord(source: .icost, fileName: fileName)
         context.insert(record)
@@ -326,8 +334,11 @@ enum LedgerExportImporter {
             transaction.kind = row.type.kind
             transaction.amount = row.amount
             transaction.currencyCode = row.currency
-            transaction.category = isFlow ? row.category : row.typeLabel
-            transaction.subcategory = isFlow ? row.subcategory : ""
+            let kindRaw = row.type.kind.rawValue
+            transaction.category = isFlow
+                ? symbolNames["\(kindRaw)|\(CategoryName.label(row.category))"] ?? row.category : row.typeLabel
+            transaction.subcategory = isFlow
+                ? symbolNames["\(kindRaw)|\(CategoryName.label(row.category))|\(CategoryName.label(row.subcategory))"] ?? row.subcategory : ""
             transaction.note = row.remark
             transaction.account = account(named: row.account, fallbackCurrency: row.currency)
             transaction.transferAccount = isFlow ? nil : account(named: row.transferAccount, fallbackCurrency: row.currency)

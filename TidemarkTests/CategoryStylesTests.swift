@@ -19,17 +19,54 @@ final class CategoryStylesTests: XCTestCase {
         defer {
             if let saved { defaults.set(saved, forKey: CategoryStyles.storageKey) } else { defaults.removeObject(forKey: CategoryStyles.storageKey) }
         }
+        let pets = CategoryName.compose(symbol: "pawprint", rest: "Pets zz")
         var catalog = CategoryCatalog()
-        catalog.custom = [CustomCategory(kind: "expense", name: "Pets zz", parent: ""),
-                          CustomCategory(kind: "expense", name: "Vet zz", parent: "Pets zz")]
-        catalog.icons[CategoryStyles.iconKey(.expense, "Vet zz")] = "cross.case"
+        catalog.custom = [CustomCategory(kind: "expense", name: pets, parent: ""),
+                          CustomCategory(kind: "expense", name: "Vet zz", parent: pets)]
         defaults.set(try JSONEncoder().encode(catalog), forKey: CategoryStyles.storageKey)
 
-        XCTAssertEqual(CategoryStyles.stored().icons["expense|Vet zz"], "cross.case")
         let container = try TidemarkSchema.makeContainer(inMemory: true)
         let stats = EntryStats.load(container.mainContext)
-        XCTAssertTrue(stats.categories[.expense]?.contains("Pets zz") ?? false)
-        XCTAssertEqual(stats.subcategories[.expense]?["Pets zz"], ["Vet zz"])
+        XCTAssertTrue(stats.categories[.expense]?.contains(pets) ?? false)
+        XCTAssertEqual(stats.subcategories[.expense]?[pets], ["Vet zz"])
+    }
+
+    func testSymbolLivesInsideTheName() {
+        let name = CategoryName.compose(symbol: "cart", rest: "🛒 Groceries")
+        XCTAssertEqual(CategoryName.symbol(name), "cart")
+        XCTAssertEqual(CategoryName.label(name), "Groceries")
+        XCTAssertEqual(CategoryName.withoutSymbol(name), "🛒 Groceries")
+        XCTAssertEqual(CategoryName.displaySymbol(for: name), "cart")
+        XCTAssertEqual(CategoryName.displaySymbol(for: "Coffee"), "cup.and.saucer")
+        XCTAssertEqual(CategoryName.compose(symbol: "bag", rest: name), "\u{E000}bag\u{E001}🛒 Groceries")
+        XCTAssertEqual(CategoryName.resolve("Groceries", among: ["Food", name]), name)
+        XCTAssertEqual(CategoryName.resolve("New", among: [name]), "New")
+        XCTAssertNil(CategoryName.glyph(for: CategoryName.compose(symbol: "cart", rest: "Zzz")))
+    }
+
+    func testMigrationEmbedsAutomaticAndChosenIcons() throws {
+        let container = try TidemarkSchema.makeContainer(inMemory: true)
+        let context = container.mainContext
+        let account = Account(name: "Cash", kind: .payment)
+        context.insert(account)
+        let meal = Transaction(date: Date(), kind: .expense, amount: 5, category: "Food", subcategory: "Meal", account: account)
+        let odd = Transaction(date: Date(), kind: .expense, amount: 5, category: "Qwerty", account: account)
+        let chosen = Transaction(date: Date(), kind: .income, amount: 9, category: "Side", account: account)
+        let move = Transaction(date: Date(), kind: .transfer, amount: 1, category: "Transfer", account: account)
+        [meal, odd, chosen, move].forEach(context.insert)
+        try context.save()
+
+        try CategorySymbolMigration.run(context, legacy: ["income|Side": "star"])
+        XCTAssertEqual(CategoryName.symbol(meal.category), "fork.knife")
+        XCTAssertEqual(CategoryName.label(meal.category), "Food")
+        XCTAssertEqual(CategoryName.symbol(meal.subcategory), "fork.knife")
+        XCTAssertEqual(odd.category, "Qwerty")
+        XCTAssertEqual(chosen.category, CategoryName.compose(symbol: "star", rest: "Side"))
+        XCTAssertEqual(move.category, "Transfer")
+
+        let before = meal.category
+        try CategorySymbolMigration.run(context, legacy: [:])
+        XCTAssertEqual(meal.category, before)
     }
 
     func testRenameUpdatesRecordsAndPresets() throws {
@@ -52,6 +89,7 @@ final class CategoryStylesTests: XCTestCase {
         XCTAssertEqual(records.first { $0.kind == .income }?.category, "Food")
         XCTAssertEqual(preset.category, "Eating")
         XCTAssertEqual(preset.subcategory, "Dinner")
-        XCTAssertEqual(CategoryRenamer.fullName(replacingLabelOf: "🍔 Food", with: "Eating"), "🍔 Eating")
+        XCTAssertEqual(CategoryRenamer.fullName(replacingLabelOf: "🍔 Food", with: "Eating", symbol: nil), "🍔 Eating")
+        XCTAssertEqual(CategoryName.symbol(CategoryRenamer.fullName(replacingLabelOf: "Food", with: "Eating", symbol: "cart")), "cart")
     }
 }

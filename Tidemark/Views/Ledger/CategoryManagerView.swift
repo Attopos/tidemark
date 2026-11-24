@@ -59,7 +59,6 @@ struct CategoryManagerView: View {
         .background(showsDone ? DS.page : Color.clear)
         .task { reload() }
         .onReceive(NotificationCenter.default.publisher(for: CategoryStyles.didChange)) { _ in reload() }
-        .onReceive(NotificationCenter.default.publisher(for: CategoryStyles.didReceive)) { _ in reload() }
         .sheet(item: $editing) { target in
             CategoryEditor(target: target, parents: names)
         }
@@ -192,9 +191,7 @@ private struct CategoryEditor: View {
         .onAppear {
             name = target.isNew ? "" : CategoryName.label(target.name)
             parent = target.parent
-            symbol = target.isNew ? nil
-                : styles.symbol(kind: target.kind, name: target.name) ?? EntryGlyph.symbol(for: target.name)
-                    ?? CategoryName.glyph(for: target.name)
+            symbol = target.isNew ? nil : CategoryName.displaySymbol(for: target.name)
         }
     }
 
@@ -202,10 +199,9 @@ private struct CategoryEditor: View {
 
     private func save() {
         if target.isNew {
-            styles.add(name: trimmed, parent: parent, kind: target.kind, symbol: symbol)
+            styles.add(name: CategoryName.compose(symbol: symbol, rest: trimmed), parent: parent, kind: target.kind)
         } else {
-            styles.setSymbol(symbol, kind: target.kind, name: target.name)
-            let renamed = CategoryRenamer.fullName(replacingLabelOf: target.name, with: trimmed)
+            let renamed = CategoryRenamer.fullName(replacingLabelOf: target.name, with: trimmed, symbol: symbol)
             if renamed != target.name {
                 do {
                     _ = try CategoryRenamer.rename(kind: target.kind, name: target.name, parent: target.parent,

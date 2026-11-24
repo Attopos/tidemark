@@ -1,15 +1,50 @@
 import SwiftUI
 
 enum CategoryName {
+    static let symbolOpen: Character = "\u{E000}"
+    static let symbolClose: Character = "\u{E001}"
+
+    static func symbol(_ name: String) -> String? {
+        guard name.first == symbolOpen, let close = name.firstIndex(of: symbolClose) else { return nil }
+        let value = String(name[name.index(after: name.startIndex)..<close])
+        return value.isEmpty ? nil : value
+    }
+
+    static func withoutSymbol(_ name: String) -> String {
+        guard name.first == symbolOpen, let close = name.firstIndex(of: symbolClose) else { return name }
+        return String(name[name.index(after: close)...])
+    }
+
+    static func compose(symbol: String?, rest: String) -> String {
+        let plain = withoutSymbol(rest).trimmingCharacters(in: .whitespaces)
+        guard let symbol, !symbol.isEmpty else { return plain }
+        return "\(symbolOpen)\(symbol)\(symbolClose)\(plain)"
+    }
+
     static func split(_ name: String) -> (emoji: String?, label: String) {
-        guard let first = name.first, first.isEmojiIcon else {
-            return (nil, name.trimmingCharacters(in: .whitespaces))
+        let plain = withoutSymbol(name)
+        guard let first = plain.first, first.isEmojiIcon else {
+            return (nil, plain.trimmingCharacters(in: .whitespaces))
         }
-        let rest = name.dropFirst().trimmingCharacters(in: .whitespaces)
-        return (String(first), rest.isEmpty ? name : rest)
+        let rest = plain.dropFirst().trimmingCharacters(in: .whitespaces)
+        return (String(first), rest.isEmpty ? plain : rest)
     }
 
     static func label(_ name: String) -> String { split(name).label }
+
+    static func resolve(_ typed: String, among names: [String]) -> String {
+        let trimmed = typed.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, symbol(trimmed) == nil else { return trimmed }
+        return names.first { $0 == trimmed } ?? names.first { label($0) == label(trimmed) } ?? trimmed
+    }
+
+    static func automaticSymbol(for name: String) -> String? {
+        EntryGlyph.symbol(for: name) ?? glyph(for: name)
+    }
+
+    static func displaySymbol(for name: String) -> String? {
+        symbol(name) ?? automaticSymbol(for: name)
+    }
 
     private static let glyphs: [(words: [String], symbol: String)] = [
         (["salary", "工资", "薪"], "banknote"),
@@ -36,7 +71,7 @@ enum CategoryName {
     ]
 
     static func glyph(for name: String) -> String? {
-        let lower = name.lowercased()
+        let lower = label(name).lowercased()
         return glyphs.first { $0.words.contains(where: lower.contains) }?.symbol
     }
 }
@@ -59,7 +94,7 @@ struct CategoryIcon: View {
         let parts = CategoryName.split(name)
         ZStack {
             Circle().fill(DS.bgElevated)
-            if let symbol = CategoryStyles.shared.symbol(kind: kind, name: name) ?? EntryGlyph.symbol(for: name) ?? CategoryName.glyph(for: name) ?? (kind.isConsumptionFlow ? nil : kind.icon) {
+            if let symbol = CategoryName.displaySymbol(for: name) ?? (kind.isConsumptionFlow ? nil : kind.icon) {
                 Image(systemName: symbol)
                     .font(.system(size: size * 0.4, weight: .regular).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)

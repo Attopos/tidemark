@@ -34,6 +34,7 @@ struct TidemarkApp: App {
                     #if DEBUG
                     AccountSeed.applyFromEnvironment(container.mainContext)
                     #endif
+                    if sync != nil { CategorySymbolMigration.runIfNeeded(container.mainContext) }
                     sync?.start()
                 }
         }

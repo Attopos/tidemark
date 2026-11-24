@@ -35,8 +35,8 @@ struct TransactionEditor: View {
         _kind = State(initialValue: transaction?.kind ?? .expense)
         _amountText = State(initialValue: transaction.map { text($0.amount) } ?? "")
         _currency = State(initialValue: transaction?.currencyCode ?? "")
-        _category = State(initialValue: transaction?.category ?? "")
-        _subcategory = State(initialValue: transaction?.subcategory ?? "")
+        _category = State(initialValue: CategoryName.label(transaction?.category ?? ""))
+        _subcategory = State(initialValue: CategoryName.label(transaction?.subcategory ?? ""))
         _accountID = State(initialValue: transaction?.account?.id)
         _transferAccountID = State(initialValue: transaction?.transferAccount?.id)
         _arrivalText = State(initialValue: transaction?.transferAmount.map(text) ?? "")
@@ -56,8 +56,8 @@ struct TransactionEditor: View {
             _kind = State(initialValue: draft.kind)
             _amountText = State(initialValue: draft.amount.map(text) ?? "")
             _currency = State(initialValue: draft.currency ?? "")
-            _category = State(initialValue: draft.category ?? "")
-            _subcategory = State(initialValue: draft.subcategory ?? "")
+            _category = State(initialValue: CategoryName.label(draft.category ?? ""))
+            _subcategory = State(initialValue: CategoryName.label(draft.subcategory ?? ""))
             _accountID = State(initialValue: draft.accountID)
             _note = State(initialValue: draft.note ?? "")
             if let when = draft.date { _date = State(initialValue: when) }
@@ -69,8 +69,8 @@ struct TransactionEditor: View {
         kind = preset.kind
         amountText = text(preset.amount)
         currency = preset.currencyCode
-        category = preset.category
-        subcategory = preset.subcategory
+        category = CategoryName.label(preset.category)
+        subcategory = CategoryName.label(preset.subcategory)
         accountID = preset.accountID
         transferAccountID = preset.transferAccountID
         note = preset.note
@@ -80,8 +80,8 @@ struct TransactionEditor: View {
         guard let amount else { return }
         let name = CategoryName.label(subcategory.isEmpty ? (category.isEmpty ? kind.displayName : category) : subcategory)
         let preset = RecordPreset(name: name, kind: kind, amount: amount, currencyCode: resolvedCurrency)
-        preset.category = category.trimmingCharacters(in: .whitespaces)
-        preset.subcategory = subcategory.trimmingCharacters(in: .whitespaces)
+        preset.category = resolvedCategory
+        preset.subcategory = resolvedSubcategory
         preset.accountID = accountID
         preset.transferAccountID = isFlow ? nil : transferAccountID
         preset.note = note
@@ -113,10 +113,18 @@ struct TransactionEditor: View {
         return accountID != nil || transferAccountID != nil
     }
 
+    private var resolvedCategory: String {
+        CategoryName.resolve(category, among: suggestions(\.category))
+    }
+
+    private var resolvedSubcategory: String {
+        CategoryName.resolve(subcategory, among: suggestions(\.subcategory, within: category))
+    }
+
     private func suggestions(_ keyPath: KeyPath<Transaction, String>, within parent: String? = nil) -> [String] {
         var counts: [String: Int] = [:]
         for item in transactions where item.kind == kind {
-            if let parent, item.category != parent { continue }
+            if let parent, CategoryName.label(item.category) != CategoryName.label(parent) { continue }
             let name = item[keyPath: keyPath]
             if !name.isEmpty { counts[name, default: 0] += 1 }
         }
@@ -263,7 +271,7 @@ struct TransactionEditor: View {
             if !options.isEmpty {
                 Menu {
                     ForEach(options, id: \.self) { option in
-                        Button(option) { text.wrappedValue = option }
+                        Button(CategoryName.label(option)) { text.wrappedValue = CategoryName.label(option) }
                     }
                 } label: {
                     Image(systemName: "chevron.down")
@@ -300,8 +308,8 @@ struct TransactionEditor: View {
         target.note = note
         target.updatedAt = Date()
         if isFlow {
-            target.category = category.trimmingCharacters(in: .whitespaces)
-            target.subcategory = subcategory.trimmingCharacters(in: .whitespaces)
+            target.category = resolvedCategory
+            target.subcategory = resolvedSubcategory
             target.transferAccount = nil
             target.transferAmount = nil
             target.refundAmount = kind == .expense ? min(Self.decimal(refundText) ?? 0, amount) : 0

@@ -22,7 +22,7 @@ struct RecordDetailView: View {
 
     private var typeText: String {
         let isFlow = transaction.kind == .expense || transaction.kind == .income
-        let category = [transaction.category, transaction.subcategory].filter { !$0.isEmpty }.joined(separator: "-")
+        let category = [transaction.category, transaction.subcategory].filter { !$0.isEmpty }.map(CategoryName.label).joined(separator: "-")
         let kindName = isFlow ? transaction.kind.displayName
                               : tr(LedgerExportType.canonical(transaction.category.isEmpty
                                                               ? transaction.kind.displayName : transaction.category))

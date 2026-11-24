@@ -22,7 +22,6 @@ final class CategoryStyles {
     static let shared = CategoryStyles()
     nonisolated static let storageKey = "categoryCatalog"
     nonisolated static let didChange = Notification.Name("CategoryStylesDidChange")
-    nonisolated static let didReceive = Notification.Name("CategoryStylesDidReceive")
 
     private(set) var catalog: CategoryCatalog
 
@@ -36,31 +35,13 @@ final class CategoryStyles {
         return value
     }
 
-    nonisolated static func iconKey(_ kind: TransactionKind, _ name: String) -> String {
-        "\(kind.rawValue)|\(name)"
-    }
-
-    func symbol(kind: TransactionKind, name: String) -> String? {
-        catalog.icons[Self.iconKey(kind, name)]
-    }
-
-    func setSymbol(_ symbol: String?, kind: TransactionKind, name: String) {
-        catalog.icons[Self.iconKey(kind, name)] = symbol
-        save()
-    }
-
-    func custom(kind: TransactionKind) -> [CustomCategory] {
-        catalog.custom.filter { $0.kind == kind.rawValue }
-    }
-
     func isCustom(kind: TransactionKind, name: String, parent: String) -> Bool {
         catalog.custom.contains { $0.kind == kind.rawValue && $0.name == name && $0.parent == parent }
     }
 
-    func add(name: String, parent: String, kind: TransactionKind, symbol: String?) {
+    func add(name: String, parent: String, kind: TransactionKind) {
         let entry = CustomCategory(kind: kind.rawValue, name: name, parent: parent)
         if !catalog.custom.contains(entry) { catalog.custom.append(entry) }
-        catalog.icons[Self.iconKey(kind, name)] = symbol
         save()
     }
 
@@ -70,10 +51,6 @@ final class CategoryStyles {
     }
 
     func rename(kind: TransactionKind, name: String, parent: String, to newName: String) {
-        let oldKey = Self.iconKey(kind, name)
-        if let symbol = catalog.icons.removeValue(forKey: oldKey) {
-            catalog.icons[Self.iconKey(kind, newName)] = symbol
-        }
         for index in catalog.custom.indices where catalog.custom[index].kind == kind.rawValue {
             if catalog.custom[index].name == name && catalog.custom[index].parent == parent {
                 catalog.custom[index].name = newName
@@ -87,23 +64,76 @@ final class CategoryStyles {
         save()
     }
 
-    func replace(with incoming: CategoryCatalog) {
-        guard incoming != catalog, incoming.updatedAt > catalog.updatedAt else { return }
-        catalog = incoming
-        persist(notify: false)
-        NotificationCenter.default.post(name: Self.didReceive, object: nil)
+    func reload() {
+        catalog = Self.stored()
     }
 
     private func save() {
         catalog.updatedAt = Date()
-        persist(notify: true)
-    }
-
-    private func persist(notify: Bool) {
         if let data = try? JSONEncoder().encode(catalog) {
             UserDefaults.standard.set(data, forKey: Self.storageKey)
         }
-        if notify { NotificationCenter.default.post(name: Self.didChange, object: nil) }
+        NotificationCenter.default.post(name: Self.didChange, object: nil)
+    }
+}
+
+enum CategorySymbolMigration {
+    static let doneKey = "categorySymbolsEmbedded.v1"
+
+    @MainActor
+    static func runIfNeeded(_ context: ModelContext) {
+        guard !UserDefaults.standard.bool(forKey: doneKey) else { return }
+        do {
+            let backup = try BackupService.makeBackup(from: context, settings: BackupFile.Settings())
+            if !(backup.transactions ?? []).isEmpty {
+                _ = try BackupService.writeBackup(backup, to: BackupService.automaticFolder)
+            }
+            try run(context, legacy: CategoryStyles.stored().icons)
+            var catalog = CategoryStyles.stored()
+            catalog.icons = [:]
+            catalog.custom = catalog.custom.map { entry in
+                var copy = entry
+                let kind = TransactionKind(rawValue: entry.kind) ?? .expense
+                copy.name = embed(entry.name, kind: kind, legacy: CategoryStyles.stored().icons)
+                if !entry.parent.isEmpty { copy.parent = embed(entry.parent, kind: kind, legacy: CategoryStyles.stored().icons) }
+                return copy
+            }
+            UserDefaults.standard.set(try JSONEncoder().encode(catalog), forKey: CategoryStyles.storageKey)
+            CategoryStyles.shared.reload()
+            UserDefaults.standard.set(true, forKey: doneKey)
+        } catch {
+            UserDefaults.standard.set(false, forKey: doneKey)
+        }
+    }
+
+    static func embed(_ name: String, kind: TransactionKind, legacy: [String: String]) -> String {
+        guard !name.isEmpty, CategoryName.symbol(name) == nil else { return name }
+        let symbol = legacy["\(kind.rawValue)|\(name)"] ?? CategoryName.automaticSymbol(for: name)
+        return CategoryName.compose(symbol: symbol, rest: name)
+    }
+
+    @MainActor
+    static func run(_ context: ModelContext, legacy: [String: String]) throws {
+        let flows: [String] = [TransactionKind.expense.rawValue, TransactionKind.income.rawValue]
+        let records = try context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { flows.contains($0.kindRaw) }))
+        for record in records {
+            let category = embed(record.category, kind: record.kind, legacy: legacy)
+            let subcategory = embed(record.subcategory, kind: record.kind, legacy: legacy)
+            if record.category != category { record.category = category }
+            if record.subcategory != subcategory { record.subcategory = subcategory }
+        }
+        let presets = try context.fetch(FetchDescriptor<RecordPreset>(predicate: #Predicate { flows.contains($0.kindRaw) }))
+        for preset in presets {
+            let category = embed(preset.category, kind: preset.kind, legacy: legacy)
+            let subcategory = embed(preset.subcategory, kind: preset.kind, legacy: legacy)
+            if preset.category != category { preset.category = category }
+            if preset.subcategory != subcategory { preset.subcategory = subcategory }
+        }
+        for commitment in try context.fetch(FetchDescriptor<RecurringCommitment>()) {
+            let category = embed(commitment.category, kind: .expense, legacy: legacy)
+            if commitment.category != category { commitment.category = category }
+        }
+        if context.hasChanges { try context.save() }
     }
 }
 
@@ -203,9 +233,9 @@ enum CategoryRenamer {
         return changed
     }
 
-    static func fullName(replacingLabelOf name: String, with label: String) -> String {
+    static func fullName(replacingLabelOf name: String, with label: String, symbol: String?) -> String {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let emoji = CategoryName.split(name).emoji else { return trimmed }
-        return "\(emoji) \(trimmed)"
+        let rest = CategoryName.split(name).emoji.map { "\($0) \(trimmed)" } ?? trimmed
+        return CategoryName.compose(symbol: symbol, rest: rest)
     }
 }
