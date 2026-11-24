@@ -14,7 +14,7 @@ extension DS {
     static let violetDeep = Color(hex: 0x5F5B66)
     static let violetDark = Color(hex: 0x3A3740)
     static let limeSoft = Color(hex: 0xFFB8D4)
-    static let lime = Color(hex: 0xE04A82)
+    static let lime = Color(hex: 0xD93B86)
     static let limeDeep = Color(hex: 0xC4276A)
     static let ink = Color(hex: 0x141217)
 

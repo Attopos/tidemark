@@ -56,7 +56,7 @@ enum DS {
     static let bgSecondary  = Color(light: 0xFFFFFF, dark: 0x18161B)
     static let bgElevated   = Color(light: 0xFFFFFF, dark: 0x221F26)
 
-    static let accent       = Color(light: 0xD63C78, dark: 0xE04A82)
+    static let accent       = Color(hex: 0xD93B86)
     static let selection    = Color(light: 0xFFFFFF, dark: 0x3A3740)
     static let accentDark   = Color(light: 0xFBE3EC, dark: 0x3A1A2B)
     static let accentText   = Color(light: 0xC0306B, dark: 0xEC6A9B)
@@ -69,11 +69,11 @@ enum DS {
 
     static let finBlue      = Color(light: 0x5E5A64, dark: 0xB5B1BB)
     static let positive     = Color(light: 0x0F9E6E, dark: 0x3DD9A0)
-    static let negative     = Color(light: 0xD63C78, dark: 0xE04A82)
+    static let negative     = Color(hex: 0xD93B86)
     static let warning      = Color(light: 0x5E5A64, dark: 0xC9C5CF)
 
     static let categorical: [Color] = [
-        Color(hex: 0xE04A82), Color(hex: 0xC9C5CF), Color(hex: 0xC4276A),
+        Color(hex: 0xD93B86), Color(hex: 0xC9C5CF), Color(hex: 0xC4276A),
         Color(hex: 0x8E8A96), Color(hex: 0xFFB8D4), Color(hex: 0x5F5B66), Color(hex: 0x7A2350),
     ]
     static let categoricalOther = Color(hex: 0x4A4750)
@@ -83,7 +83,7 @@ enum DS {
     }
 
     static let heroGradient = LinearGradient(
-        colors: [Color(hex: 0xE8649A), Color(hex: 0xE04A82), Color(hex: 0xCC3A72)],
+        colors: [Color(hex: 0xE8649A), Color(hex: 0xD93B86), Color(hex: 0xCC3A72)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

@@ -397,7 +397,7 @@ extension Exposure {
         case .intlEquity: return Color(light: 0xB5B1BB, dark: 0xC9C5CF)
         case .chinaEquity: return Color(light: 0x4A4750, dark: 0x5F5B66)
         case .crypto: return Color(light: 0x2A272E, dark: 0x4A4750)
-        case .gold: return Color(light: 0xD63C78, dark: 0xE04A82)
+        case .gold: return Color(hex: 0xD93B86)
         case .bond: return Color(light: 0xA81F5A, dark: 0xC4276A)
         case .cash: return Color(light: 0xF27DAE, dark: 0xFFB8D4)
         case .other: return DS.textTertiary
