@@ -228,7 +228,7 @@ struct QuickEntryView: View {
             category = carried?.category ?? ""
             subcategory = carried?.subcategory ?? ""
             carried = nil
-            accountID = stats.lastAccount[kind] ?? accounts.first?.id
+            accountID = DefaultAccounts.pick(for: kind, among: accounts, lastUsed: stats.lastAccount[kind])
             if kind == .transfer && transferAccountID == nil { transferAccountID = stats.lastTransferTarget }
         }
         .sheet(item: $picking) { slot in
@@ -282,7 +282,7 @@ struct QuickEntryView: View {
 
     private func use(_ fresh: EntryStats) {
         stats = fresh
-        if accountID == nil { accountID = fresh.lastAccount[kind] ?? accounts.first?.id }
+        if accountID == nil { accountID = DefaultAccounts.pick(for: kind, among: accounts, lastUsed: fresh.lastAccount[kind]) }
     }
 
     private var topBar: some View {

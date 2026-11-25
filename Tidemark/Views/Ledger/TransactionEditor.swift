@@ -37,7 +37,7 @@ struct TransactionEditor: View {
         _currency = State(initialValue: transaction?.currencyCode ?? "")
         _category = State(initialValue: CategoryName.label(transaction?.category ?? ""))
         _subcategory = State(initialValue: CategoryName.label(transaction?.subcategory ?? ""))
-        _accountID = State(initialValue: transaction?.account?.id)
+        _accountID = State(initialValue: transaction == nil ? DefaultAccounts.id(for: .expense) : transaction?.account?.id)
         _transferAccountID = State(initialValue: transaction?.transferAccount?.id)
         _arrivalText = State(initialValue: transaction?.transferAmount.map(text) ?? "")
         var initialDate = Date()
@@ -58,7 +58,7 @@ struct TransactionEditor: View {
             _currency = State(initialValue: draft.currency ?? "")
             _category = State(initialValue: CategoryName.label(draft.category ?? ""))
             _subcategory = State(initialValue: CategoryName.label(draft.subcategory ?? ""))
-            _accountID = State(initialValue: draft.accountID)
+            _accountID = State(initialValue: draft.accountID ?? DefaultAccounts.id(for: draft.kind))
             _note = State(initialValue: draft.note ?? "")
             if let when = draft.date { _date = State(initialValue: when) }
         }

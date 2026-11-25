@@ -1,10 +1,20 @@
 import SwiftUI
+import SwiftData
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
     @Environment(\.modelContext) private var context
     @State private var showsPresets = false
     @State private var showsCategories = false
+    @Query(sort: \Account.createdAt) private var allAccounts: [Account]
+
+    private var accountChoices: [UUID?] {
+        [nil] + allAccounts.filter { $0.isLedgerAccount && !$0.isArchived }.map(\.id)
+    }
+
+    private func accountLabel(_ id: UUID?) -> String {
+        id.flatMap { id in allAccounts.first { $0.id == id }?.name } ?? tr("Last used")
+    }
 
     var body: some View {
         @Bindable var app = app
@@ -66,6 +76,14 @@ struct SettingsView: View {
                     MacSetupAction(icon: "square.grid.2x2.fill", color: .pink, title: tr("Categories")) {
                         showsCategories = true
                     }
+                }
+
+                MacSetupCard {
+                    MacSetupMenu(icon: "arrow.up.right", color: .pink, title: tr("Default expense account"),
+                                 options: accountChoices, selection: $app.defaultExpenseAccountID, label: accountLabel)
+                    MacSetupDivider()
+                    MacSetupMenu(icon: "arrow.down.left", color: .green, title: tr("Default income account"),
+                                 options: accountChoices, selection: $app.defaultIncomeAccountID, label: accountLabel)
                 }
 
                 MacSetupCard {
