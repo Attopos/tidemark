@@ -92,4 +92,69 @@ final class CategoryStylesTests: XCTestCase {
         XCTAssertEqual(CategoryRenamer.fullName(replacingLabelOf: "🍔 Food", with: "Eating", symbol: nil), "🍔 Eating")
         XCTAssertEqual(CategoryName.symbol(CategoryRenamer.fullName(replacingLabelOf: "Food", with: "Eating", symbol: "cart")), "cart")
     }
+
+    func testEveryCurrentSubcategoryGetsAnIcon() {
+        let unmatched = [
+            "🚭 CIGARETTES",
+            "🍉 Juice",
+            "🪥 NECESSITY",
+            "🌹 LOVER",
+            "👐 MASSAGE",
+            "🥛 Milk",
+            "💦 Bottled water",
+            "🎫 TICKET",
+            "🎓 EDU.",
+            "👪 FAMILY",
+            "💈 HAIRCUT",
+            "🤖 OPENAI",
+            "📦 EXPRESS",
+            "🏸 BADMINTON",
+            "🛂 VISA",
+            "🍹 Cocktail",
+            "🌐 VPN",
+            "🏄‍♂️ Windsurfing",
+            "☁️ GOOGLE ONE",
+            "🍎 IPAD",
+            "🧺 LAUNDRY",
+            "💻 Laptop",
+            "🕺 DRIFTING",
+            "💵 USDT",
+            "🤿 Diving",
+            "🏏 Squash",
+            "🧗‍♂️ ROCK CLIMBING",
+            "🎢 ROLLER COASTER",
+            "🏐 Volleyball",
+            "🎙️ KTV",
+            "🎾 Tennis",
+            "🏄 Paddling",
+            "🚲 Cycling",
+            "🎭 Opera",
+        ].filter { CategoryName.automaticSymbol(for: $0) == nil }
+        XCTAssertEqual(unmatched, [])
+        let kept: [(String, String)] = [
+            ("🧼DAILY", "basket"),
+            ("📕STUDY", "book"),
+            ("🏡ACCOM.", "building.2"),
+            ("☕️DRINKS", "cup.and.saucer"),
+            ("🍔FOOD", "fork.knife"),
+            ("🎱ENTERTAINMENT", "gamecontroller"),
+            ("🚗TRANSP.", "tram"),
+            ("🥑FRUITS", "carrot"),
+            ("🥗MEAL", "fork.knife"),
+            ("🚕 TAXI", "car"),
+            ("🛩️AIRCRAFT", "airplane"),
+            ("📲 PHONE BILL", "iphone"),
+            ("🍿Movie", "film"),
+            ("🕹️ GAME", "gamecontroller"),
+            ("水果", "carrot"),
+            ("酒店", "building.2"),
+            ("游戏", "gamecontroller"),
+            ("机票", "airplane"),
+            ("奶茶", "cup.and.saucer"),
+            ("水电", "bolt"),
+        ]
+        for (name, symbol) in kept {
+            XCTAssertEqual(CategoryName.automaticSymbol(for: name), symbol, name)
+        }
+    }
 }
