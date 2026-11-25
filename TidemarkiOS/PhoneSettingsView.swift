@@ -55,6 +55,15 @@ struct PhoneSettingsView: View {
                     }
                 }
                 SetupCard {
+                    SetupLink(icon: "arrow.up.right", color: .pink, title: tr("Default expense account")) {
+                        DefaultAccountView(kind: .expense)
+                    }
+                    SetupDivider()
+                    SetupLink(icon: "arrow.down.left", color: .green, title: tr("Default income account")) {
+                        DefaultAccountView(kind: .income)
+                    }
+                }
+                SetupCard {
                     SetupLink(icon: "sun.max.fill", color: .yellow, title: tr("Appearance"),
                               value: app.appearance.title) { AppearanceSettingsView() }
                     SetupDivider()
@@ -593,6 +602,29 @@ struct LanguageSettingsView: View {
     var body: some View {
         SetupPage(title: tr("Language")) {
             SetupChoices(options: AppLanguage.allCases, selection: app.language, title: \.displayName) { app.language = $0 }
+        }
+    }
+}
+
+struct DefaultAccountView: View {
+    @Environment(AppState.self) private var app
+    @Query(sort: \Account.createdAt) private var allAccounts: [Account]
+    let kind: TransactionKind
+
+    private var choices: [UUID?] {
+        [nil] + allAccounts.filter { $0.isLedgerAccount && !$0.isArchived }.map(\.id)
+    }
+
+    private var selection: UUID? {
+        kind == .income ? app.defaultIncomeAccountID : app.defaultExpenseAccountID
+    }
+
+    var body: some View {
+        SetupPage(title: kind == .income ? tr("Default income account") : tr("Default expense account")) {
+            SetupChoices(options: choices, selection: selection,
+                         title: { id in id.flatMap { id in allAccounts.first { $0.id == id }?.name } ?? tr("Last used") }) { id in
+                if kind == .income { app.defaultIncomeAccountID = id } else { app.defaultExpenseAccountID = id }
+            }
         }
     }
 }

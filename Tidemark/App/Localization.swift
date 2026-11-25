@@ -44,7 +44,7 @@ enum L10n {
     }
 
     static let zh: [String: String] = [
-        "New category": "新建分类", "Common": "常用", "Under": "所属", "Top level": "一级分类", "Search %d icons": "搜索 %d 个图标",
+        "New category": "新建分类", "Default expense account": "默认支出账户", "Default income account": "默认收入账户", "Last used": "上次用的", "Common": "常用", "Under": "所属", "Top level": "一级分类", "Search %d icons": "搜索 %d 个图标",
         "Shopping": "购物", "Home": "居家", "Transport": "交通", "Vehicles": "车辆", "Fitness": "运动",
         "Health": "健康", "Nature": "自然", "Weather": "天气", "Games": "游戏", "Media": "影音", "Photos": "摄影",
         "Social": "社交", "Devices": "设备", "Connectivity": "网络", "Places": "地点", "Time": "时间",
@@ -401,7 +401,7 @@ enum L10n {
     ]
 
     static let es: [String: String] = [
-        "New category": "Nueva categoría", "Common": "Frecuentes", "Under": "Dentro de", "Top level": "Nivel superior", "Search %d icons": "Buscar entre %d iconos",
+        "New category": "Nueva categoría", "Default expense account": "Cuenta de gastos por defecto", "Default income account": "Cuenta de ingresos por defecto", "Last used": "Última usada", "Common": "Frecuentes", "Under": "Dentro de", "Top level": "Nivel superior", "Search %d icons": "Buscar entre %d iconos",
         "Shopping": "Compras", "Home": "Hogar", "Transport": "Transporte", "Vehicles": "Vehículos", "Fitness": "Deporte",
         "Health": "Salud", "Nature": "Naturaleza", "Weather": "Tiempo", "Games": "Juegos", "Media": "Medios", "Photos": "Fotos",
         "Social": "Social", "Devices": "Dispositivos", "Connectivity": "Conectividad", "Places": "Lugares", "Time": "Hora",

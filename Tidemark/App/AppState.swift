@@ -41,6 +41,14 @@ final class AppState {
         didSet { UserDefaults.standard.set(baseCurrency, forKey: "baseCurrency") }
     }
 
+    var defaultExpenseAccountID: UUID? = DefaultAccounts.id(for: .expense) {
+        didSet { DefaultAccounts.set(defaultExpenseAccountID, for: .expense) }
+    }
+
+    var defaultIncomeAccountID: UUID? = DefaultAccounts.id(for: .income) {
+        didSet { DefaultAccounts.set(defaultIncomeAccountID, for: .income) }
+    }
+
     var language: AppLanguage {
         didSet {
             UserDefaults.standard.set(language.rawValue, forKey: "appLanguage")
