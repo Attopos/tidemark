@@ -78,7 +78,7 @@ final class CategoryStyles {
 }
 
 enum CategorySymbolMigration {
-    static let doneKey = "categorySymbolsEmbedded.v1"
+    static let doneKey = "categorySymbolsEmbedded.v2"
 
     @MainActor
     static func runIfNeeded(_ context: ModelContext) {
