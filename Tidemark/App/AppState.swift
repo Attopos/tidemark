@@ -254,6 +254,7 @@ final class AppState {
 
     @MainActor
     func backUp(_ context: ModelContext) {
+        guard !TidemarkSchema.isTesting else { return }
         let container = context.container
         let settings = backupSettings
         let previous = backupTask

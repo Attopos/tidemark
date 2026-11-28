@@ -58,7 +58,7 @@ final class PerfProbe: NSObject {
         NotificationCenter.default.post(name: Self.openDetail, object: nil)
         try? await Task.sleep(for: .milliseconds(1500))
         capture("detail")
-        for field in ["type", "remark", "account"] {
+        for field in ["type", "remark", "account", "amount"] {
             NotificationCenter.default.post(name: Self.openField, object: field)
             try? await Task.sleep(for: .milliseconds(1500))
             capture("field-\(field)")

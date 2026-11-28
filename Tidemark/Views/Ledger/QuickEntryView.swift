@@ -9,6 +9,7 @@ import PhotosUI
 final class EntryInput {
     var expression = ""
     var note = ""
+    var replacesOnType = false
 
     static let operators: Set<Character> = ["+", "−", "×", "÷"]
 
@@ -82,7 +83,13 @@ final class EntryInput {
         }
     }
 
-    func press(_ key: String) { Self.press(key, on: &expression) }
+    func press(_ key: String) {
+        if replacesOnType {
+            replacesOnType = false
+            if key == "." || key.allSatisfy(\.isWholeNumber) { expression = "" }
+        }
+        Self.press(key, on: &expression)
+    }
 
     func set(amount: Decimal?) {
         expression = amount.map { NSDecimalNumber(decimal: $0.rounded(2)).stringValue } ?? ""
@@ -744,9 +751,6 @@ private struct EntryPad: View {
     @State private var toast = false
     @State private var bump = false
 
-    private static let rows = [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
-                               ["7", "8", "9", "again"], [".", "0", "⌫", "done"]]
-
     var body: some View {
         VStack(spacing: 8) {
             card
@@ -773,29 +777,9 @@ private struct EntryPad: View {
                         withAnimation(.easeOut(duration: 0.25)) { toast = false }
                     }
                 }
-            VStack(spacing: 7) {
-                ForEach(Self.rows, id: \.self) { row in
-                    HStack(spacing: 7) {
-                        ForEach(row, id: \.self) { key($0) }
-                    }
-                }
-            }
+            CalculatorPad(input: input, extra: .again, onDone: { onSave(true) }, onAgain: { onSave(false) })
         }
-        #if os(macOS)
-        .focusable()
-        .focusEffectDisabled()
-        .focused($padFocused)
-        .onAppear { padFocused = true }
-        .onKeyPress(phases: .down) { press in
-            if press.key == .return { onSave(true); return .handled }
-            if press.key == .delete || press.key == .deleteForward { input.press("⌫"); return .handled }
-            let map: [String: String] = ["+": "+", "-": "−", "*": "×", "x": "×", "/": "÷", ",": "."]
-            let typed = press.characters
-            if let symbol = map[typed] { input.press(symbol); return .handled }
-            if typed.count == 1, typed == "." || typed.first!.isWholeNumber { input.press(typed); return .handled }
-            return .ignored
-        }
-        #endif
+        .calculatorKeyboard(input, focus: $padFocused) { onSave(true) }
     }
 
     private var amountColor: Color {
@@ -804,25 +788,7 @@ private struct EntryPad: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text(Fmt.money(input.amount ?? 0, currency))
-                    .font(DS.money(34))
-                    .foregroundStyle(amountColor)
-                    .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.22), value: input.expression)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .layoutPriority(1)
-                Spacer(minLength: 8)
-                if input.hasOperator {
-                    Text(input.expression)
-                        .font(.system(size: 14).monospacedDigit())
-                        .foregroundStyle(DS.textTertiary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
-            }
-            .frame(height: 62)
+            CalculatorDisplay(input: input, currency: currency, color: amountColor)
             Divider().overlay(DS.border)
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
@@ -854,14 +820,69 @@ private struct EntryPad: View {
         .background(DS.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
+}
+
+struct CalculatorDisplay: View {
+    let input: EntryInput
+    let currency: String
+    let color: Color
+
+    var body: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 8) {
+            Text(Fmt.money(input.amount ?? 0, currency))
+                .font(DS.money(34))
+                .foregroundStyle(color)
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.22), value: input.expression)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .layoutPriority(1)
+            Spacer(minLength: 8)
+            if input.hasOperator {
+                Text(input.expression)
+                    .font(.system(size: 14).monospacedDigit())
+                    .foregroundStyle(DS.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
+        }
+        .frame(height: 62)
+    }
+}
+
+struct CalculatorPad: View {
+    enum Extra { case again, clear }
+
+    @Bindable var input: EntryInput
+    var extra: Extra = .again
+    let onDone: () -> Void
+    var onAgain: () -> Void = {}
+
+    private var rows: [[String]] {
+        [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
+         ["7", "8", "9", extra == .again ? "again" : "clear"], [".", "0", "⌫", "done"]]
+    }
+
+    var body: some View {
+        VStack(spacing: 7) {
+            ForEach(rows, id: \.self) { row in
+                HStack(spacing: 7) {
+                    ForEach(row, id: \.self) { key($0) }
+                }
+            }
+        }
+    }
 
     private func key(_ key: String) -> some View {
         let isDone = key == "done"
         let isAgain = key == "again"
         return PadKey(fill: isDone ? DS.accent : DS.bgElevated, height: keyHeight, firesOnTouchDown: !isDone && !isAgain) {
-            if isDone { onSave(true) }
-            else if isAgain { onSave(false) }
-            else { input.press(key) }
+            switch key {
+            case "done": onDone()
+            case "again": onAgain()
+            case "clear": input.replacesOnType = false; input.expression = ""
+            default: input.press(key)
+            }
         } label: {
             Group {
                 switch key {
@@ -869,6 +890,7 @@ private struct EntryPad: View {
                 case "+×": Text("+ ×")
                 case "−÷": Text("− ÷")
                 case "again": Text(tr("Again"))
+                case "clear": Text("C")
                 case "done": Text(input.hasOperator ? "=" : tr("Done"))
                 default: Text(key)
                 }
@@ -884,6 +906,30 @@ private struct EntryPad: View {
         49
         #else
         44
+        #endif
+    }
+}
+
+extension View {
+    func calculatorKeyboard(_ input: EntryInput, focus: FocusState<Bool>.Binding,
+                            onReturn: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        self
+            .focusable()
+            .focusEffectDisabled()
+            .focused(focus)
+            .onAppear { focus.wrappedValue = true }
+            .onKeyPress(phases: .down) { press in
+                if press.key == .return { onReturn(); return .handled }
+                if press.key == .delete || press.key == .deleteForward { input.press("⌫"); return .handled }
+                let map: [String: String] = ["+": "+", "-": "−", "*": "×", "x": "×", "/": "÷", ",": "."]
+                let typed = press.characters
+                if let symbol = map[typed] { input.press(symbol); return .handled }
+                if typed.count == 1, typed == "." || typed.first!.isWholeNumber { input.press(typed); return .handled }
+                return .ignored
+            }
+        #else
+        self
         #endif
     }
 }

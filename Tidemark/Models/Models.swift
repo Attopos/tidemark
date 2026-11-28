@@ -581,9 +581,11 @@ enum TidemarkSchema {
         ImportRecord.self, ImportSourceState.self, CurrencyRate.self, RecordPreset.self,
     ]
 
+    static let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
         let schema = Schema(models)
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory || isTesting, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
 }

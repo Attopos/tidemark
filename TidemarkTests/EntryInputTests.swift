@@ -24,4 +24,19 @@ final class EntryInputTests: XCTestCase {
         XCTAssertEqual(type(["8", "−", "⌫"]), "8")
         XCTAssertEqual(type(["8", "+", "×"]), "8×")
     }
+
+    func testEditingReplacesOnFirstDigit() {
+        let input = EntryInput()
+        input.set(amount: 35.5)
+        input.replacesOnType = true
+        input.press("1")
+        input.press("2")
+        XCTAssertEqual(input.expression, "12")
+        input.set(amount: 35.5)
+        input.replacesOnType = true
+        input.press("+")
+        input.press("2")
+        XCTAssertEqual(input.expression, "35.5+2")
+        XCTAssertEqual(input.amount, Decimal(string: "37.5"))
+    }
 }

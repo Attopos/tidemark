@@ -5,7 +5,6 @@ struct TransactionEditor: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Account.createdAt) private var allAccounts: [Account]
-    @Query private var transactions: [Transaction]
     @Query(sort: \RecordPreset.name) private var presets: [RecordPreset]
 
     let transaction: Transaction?
@@ -27,6 +26,7 @@ struct TransactionEditor: View {
     @State private var claim: ClaimStatus
     @State private var claimText: String
     @State private var savedTemplate = false
+    @State private var stats = EntryStats.latest
     @FocusState private var amountFocused: Bool
 
     init(transaction: Transaction?, defaultDate: Date? = nil, draft: ReceiptDraft? = nil) {
@@ -122,13 +122,15 @@ struct TransactionEditor: View {
     }
 
     private func suggestions(_ keyPath: KeyPath<Transaction, String>, within parent: String? = nil) -> [String] {
-        var counts: [String: Int] = [:]
-        for item in transactions where item.kind == kind {
-            if let parent, CategoryName.label(item.category) != CategoryName.label(parent) { continue }
-            let name = item[keyPath: keyPath]
-            if !name.isEmpty { counts[name, default: 0] += 1 }
-        }
-        return counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.map(\.key)
+        let catalog = stats ?? EntryStats()
+        let parents = catalog.categories[kind] ?? []
+        guard let parent else { return parents }
+        let wanted = CategoryName.label(parent)
+        let subs = catalog.subcategories[kind] ?? [:]
+        var seen = Set<String>()
+        return parents.filter { CategoryName.label($0) == wanted }
+            .flatMap { subs[$0] ?? [] }
+            .filter { seen.insert($0).inserted }
     }
 
     var body: some View {
@@ -244,7 +246,10 @@ struct TransactionEditor: View {
             }
         }
         .editorSheet(width: 460)
-        .onAppear { if transaction == nil { amountFocused = true } }
+        .onAppear {
+            if stats == nil { stats = EntryStats.load(context) }
+            if transaction == nil { amountFocused = true }
+        }
     }
 
     private func label(_ text: String) -> some View {
