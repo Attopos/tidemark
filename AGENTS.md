@@ -16,6 +16,7 @@
 - commit 和 PR 里不加 Co-Authored-By、Claude-Session 等署名行。
 - 代码里尽量不写注释，除非是特别关键的功能。
 - Tidemark/Resources 下的文件打包时会被拍平到 app 根目录，文件名必须全局唯一（例如来源说明写成 SOURCES-<目录>.md），否则 Debug 能编过、TestFlight 归档会报 Multiple commands produce。
+- 测试宿主就是真 app：凡是启动时会写文件、跑迁移、改数据库的逻辑，都要用 TidemarkSchema.isTesting 挡住，否则 `./build.sh test` 会动到真实数据和 iCloud 备份。
 - 合并前先确认 `./build.sh test` 的结果真是 TEST SUCCEEDED，不要把 `test | grep` 直接用 `&&` 接合并（grep 总是成功）；被 gitignore 的本地测试文件（TidemarkTests/ZZLocal*）也会参与编译，改公共 API 时一起改。
 
 ## 文档同步
