@@ -32,7 +32,7 @@ enum RecordField: String, Identifiable {
         case .type, .currency, .account, .toAccount: return [.medium, .large]
         case .date: return [.height(560)]
         case .reimbursement: return [.height(300)]
-        case .amount, .arrived, .discount, .refund, .fee: return [.height(420)]
+        case .amount, .arrived, .discount, .refund, .fee: return [.height(480)]
         default: return [.height(230)]
         }
     }
@@ -79,7 +79,7 @@ struct RecordFieldEditor: View {
         }
         .background(DS.page)
         #if os(macOS)
-        .frame(width: 420, height: field.isNumber ? 420 : field == .remark || field == .address ? 200 : 520)
+        .frame(width: 460, height: field.isNumber ? 470 : field == .remark || field == .address ? 200 : 520)
         #endif
         .onAppear(perform: load)
     }
@@ -165,26 +165,12 @@ struct RecordFieldEditor: View {
         field == .arrived ? (transaction.transferAccount?.currencyCode ?? transaction.currencyCode) : transaction.currencyCode
     }
 
-    private var amountColor: Color {
-        guard field == .amount else { return DS.textPrimary }
-        return transaction.kind == .income ? FlowPalette.income
-            : transaction.kind == .expense ? FlowPalette.expense : DS.textPrimary
-    }
-
     private var calculator: some View {
-        VStack(spacing: 12) {
-            CalculatorDisplay(input: input, currency: currencyCode, color: amountColor)
-                .padding(.horizontal, 16)
-                .background(DS.bgElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            CalculatorPad(input: input, extra: .clear) {
-                if input.hasOperator { input.set(amount: input.amount) } else if canSave { save() }
-            }
-        }
-        .padding(.horizontal, 20)
-        .calculatorKeyboard(input, focus: $focused) {
+        EntryPad(input: input, kind: field == .amount ? transaction.kind : .transfer, currency: currencyCode,
+                 date: transaction.date, savedCount: 0, onMore: nil, editing: true) { _ in
             if input.hasOperator { input.set(amount: input.amount) } else if canSave { save() }
         }
+        .padding(.horizontal, 20)
     }
 
     private func inputField(placeholder: String) -> some View {
@@ -339,6 +325,7 @@ struct RecordFieldEditor: View {
         }
         if field.isNumber {
             input.set(amount: Self.decimal(text))
+            input.note = transaction.note
             input.replacesOnType = !input.expression.isEmpty
         }
         if field == .remark || field == .address {
@@ -356,6 +343,7 @@ struct RecordFieldEditor: View {
 
     private func save() {
         let value = field.isNumber ? input.amount : Self.decimal(text)
+        if field.isNumber { transaction.note = input.note.trimmingCharacters(in: .whitespacesAndNewlines) }
         switch field {
         case .amount:
             guard let value, value > 0 else { return }

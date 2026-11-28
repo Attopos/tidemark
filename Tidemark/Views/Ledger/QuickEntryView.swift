@@ -739,17 +739,23 @@ private struct EntryChip<Icon: View>: View {
     }
 }
 
-private struct EntryPad: View {
+struct EntryPad: View {
     @Bindable var input: EntryInput
     let kind: TransactionKind
     let currency: String
     let date: Date
     let savedCount: Int
-    let onMore: () -> Void
+    let onMore: (() -> Void)?
+    var editing = false
     let onSave: (_ closing: Bool) -> Void
     @FocusState private var padFocused: Bool
     @State private var toast = false
     @State private var bump = false
+
+    private var rows: [[String]] {
+        [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
+         ["7", "8", "9", editing ? "clear" : "again"], [".", "0", "⌫", "done"]]
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -777,9 +783,29 @@ private struct EntryPad: View {
                         withAnimation(.easeOut(duration: 0.25)) { toast = false }
                     }
                 }
-            CalculatorPad(input: input, extra: .again, onDone: { onSave(true) }, onAgain: { onSave(false) })
+            VStack(spacing: 7) {
+                ForEach(rows, id: \.self) { row in
+                    HStack(spacing: 7) {
+                        ForEach(row, id: \.self) { key($0) }
+                    }
+                }
+            }
         }
-        .calculatorKeyboard(input, focus: $padFocused) { onSave(true) }
+        #if os(macOS)
+        .focusable()
+        .focusEffectDisabled()
+        .focused($padFocused)
+        .onAppear { padFocused = true }
+        .onKeyPress(phases: .down) { press in
+            if press.key == .return { onSave(true); return .handled }
+            if press.key == .delete || press.key == .deleteForward { input.press("⌫"); return .handled }
+            let map: [String: String] = ["+": "+", "-": "−", "*": "×", "x": "×", "/": "÷", ",": "."]
+            let typed = press.characters
+            if let symbol = map[typed] { input.press(symbol); return .handled }
+            if typed.count == 1, typed == "." || typed.first!.isWholeNumber { input.press(typed); return .handled }
+            return .ignored
+        }
+        #endif
     }
 
     private var amountColor: Color {
@@ -788,7 +814,25 @@ private struct EntryPad: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CalculatorDisplay(input: input, currency: currency, color: amountColor)
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Text(Fmt.money(input.amount ?? 0, currency))
+                    .font(DS.money(34))
+                    .foregroundStyle(amountColor)
+                    .contentTransition(.numericText())
+                    .animation(.snappy(duration: 0.22), value: input.expression)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .layoutPriority(1)
+                Spacer(minLength: 8)
+                if input.hasOperator {
+                    Text(input.expression)
+                        .font(.system(size: 14).monospacedDigit())
+                        .foregroundStyle(DS.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+            }
+            .frame(height: 62)
             Divider().overlay(DS.border)
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
@@ -805,14 +849,16 @@ private struct EntryPad: View {
                     .font(.system(size: 16).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                     .onSubmit { padFocused = true }
-                Button(action: onMore) {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 14, weight: .regular).monospacedDigit())
-                        .foregroundStyle(DS.textPrimary)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(DS.bgPrimary.opacity(0.6)))
+                if let onMore {
+                    Button(action: onMore) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 14, weight: .regular).monospacedDigit())
+                            .foregroundStyle(DS.textPrimary)
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(DS.bgPrimary.opacity(0.6)))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .frame(height: 50)
         }
@@ -820,69 +866,15 @@ private struct EntryPad: View {
         .background(DS.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
-}
-
-struct CalculatorDisplay: View {
-    let input: EntryInput
-    let currency: String
-    let color: Color
-
-    var body: some View {
-        HStack(alignment: .lastTextBaseline, spacing: 8) {
-            Text(Fmt.money(input.amount ?? 0, currency))
-                .font(DS.money(34))
-                .foregroundStyle(color)
-                .contentTransition(.numericText())
-                .animation(.snappy(duration: 0.22), value: input.expression)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .layoutPriority(1)
-            Spacer(minLength: 8)
-            if input.hasOperator {
-                Text(input.expression)
-                    .font(.system(size: 14).monospacedDigit())
-                    .foregroundStyle(DS.textTertiary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-            }
-        }
-        .frame(height: 62)
-    }
-}
-
-struct CalculatorPad: View {
-    enum Extra { case again, clear }
-
-    @Bindable var input: EntryInput
-    var extra: Extra = .again
-    let onDone: () -> Void
-    var onAgain: () -> Void = {}
-
-    private var rows: [[String]] {
-        [["1", "2", "3", "+×"], ["4", "5", "6", "−÷"],
-         ["7", "8", "9", extra == .again ? "again" : "clear"], [".", "0", "⌫", "done"]]
-    }
-
-    var body: some View {
-        VStack(spacing: 7) {
-            ForEach(rows, id: \.self) { row in
-                HStack(spacing: 7) {
-                    ForEach(row, id: \.self) { key($0) }
-                }
-            }
-        }
-    }
 
     private func key(_ key: String) -> some View {
         let isDone = key == "done"
         let isAgain = key == "again"
         return PadKey(fill: isDone ? DS.accent : DS.bgElevated, height: keyHeight, firesOnTouchDown: !isDone && !isAgain) {
-            switch key {
-            case "done": onDone()
-            case "again": onAgain()
-            case "clear": input.replacesOnType = false; input.expression = ""
-            default: input.press(key)
-            }
+            if isDone { onSave(true) }
+            else if isAgain { onSave(false) }
+            else if key == "clear" { input.replacesOnType = false; input.expression = "" }
+            else { input.press(key) }
         } label: {
             Group {
                 switch key {
@@ -906,30 +898,6 @@ struct CalculatorPad: View {
         49
         #else
         44
-        #endif
-    }
-}
-
-extension View {
-    func calculatorKeyboard(_ input: EntryInput, focus: FocusState<Bool>.Binding,
-                            onReturn: @escaping () -> Void) -> some View {
-        #if os(macOS)
-        self
-            .focusable()
-            .focusEffectDisabled()
-            .focused(focus)
-            .onAppear { focus.wrappedValue = true }
-            .onKeyPress(phases: .down) { press in
-                if press.key == .return { onReturn(); return .handled }
-                if press.key == .delete || press.key == .deleteForward { input.press("⌫"); return .handled }
-                let map: [String: String] = ["+": "+", "-": "−", "*": "×", "x": "×", "/": "÷", ",": "."]
-                let typed = press.characters
-                if let symbol = map[typed] { input.press(symbol); return .handled }
-                if typed.count == 1, typed == "." || typed.first!.isWholeNumber { input.press(typed); return .handled }
-                return .ignored
-            }
-        #else
-        self
         #endif
     }
 }
