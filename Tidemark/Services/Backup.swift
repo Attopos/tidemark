@@ -508,12 +508,31 @@ enum BackupService {
         return "\(filePrefix)\(formatter.string(from: date)).json"
     }
 
+    nonisolated(unsafe) private static var recordCounts: [String: Int] = [:]
+
+    static func recordCount(at url: URL) -> Int? {
+        if let cached = recordCounts[url.path] { return cached }
+        guard let data = try? Data(contentsOf: url), let backup = try? decode(data) else { return nil }
+        let count = backup.transactions?.count ?? 0
+        recordCounts[url.path] = count
+        return count
+    }
+
+    static func isSuspiciousDrop(from previous: Int, to next: Int) -> Bool {
+        previous - next > max(20, previous / 20)
+    }
+
     @discardableResult
     static func writeBackup(_ backup: BackupFile, to folder: URL) throws -> URL {
         let files = FileManager.default
         try files.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(fileName(for: backup.createdAt))
+        var url = folder.appendingPathComponent(fileName(for: backup.createdAt))
+        let count = backup.transactions?.count ?? 0
+        if let previous = recordCount(at: url), isSuspiciousDrop(from: previous, to: count) {
+            url = folder.appendingPathComponent(fileName(for: backup.createdAt).replacingOccurrences(of: ".json", with: "-smaller.json"))
+        }
         try encode(backup).write(to: url, options: .atomic)
+        recordCounts[url.path] = count
         let old = backupFiles(in: folder).dropFirst(keepFiles)
         for stale in old { try? files.removeItem(at: stale) }
         return url

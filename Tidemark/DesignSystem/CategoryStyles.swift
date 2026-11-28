@@ -82,7 +82,7 @@ enum CategorySymbolMigration {
 
     @MainActor
     static func runIfNeeded(_ context: ModelContext) {
-        guard !UserDefaults.standard.bool(forKey: doneKey) else { return }
+        guard !UserDefaults.standard.bool(forKey: doneKey), !TidemarkSchema.isTesting else { return }
         do {
             let backup = try BackupService.makeBackup(from: context, settings: BackupFile.Settings())
             if !(backup.transactions ?? []).isEmpty {

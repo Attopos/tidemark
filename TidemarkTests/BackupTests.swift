@@ -187,4 +187,24 @@ final class BackupTests: XCTestCase {
         XCTAssertEqual(files.count, BackupService.keepFiles)
         XCTAssertEqual(files.first?.lastPathComponent, BackupService.fileName(for: backup.createdAt))
     }
+
+    func testMuchSmallerBackupNeverReplacesTheDaysFile() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tidemark-backup-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let source = try makeContext()
+        try seed(source)
+        source.insert(Transaction(date: Date(), kind: .expense, amount: 12))
+        try source.save()
+        var full = try roundTrip(source)
+        full.transactions = (0..<100).map { _ in full.transactions![0] }
+        let original = try BackupService.writeBackup(full, to: folder)
+        var smaller = full
+        smaller.transactions = Array(full.transactions!.prefix(10))
+        let diverted = try BackupService.writeBackup(smaller, to: folder)
+        XCTAssertNotEqual(original, diverted)
+        XCTAssertEqual(try BackupService.decode(Data(contentsOf: original)).transactions?.count, 100)
+        var oneLess = full
+        oneLess.transactions = Array(full.transactions!.prefix(99))
+        XCTAssertEqual(try BackupService.writeBackup(oneLess, to: folder), original)
+    }
 }

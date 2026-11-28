@@ -161,16 +161,15 @@ struct LedgerView: View {
         let expense = HeroFigure(title: tr("Expense"), value: summary.expense, code: code,
                                  details: [(tr("Income"), Fmt.money(summary.income, code)), (tr("Balance"), Fmt.money(summary.balance, code, showSign: true))])
         let pendingAll = pendingClaims
-        let daily = HeroFigure(title: tr("Reimbursement pending"), value: pendingAll, code: code,
-                               details: [(tr("Claimed"), Fmt.money(summary.claimed, code)),
-                                         (tr("Daily average"), Fmt.money(summary.averageExpense, code))])
+        let claims = HeroFigure(title: tr("Reimbursement pending"), value: pendingAll, code: code,
+                                details: [(tr("Claimed"), Fmt.money(summary.claimed, code))])
         let assets = HeroFigure(title: tr("Cash net assets"), value: net.assets - net.debts, code: code,
                                 details: [(tr("Assets"), Fmt.money(net.assets, code)), (tr("Debts"), Fmt.money(net.debts, code))])
         return Group {
             if stacked {
                 VStack(spacing: DS.gridGap) { expense; assets }
             } else {
-                HStack(alignment: .top, spacing: DS.gridGap) { expense; daily; assets }
+                HStack(alignment: .top, spacing: DS.gridGap) { expense; claims; assets }
             }
         }
     }
