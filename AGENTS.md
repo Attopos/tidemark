@@ -12,7 +12,7 @@
 ## 规则
 
 - 新分支命名 `feature/attopos/<简短描述>`；不开 PR，在 Mac 上构建、测试通过后自动更新文档、合进 `main` 并 push，不用再问。
-- 不用模拟器，直接装真机测试；每次 build 或测试后立即关闭模拟器、删除构建中间文件。
+- 不用模拟器，也不再装 iPhone 真机测试（2026-11-29 起）：Mac 上测试通过就合进 main、build 号加一，用 `./build.sh testflight` 发 TestFlight，不用再问；每次 build 或测试后立即关闭模拟器、删除构建中间文件。
 - commit 和 PR 里不加 Co-Authored-By、Claude-Session 等署名行。
 - 代码里尽量不写注释，除非是特别关键的功能。
 - Tidemark/Resources 下的文件打包时会被拍平到 app 根目录，文件名必须全局唯一（例如来源说明写成 SOURCES-<目录>.md），否则 Debug 能编过、TestFlight 归档会报 Multiple commands produce。
