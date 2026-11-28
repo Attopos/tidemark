@@ -19,7 +19,7 @@ struct RootView: View {
                 Group {
                     switch app.section {
                     case .portfolio:
-                        if app.portfolioUnlocked { PortfolioView() } else { PortfolioLock() }
+                        PortfolioView()
                     case .ledger: LedgerView()
                     case .accounts: AccountsView()
                     case .analysis: AnalysisView()
@@ -63,9 +63,6 @@ struct RootView: View {
         .id("\(app.language.rawValue)-\(app.amountsHidden)")
         .environment(\.locale, app.language.locale)
         .onAppear { app.applyAppearance() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
-            app.lockPortfolio()
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             PresetScheduler.run(in: context)
         }
@@ -121,7 +118,7 @@ private struct SectionRail: View {
             ForEach([AppSection.ledger, .accounts, .analysis]) { button($0) }
             Spacer()
             Divider().frame(width: 44).padding(.vertical, 6)
-            button(.portfolio, badge: app.portfolioLockEnabled ? (app.portfolioUnlocked ? "lock.open.fill" : "lock.fill") : nil)
+            button(.portfolio)
             button(.settings)
         }
         .padding(.top, 44)
@@ -156,37 +153,6 @@ private struct SectionRail: View {
         }
         .buttonStyle(.plain)
         .help(section.title)
-    }
-}
-
-private struct PortfolioLock: View {
-    @Environment(AppState.self) private var app
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 34, weight: .light).monospacedDigit())
-                .foregroundStyle(DS.textTertiary)
-            Text(tr("Portfolio is locked"))
-                .font(.system(size: 19, weight: .regular).monospacedDigit())
-                .foregroundStyle(DS.textPrimary)
-            Text(tr("Use your Mac password or Touch ID to open it. It locks again when you leave the page or the app."))
-                .font(DS.body)
-                .foregroundStyle(DS.textSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
-            Button(tr("Unlock")) { Task { await app.unlockPortfolio() } }
-                .buttonStyle(AccentButtonStyle())
-                .keyboardShortcut(.defaultAction)
-            if let message = app.unlockMessage {
-                Text(message)
-                    .font(DS.caption)
-                    .foregroundStyle(DS.warning)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DS.page)
-        .task { await app.unlockPortfolio() }
     }
 }
 

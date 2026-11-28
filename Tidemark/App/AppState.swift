@@ -5,7 +5,6 @@ import AppKit
 import Observation
 import SwiftData
 import UniformTypeIdentifiers
-import LocalAuthentication
 
 enum AppSection: String, CaseIterable, Identifiable {
     case ledger, accounts, analysis, portfolio, settings
@@ -59,7 +58,6 @@ final class AppState {
     var section: AppSection {
         didSet {
             UserDefaults.standard.set(section.rawValue, forKey: "appSection")
-            if oldValue == .portfolio && section != .portfolio { lockPortfolio() }
         }
     }
 
@@ -81,57 +79,9 @@ final class AppState {
         #endif
     }
 
-    var portfolioLockEnabled: Bool = UserDefaults.standard.bool(forKey: "portfolioLockEnabled") {
-        didSet {
-            UserDefaults.standard.set(portfolioLockEnabled, forKey: "portfolioLockEnabled")
-            if !portfolioLockEnabled { portfolioUnlocked = true } else { lockPortfolio() }
-        }
-    }
-
-    private(set) var portfolioUnlocked = !UserDefaults.standard.bool(forKey: "portfolioLockEnabled")
-    private(set) var unlockMessage: String?
-    private var importAfterUnlock = false
-
-    func lockPortfolio() {
-        guard portfolioLockEnabled else { return }
-        portfolioUnlocked = false
-        importAfterUnlock = false
-    }
-
-    @MainActor
-    func unlockPortfolio() async {
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-            #if os(macOS)
-            unlockMessage = error?.localizedDescription ?? tr("This Mac cannot check a password.")
-            #else
-            unlockMessage = error?.localizedDescription ?? tr("Set a passcode on this device first.")
-            #endif
-            return
-        }
-        do {
-            portfolioUnlocked = try await context.evaluatePolicy(.deviceOwnerAuthentication,
-                                                                 localizedReason: tr("unlock the portfolio"))
-            unlockMessage = nil
-            if portfolioUnlocked && importAfterUnlock {
-                importAfterUnlock = false
-                ocrImportPresented = true
-            }
-        } catch {
-            let quiet: [LAError.Code] = [.userCancel, .systemCancel, .appCancel]
-            unlockMessage = (error as? LAError).map { quiet.contains($0.code) } == true ? nil : error.localizedDescription
-        }
-    }
-
     @MainActor
     func openScreenshotImport() {
-        if portfolioUnlocked {
-            ocrImportPresented = true
-        } else {
-            importAfterUnlock = true
-            section = .portfolio
-        }
+        ocrImportPresented = true
     }
 
     var amountsHidden: Bool = UserDefaults.standard.bool(forKey: "amountsHidden") {

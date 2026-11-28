@@ -26,15 +26,6 @@ struct SettingsView: View {
                     .padding(.bottom, 10)
 
                 MacSetupCard {
-                    MacSetupRow(icon: "lock.fill", color: .blue, title: tr("Portfolio lock")) {
-                        Toggle("", isOn: $app.portfolioLockEnabled)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .tint(DS.accent)
-                    }
-                }
-
-                MacSetupCard {
                     MacSetupRow(icon: "icloud.fill", color: Color(white: 0.45), title: tr("iCloud Sync")) {
                         SyncStatusView().fixedSize()
                     }

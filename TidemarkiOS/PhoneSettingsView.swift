@@ -239,7 +239,6 @@ struct SetupChoices<Option: Hashable>: View {
 
 struct ProtectionView: View {
     @Environment(AppLock.self) private var lock
-    @Environment(AppState.self) private var app
 
     var body: some View {
         SetupPage(title: tr("Protection")) {
@@ -256,13 +255,6 @@ struct ProtectionView: View {
             }
             if lock.enabled {
                 SetupChoices(options: AppLock.Delay.allCases, selection: lock.delay, title: \.title) { lock.delay = $0 }
-            }
-            SetupCard {
-                SetupRowLabel(icon: "chart.pie.fill", color: .purple, title: tr("Portfolio lock")) {
-                    Toggle("", isOn: Binding(get: { app.portfolioLockEnabled }, set: { app.portfolioLockEnabled = $0 }))
-                        .labelsHidden()
-                        .tint(.green)
-                }
             }
         }
     }

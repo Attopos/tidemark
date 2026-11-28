@@ -15,13 +15,7 @@ struct PhonePortfolioView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if app.portfolioLockEnabled && !app.portfolioUnlocked {
-                    locked
-                } else {
-                    content
-                }
-            }
+            content
             .background(DS.page)
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -58,41 +52,9 @@ struct PhonePortfolioView: View {
 
     private var title: some View {
         PageTitle(title: tr("Portfolio")) {
-            if !app.portfolioLockEnabled || app.portfolioUnlocked {
-                RoundIconButton(symbol: "text.viewfinder") { app.ocrImportPresented = true }
-                    .accessibilityLabel(tr("Import screenshot"))
-            }
+            RoundIconButton(symbol: "text.viewfinder") { app.ocrImportPresented = true }
+                .accessibilityLabel(tr("Import screenshot"))
         }
-    }
-
-    private var locked: some View {
-        VStack(spacing: 16) {
-            title
-                .padding(.horizontal, DS.phoneMargin)
-                .padding(.top, PageTitle<EmptyView>.pageTop)
-            Spacer()
-            Image(systemName: "lock.fill")
-                .font(.system(size: 26, weight: .regular).monospacedDigit())
-                .foregroundStyle(DS.ink)
-                .frame(width: 64, height: 64)
-                .background(DS.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            Text(tr("Portfolio is locked"))
-                .font(.system(size: 20, weight: .medium).monospacedDigit())
-                .foregroundStyle(DS.textPrimary)
-            if let message = app.unlockMessage {
-                Text(message)
-                    .font(TS.caption)
-                    .foregroundStyle(DS.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-            Button(tr("Unlock")) { Task { await app.unlockPortfolio() } }
-                .buttonStyle(AccentButtonStyle())
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task { await app.unlockPortfolio() }
     }
 
     private var content: some View {
