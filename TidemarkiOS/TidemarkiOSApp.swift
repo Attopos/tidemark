@@ -97,7 +97,6 @@ struct PhoneRootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             lock.sceneChanged(to: phase)
-            if phase == .background { app.lockPortfolio() }
             if phase == .active { PresetScheduler.run(in: context) }
         }
         .overlay {
